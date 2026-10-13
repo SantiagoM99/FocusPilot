@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "FocusPilot Spike S2",
+  "version": "0.0.1",
+  "description": "Throwaway spike: native messaging, DNR policy, lifecycle observations.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAygCpHT/caM47jc64hI1Y8y/ucWK4g8q4DVq1bNBjewk1YDZHqq/d4or1ysCDKv1p9urkBPlpktdMTEk+Z7Hl0zPanU/MGrNWXuzsza0vLFvJNrV9XR99isMG9HOTJbiVtm0VlRExbVxNMp4FCOLGFtBx06J0Q2nL6l0Bu2RitLRfvEfOLOyZV+GK7hhg4cevQznczzMebuC6AYb38sWaUvhEX8K1Mz0tVy43QIJf8FVlgygvIYIcK5E1uJUwgepB8pZIg3Nkh+3HAW5azSTPRkMCVuBA2a02WN5yy97L4BzZOFUfXUzz/ut1Fy/iemOMlpHLKy1n77RKDpIjdIWHLwIDAQAB",
+  "minimum_chrome_version": "120",
+  "incognito": "spanning",
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "permissions": [
+    "nativeMessaging",
+    "declarativeNetRequest",
+    "alarms",
+    "storage"
+  ],
+  "action": {
+    "default_title": "FocusPilot Spike S2",
+    "default_popup": "popup.html"
+  }
+}

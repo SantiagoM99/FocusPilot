@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "FocusPilot Spike S2 Intruder",
+  "version": "0.0.1",
+  "description": "Tries to reach the FocusPilot spike host from a non-allowed origin.",
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "permissions": [
+    "nativeMessaging",
+    "storage"
+  ],
+  "action": {
+    "default_title": "Intruder",
+    "default_popup": "popup.html"
+  }
+}
