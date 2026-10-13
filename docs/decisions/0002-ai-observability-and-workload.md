@@ -24,4 +24,4 @@ A native REST exporter preserves the single Swift runtime but requires implement
 
 P0: local accounting for model calls when introduced, basic usage/budget view. P1: optional LangSmith, workload recommendations, selected external usage adapters and validated explicit interruption. P2: broader quota integrations and true pause/resume where supported. Generic process termination remains outside the first release.
 
-See [AI usage and workload](../AI_USAGE_AND_WORKLOAD.md) for the full specification. [Decision 0003](0003-architecture-review-corrections.md) proposes a smaller P0 (serialized gateway, daily cap, no reservations), an export cursor instead of a trace outbox, and a workload view led by task structure; pending owner acceptance.
+See [AI usage and workload](../AI_USAGE_AND_WORKLOAD.md) for the full specification. [Decision 0003](0003-architecture-review-corrections.md) adopts a smaller P0 (serialized gateway, daily cap, no reservations), an export cursor instead of a trace outbox, and a workload view led by task structure; accepted by the owner on 2026-10-13.

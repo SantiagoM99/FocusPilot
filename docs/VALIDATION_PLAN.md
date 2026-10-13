@@ -12,6 +12,7 @@
 | Herdr access | External native app can select session, list/read agents, focus explicit pane; distribution sandbox compatible | Read-only/manual linking until solved |
 | Folder access | User-selected roots, bookmark persistence, moved folders, collisions/symlinks | Explicit user re-selection and repair |
 | Lifecycle | Close window vs quit, restart session restoration, stale observations | No live-state assumptions on recovery |
+| iPhone signal | Mac turns a synced Focus on/off via the shortcuts tool; iPhone open/close automations run without confirmation, check the Focus, show the current action, optionally return to the Home Screen and append to an iCloud Drive file; sync delay measured | Phone nudge unavailable; Opal alone covers the phone |
 | Unsupported browsers | Detect other browsers or unprotected profiles frontmost during a session | Degraded state shown; no coverage claim |
 | External usage | Documented source formats (first candidate: Claude Code OpenTelemetry metrics via an authenticated local receiver), run attribution, cumulative counter resets and overlap with exports | Unavailable/unattributed; no invented total-computer spend |
 | Agent interruption | Fresh identity/state, supported interrupt mechanism (none in inspected Herdr commands), checkpoint/resumption and child process behavior | Manual navigation; no pause or generic termination claims |

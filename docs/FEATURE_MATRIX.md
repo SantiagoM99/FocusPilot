@@ -1,6 +1,6 @@
 # Feature matrix
 
-P0 = first complete focus loop. P1 = first-release enhancements after platform validation. P2 = later, evidence-driven work.
+P0 = first complete focus loop; phase 1 is the platform spikes plus all P0 rows (owner decision, 2026-10-13). P1 = first-release enhancements after platform validation. P2 = later, evidence-driven work.
 
 | Capability | Priority | Concrete behavior | Acceptance criterion |
 |---|---|---|---|
@@ -16,6 +16,7 @@ P0 = first complete focus loop. P1 = first-release enhancements after platform v
 | Herdr status | P0 | Working/blocked/ready/unknown and output preview | Unknown is not treated as complete; output is not executed |
 | Manual navigation | P0 | User selects linked pane or browser resource | Pane focus occurs only after explicit action |
 | Wrap-up | P0 | Completed outcome, remaining work, return cue | Next action is saved independently of conversation |
+| Phone nudge | P0, spike-gated | Focus mode from the Mac plus iPhone Shortcuts automations report distracting app opens/closes during focus time | Opening a listed app during a session shows the current action on the phone within seconds; the Mac records the visit and duration; strict sessions return to the Home Screen; nothing happens outside sessions |
 | Local AI accounting | P0, with first model calls | Record usage, request attempts, task attribution and cost basis | Retries counted once each; missing usage is unknown; rollups not double-counted |
 | Supervisor budget | P0, with first model calls | Daily admission cap, one request in flight, quiet fallback; reservations only if concurrency is later allowed | Unresolved usage counts at its conservative estimate and is visible; focus remains active |
 | New environment | P1 | Preview folder/workspace creation under configured root | Existing files never overwritten; partial failures can be reconciled |

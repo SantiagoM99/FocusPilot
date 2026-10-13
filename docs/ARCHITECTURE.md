@@ -2,7 +2,7 @@
 
 ## Core choice
 
-Native SwiftUI app with AppKit integration, local SQLite storage through GRDB.swift (owner decision, 2026-10-13), Safari Web Extension, Chrome extension, and a Herdr adapter. Provisional distribution: Developer ID signed/notarized direct download, pending packaging validation. This reduces main-app sandbox constraints but does not remove extension sandboxes or system permissions. Minimum macOS/browser versions remain unresolved.
+Native SwiftUI app with AppKit integration, local SQLite storage through GRDB.swift (owner decision, 2026-10-13), Safari Web Extension, Chrome extension, and a Herdr adapter. Provisional distribution: Developer ID signed/notarized direct download, pending packaging validation. This reduces main-app sandbox constraints but does not remove extension sandboxes or system permissions. Supported macOS: 26 only (owner decision, 2026-10-13). Minimum browser versions remain unresolved. Until the owner joins the Apple Developer Program, builds are signed to run locally and Safari needs its unsigned-extension setting, which resets when Safari restarts.
 
 ```mermaid
 flowchart TB
@@ -112,6 +112,16 @@ Closing the planning window should keep the app available through the menu bar. 
 Use absolute expiry instants for persisted exceptions, and monotonic elapsed time for foreground duration accounting. Reconcile on wake, browser reconnect, and launch. Extension background workers cannot be assumed continuously running. Explore browser alarms/native refresh and a conservative fallback; prove expiry and recovery in a spike.
 
 Installed browser rules should not depend on a model being online. Blocking an already-open SPA, private browsing permission, exception expiry while native app is quit, and suspended workers need explicit validation. DNR network rules do not themselves close an already loaded page or stop buffered media. Report measured expiry overrun rather than promise exact closure. Browser extensions can be disabled; first release does not claim tamper resistance.
+
+## iPhone distraction signal
+
+Owner decision, 2026-10-13; every mechanism below requires the iPhone spike. Screen Time data stays on the iPhone and a companion iOS app would need the Family Controls entitlement, so phase 1 uses built-in Shortcuts and iCloud Drive instead. The iPhone blocker (Opal) is untouched.
+
+1. Session start/end: the app runs an owner-created Shortcut through the `shortcuts` command-line tool to turn a "FocusPilot" Focus on or off ("Share across devices" carries it to the iPhone), and writes the current action and session mode to a small file in an iCloud Drive folder.
+2. iPhone: personal automations on "app is opened" and "app is closed" for owner-listed apps (e.g. Prime Video, games). If the FocusPilot Focus is on, the open automation shows "Go back to: <current action>", in strict sessions also returns to the Home Screen, and appends the app name and time to a phone-events file; the close automation appends the close time.
+3. Mac: the app imports new phone events as observations, notifies the owner, records phone visits and minutes as Events, and escalates repeated visits within a session.
+
+Limits: covers only listed apps; iCloud sync can take seconds to a minute; app names and times pass through the owner's iCloud account; durations need both automations to run. The files carry no task content beyond the current action text.
 
 ## Herdr boundaries
 

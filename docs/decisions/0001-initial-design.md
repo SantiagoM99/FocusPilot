@@ -21,12 +21,12 @@ SwiftUI/AppKit, local SQLite, browser-specific extension bridges, Herdr adapter,
 
 [Decision 0002](0002-ai-observability-and-workload.md) adds native model orchestration, a local usage ledger/budgets, optional LangSmith and capability-gated workload management. LangGraph is not adopted.
 
-[Decision 0003](0003-architecture-review-corrections.md) proposes process-model, enforcement-ownership and data-model corrections from a second review; pending owner acceptance.
+[Decision 0003](0003-architecture-review-corrections.md) records process-model, enforcement-ownership and data-model corrections from a second review, accepted by the owner on 2026-10-13.
 
 ## Open decisions
 
 - Final product name (FocusPilot is a working name).
-- Minimum supported OS/browser versions; validate provisional Developer ID direct distribution.
+- Minimum browser versions; validate provisional Developer ID direct distribution once a developer membership exists (macOS 26 only, per decision 0003).
 - Model provider/local model choice, costs, opt-in context scope.
 - Exact root/category mappings and workspace templates.
 - Background helpers and extension transport after spikes.

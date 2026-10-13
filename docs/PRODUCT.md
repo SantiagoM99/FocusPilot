@@ -29,7 +29,7 @@ Initial Herdr support is read-only plus explicit navigation. Environment creatio
 
 ## Release exclusions
 
-Guaranteed anti-bypass enforcement, academic platform scraping, calendar synchronization, automatic deadline changes, cross-device sync, automatic structural reorganization, large historical vector infrastructure, continuous screen surveillance, and autonomous management of agent approvals.
+Guaranteed anti-bypass enforcement, academic platform scraping, calendar synchronization, automatic deadline changes, cross-device sync, automatic structural reorganization, large historical vector infrastructure, continuous screen surveillance, and autonomous management of agent approvals. The phone nudge's iCloud Drive files exchange session state and app open/close events only; they are not cross-device sync of FocusPilot data.
 
 ## Modes
 

@@ -18,7 +18,7 @@ FocusPilot helps its owner choose a concrete next action, work across Herdr and 
 - [Validation plan](docs/VALIDATION_PLAN.md): platform spikes and product experiments before implementation.
 - [Decision log](docs/decisions/0001-initial-design.md): accepted choices and open decisions.
 - [Observability decision](docs/decisions/0002-ai-observability-and-workload.md): native orchestration, local accounting and LangSmith boundaries.
-- [Review corrections](docs/decisions/0003-architecture-review-corrections.md): proposed process model, enforcement ownership and data-model fixes, pending acceptance.
+- [Review corrections](docs/decisions/0003-architecture-review-corrections.md): accepted process model, enforcement ownership, data-model fixes and owner constraints.
 - [Product critique](docs/reviews/PRODUCT_REVIEW.md) and [architecture critique](docs/reviews/ARCHITECTURE_REVIEW.md): independent adversarial reviews.
 
 ## Current constraints

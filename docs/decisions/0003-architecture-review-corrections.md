@@ -1,8 +1,8 @@
 # Architecture review corrections
 
-Date: 2026-10-13. Status: proposed; pending owner acceptance. Platform behavior marked "validate" is unproven.
+Date: 2026-10-13. Status: accepted by owner on 2026-10-13. Platform behavior marked "validate" remains unproven until its spike.
 
-Second review of the full design set, including decision 0002. Each finding lists the change made to the documents. Nothing here is a confirmed owner decision until accepted.
+Second review of the full design set, including decision 0002. Each finding lists the change made to the documents. The owner accepted all proposals below on 2026-10-13.
 
 ## Process, ownership and enforcement
 
@@ -50,13 +50,20 @@ Second review of the full design set, including decision 0002. Each finding list
 ## Open decisions raised
 
 - Which sites are always-on versus scheduled versus session-only (owner configuration, not a design blocker).
-- Whether and how to extend focus to the owner's iPhone (Focus mode via Shortcuts, or a companion iOS app using Screen Time APIs); pending owner choice.
 
 ## Confirmed by owner
 
 - 2026-10-13: Storage library is GRDB.swift, chosen over SwiftData/Core Data for FTS5 search, WAL concurrent reads, SwiftUI observation and documented multi-process sharing. No dependency is added until implementation starts. See [Data and memory](../DATA_AND_MEMORY.md#storage-library).
 - 2026-10-13: Unknown apps and sites count as ambiguous. In Coach mode a deterministic rule (not model confidence) asks their purpose once: For this task / Always fine / Distraction / Ask later. Answers are stored as ActivityClassification; Distraction needs confirmation before blocking. See [Experience](../EXPERIENCE.md#coach-behavior).
 - 2026-10-13: When the app cannot update the policy, normal sessions stop blocking at the planned end; strict sessions keep blocking until the app reconnects. Exceptions always expire on time. See [Architecture](../ARCHITECTURE.md#enforcement-ownership).
+- 2026-10-13: All proposals in this record are accepted.
+- 2026-10-13: Supported platform is macOS 26 only; revisit if the app is ever used by others.
+- 2026-10-13: No Apple Developer Program membership for now. Development uses locally signed builds and Safari's unsigned-extension setting; membership is reconsidered once the app is built. Developer ID distribution remains the eventual route.
+- 2026-10-13: The iPhone blocker (Opal) stays separate from FocusPilot. Goal: when the owner opens distracting apps on the iPhone during focus time, FocusPilot finds out and tells the owner to return to the current action. No companion iOS app or Screen Time entitlement while there is no developer membership.
+- 2026-10-13: Phone nudge: a Mac-controlled Focus mode plus iPhone Shortcuts automations and iCloud Drive files report distracting app use during focus time; strict sessions also return the iPhone to the Home Screen, normal sessions only notify. See [Architecture](../ARCHITECTURE.md#iphone-distraction-signal).
+- 2026-10-13: Development proceeds in phases. Phase 1 is the platform spikes plus all P0 features, including the phone nudge.
+- 2026-10-13: Documentation-only updates go directly to `main`; all code lands through reviewed pull requests.
+- 2026-10-13: Work is split between the owner and agents. Every change lands through a reviewed pull request that the owner reads, understands and merges; tickets are sized for that.
 - 2026-10-13: Some block rules are always active. Rule sets support always, scheduled, or session-only activation; always-on and scheduled rules are enforced by the extensions regardless of app state.
 
 ## Sources
