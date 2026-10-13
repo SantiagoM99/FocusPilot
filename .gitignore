@@ -6,3 +6,4 @@ xcuserdata/
 .env
 .env.*
 !.env.example
+.worktrees/
