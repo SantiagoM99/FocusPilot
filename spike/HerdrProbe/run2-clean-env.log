@@ -1,0 +1,67 @@
+[2026-10-13T20:59:41Z] FocusPilot S4 Herdr probe starting; log=/Users/santiagomartineznovoa/Library/Logs/FocusPilotHerdrProbe/probe.log
+[2026-10-13T20:59:41Z] == App launch environment ==
+[2026-10-13T20:59:41Z] env keys: COMMAND_MODE,HOME,LOGNAME,OSLogRateLimit,PATH,SHELL,SSH_AUTH_SOCK,TMPDIR,USER,XPC_FLAGS,XPC_SERVICE_NAME,__CFBundleIdentifier,__CF_USER_TEXT_ENCODING
+[2026-10-13T20:59:41Z] PATH=/usr/bin:/bin:/usr/sbin:/sbin
+[2026-10-13T20:59:41Z] HERDR_* in app env: none
+[2026-10-13T20:59:41Z] parent pid=1 (1 = launchd, i.e. not a terminal child)
+[2026-10-13T20:59:41Z] == Binary resolution ==
+[2026-10-13T20:59:41Z] /usr/bin/env herdr --version with app PATH -> status 127 out= err=env: herdr: No such file or directory
+[2026-10-13T20:59:41Z] candidate /Users/santiagomartineznovoa/.local/bin/herdr: executable
+[2026-10-13T20:59:41Z] candidate /opt/homebrew/bin/herdr: absent
+[2026-10-13T20:59:41Z] candidate /usr/local/bin/herdr: absent
+[2026-10-13T20:59:41Z] candidate /Users/santiagomartineznovoa/.cargo/bin/herdr: absent
+[2026-10-13T20:59:41Z] zsh -lc 'command -v herdr' -> status 1 out= wall=192.7ms
+[2026-10-13T20:59:41Z] RESULT: using /Users/santiagomartineznovoa/.local/bin/herdr (symlink target: /Users/santiagomartineznovoa/.local/bin/herdr)
+[2026-10-13T20:59:41Z] /Users/santiagomartineznovoa/.local/bin/herdr --version -> status 0 out=herdr 0.9.0 wall=6.6ms
+[2026-10-13T20:59:41Z] == Endpoint resolution (no HERDR_* env) ==
+[2026-10-13T20:59:41Z] status --json -> status 0 wall=6.7ms err=
+[2026-10-13T20:59:41Z] client version=0.9.0 protocol=22 session=<null>
+[2026-10-13T20:59:41Z] server running=1 version=0.9.0 protocol=22 compatible=1 socket=/Users/santiagomartineznovoa/.config/herdr/herdr.sock
+[2026-10-13T20:59:41Z] VERSION CHECK: server protocol 22 == expected 22 OK
+[2026-10-13T20:59:41Z] session list --json -> status 0 wall=6.0ms
+[2026-10-13T20:59:41Z] session name=default default=1 running=1 socket=/Users/santiagomartineznovoa/.config/herdr/herdr.sock
+[2026-10-13T20:59:41Z] socket from status == socket from session list: true
+[2026-10-13T20:59:41Z] server process pid=51529 started=Sat Sep 19 21:05:55 2026 (instance identity: socket+pid+start)
+[2026-10-13T20:59:41Z] --session default status --json -> status 0 socket=/Users/santiagomartineznovoa/.config/herdr/herdr.sock err=
+[2026-10-13T20:59:41Z] sessions dir exists after --session default: false
+[2026-10-13T20:59:41Z] raw socket ping -> {"id":"probe_ping","result":{"type":"pong","version":"0.9.0","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":true,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true}}} wall=0.5ms
+[2026-10-13T20:59:41Z] == Read-only agent commands ==
+[2026-10-13T20:59:41Z] agent list -> status 0 bytes=9030 wall=8.9ms cpu=5.8ms err=
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w3:pJ name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w4:p1 name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w4:pA name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w5:p1 name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w5:pD name=renames kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w5:pE name=dictionary kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w5:pF name=percentiles kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w8:p1 name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=w9:p1 name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=wA:p1 name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=wF:p1 name=- kind=claude status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=wG:p1 name=- kind=codex status=idle
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=wH:p1 name=- kind=claude status=done
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=wH:p2 name=s2-chrome kind=claude status=done
+[2026-10-13T20:59:41Z]   [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] pane=wH:p3 name=s4-herdr kind=claude status=working
+[2026-10-13T20:59:41Z] --session default agent list -> status 0 count=15 err=
+[2026-10-13T20:59:41Z] agent get w3:pJ [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] -> status 0 pane=w3:pJ status=idle wall=9.3ms err=
+[2026-10-13T20:59:41Z] agent read w3:pJ --source visible [local/default@/Users/santiagomartineznovoa/.config/herdr/herdr.sock#pid51529] -> status 0 bytes=4265 lines=36 wall=9.6ms err= (content not logged)
+[2026-10-13T20:59:41Z] agent get w999:p999 (nonexistent) -> status 1 err={"error":{"code":"agent_not_found","message":"agent target w999:p999 not found"},"id":"cli:agent:get"}
+[2026-10-13T20:59:41Z] == Baseline (no polling): 12 polls every 5s ==
+[2026-10-13T21:00:41Z] wall ms: n=12 mean=0.0 median=0.0 min=0.0 max=0.0
+[2026-10-13T21:00:41Z] child cpu ms: n=12 mean=0.0 median=0.0 min=0.0 max=0.0 total=0.0
+[2026-10-13T21:00:41Z] app self cpu ms over window: 3.1; elapsed s: 60.0
+[2026-10-13T21:00:41Z] server cpu delta: 830.0ms over window (includes all other clients)
+[2026-10-13T21:00:41Z] failures=0 last payload bytes=0
+[2026-10-13T21:00:41Z] == CLI `agent list` polling: 12 polls every 5s ==
+[2026-10-13T21:01:41Z] wall ms: n=12 mean=11.5 median=10.2 min=8.2 max=16.2
+[2026-10-13T21:01:41Z] child cpu ms: n=12 mean=7.4 median=7.0 min=5.7 max=10.1 total=89.3
+[2026-10-13T21:01:41Z] app self cpu ms over window: 16.6; elapsed s: 60.0
+[2026-10-13T21:01:41Z] server cpu delta: 860.0ms over window (includes all other clients)
+[2026-10-13T21:01:41Z] failures=0 last payload bytes=9030
+[2026-10-13T21:01:41Z] == Raw socket `agent.list` polling: 12 polls every 5s ==
+[2026-10-13T21:02:41Z] wall ms: n=12 mean=1.1 median=1.0 min=0.9 max=1.8
+[2026-10-13T21:02:41Z] child cpu ms: n=12 mean=0.0 median=0.0 min=0.0 max=0.0 total=0.0
+[2026-10-13T21:02:41Z] app self cpu ms over window: 9.0; elapsed s: 60.0
+[2026-10-13T21:02:41Z] server cpu delta: 1100.0ms over window (includes all other clients)
+[2026-10-13T21:02:41Z] failures=0 last payload bytes=9026
+[2026-10-13T21:02:41Z] DONE
