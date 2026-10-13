@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="890" viewBox="0 0 1380 890">
+<rect width="1380" height="890" fill="#101215"/>
+<style>text{font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif}</style>
+<text x="40" y="48" font-size="28" fill="#edf0f5" font-weight="600">FocusPilot · AI Workload</text>
+<text x="40" y="78" font-size="14" fill="#a8adb6" font-weight="400">Native layout study · Illustrative data only · No agents are controlled by this mockup</text>
+<rect x="40" y="110" width="1300" height="699" rx="14" fill="#202329" stroke="#444952"/>
+<rect x="40" y="110" width="175" height="699" rx="14" fill="#272b32"/>
+<circle cx="62" cy="134" r="5" fill="#ef6b62"/>
+<circle cx="82" cy="134" r="5" fill="#edc05a"/>
+<circle cx="102" cy="134" r="5" fill="#67c87b"/>
+<text x="60" y="184" font-size="18" fill="#edf0f5" font-weight="600">FocusPilot</text>
+<text x="60" y="228" font-size="14" fill="#b9c0cc" font-weight="400">Today</text>
+<text x="60" y="266" font-size="14" fill="#b9c0cc" font-weight="400">Projects</text>
+<text x="60" y="304" font-size="14" fill="#b9c0cc" font-weight="400">Review queue</text>
+<rect x="52" y="320" width="150" height="34" rx="8" fill="#3b4450"/>
+<text x="60" y="343" font-size="14" fill="#edf0f5" font-weight="500">AI Workload</text>
+<text x="60" y="389" font-size="14" fill="#b9c0cc" font-weight="400">Memory</text>
+<text x="60" y="765" font-size="14" fill="#b9c0cc" font-weight="400">Settings</text>
+<text x="241" y="160" font-size="24" fill="#edf0f5" font-weight="600">AI Workload</text>
+<text x="241" y="188" font-size="13" fill="#a8adb6" font-weight="400">Today · America/Bogota</text>
+<rect x="240" y="208" width="319" height="112" rx="10" fill="#2a3039"/>
+<text x="256" y="232" font-size="10" fill="#a8adb6" font-weight="600">KNOWN ESTIMATED SPEND</text>
+<text x="256" y="270" font-size="23" fill="#edf0f5" font-weight="600">$0.42</text>
+<text x="256" y="298" font-size="12" fill="#a8adb6" font-weight="400">FocusPilot calls only</text>
+<rect x="585" y="208" width="319" height="112" rx="10" fill="#2a3039"/>
+<text x="601" y="232" font-size="10" fill="#a8adb6" font-weight="600">SUPERVISOR BUDGET</text>
+<text x="601" y="270" font-size="23" fill="#edf0f5" font-weight="600">$1.50</text>
+<text x="601" y="298" font-size="12" fill="#a8adb6" font-weight="400">Includes $0.08 reserved</text>
+<rect x="930" y="208" width="319" height="112" rx="10" fill="#2a3039"/>
+<text x="946" y="232" font-size="10" fill="#a8adb6" font-weight="600">USAGE COVERAGE</text>
+<text x="946" y="270" font-size="23" fill="#edf0f5" font-weight="600">1 source connected</text>
+<text x="946" y="298" font-size="12" fill="#a8adb6" font-weight="400">2 external agents unknown</text>
+<text x="241" y="355" font-size="11" fill="#a8adb6" font-weight="600">RUNS BY TASK</text>
+<text x="253" y="387" font-size="11" fill="#a8adb6" font-weight="500">Task / agent</text>
+<text x="615" y="387" font-size="11" fill="#a8adb6" font-weight="500">State</text>
+<text x="765" y="387" font-size="11" fill="#a8adb6" font-weight="500">Usage</text>
+<text x="1030" y="387" font-size="11" fill="#a8adb6" font-weight="500">Available action</text>
+<path d="M241 400 H1311 M241 479 H1311 M241 558 H1311" stroke="#3b414b"/>
+<text x="253" y="426" font-size="16" fill="#edf0f5" font-weight="600">NLP report · due tonight</text>
+<text x="253" y="451" font-size="12" fill="#a8adb6" font-weight="400">Baseline agent · needed for the report</text>
+<text x="615" y="432" font-size="14" fill="#a9ccba" font-weight="400">Working</text>
+<text x="765" y="424" font-size="14" fill="#e2c789" font-weight="400">Unknown</text>
+<text x="765" y="448" font-size="11" fill="#a8adb6" font-weight="400">External usage not connected</text>
+<rect x="1030" y="416" width="118" height="34" rx="8" fill="#333943"/>
+<text x="1042" y="438" font-size="12" fill="#edf0f5" font-weight="500">Open agent</text>
+<text x="253" y="506" font-size="16" fill="#edf0f5" font-weight="600">PhD applications</text>
+<text x="253" y="531" font-size="12" fill="#a8adb6" font-weight="400">Research agent · interruption support pending</text>
+<text x="615" y="512" font-size="14" fill="#a9ccba" font-weight="400">Working</text>
+<text x="765" y="504" font-size="14" fill="#e2c789" font-weight="400">Unknown</text>
+<text x="765" y="528" font-size="11" fill="#a8adb6" font-weight="400">External usage not connected</text>
+<rect x="1030" y="496" width="118" height="34" rx="8" fill="#333943"/>
+<text x="1042" y="518" font-size="12" fill="#edf0f5" font-weight="500">Open agent</text>
+<text x="253" y="584" font-size="16" fill="#edf0f5" font-weight="600">FocusPilot · planning</text>
+<text x="253" y="609" font-size="12" fill="#a8adb6" font-weight="400">Queued supervisor job · managed by FocusPilot</text>
+<text x="615" y="590" font-size="14" fill="#b9cbdc" font-weight="400">Queued</text>
+<text x="765" y="582" font-size="14" fill="#edf0f5" font-weight="400">$0.08 reserved</text>
+<text x="765" y="606" font-size="11" fill="#a8adb6" font-weight="400">Estimate, not a billed amount</text>
+<rect x="1030" y="576" width="146" height="34" rx="8" fill="#333943"/>
+<text x="1042" y="598" font-size="12" fill="#edf0f5" font-weight="500">Defer next job</text>
+<rect x="241" y="644" width="1067" height="140" rx="10" fill="#293440" stroke="#53677e"/>
+<text x="259" y="672" font-size="11" fill="#b4cde8" font-weight="600">PRIORITIZE TONIGHT&#x27;S REPORT</text>
+<text x="259" y="699" font-size="16" fill="#edf0f5" font-weight="500">Keep the baseline running: its result unblocks your current task.</text>
+<text x="259" y="726" font-size="12" fill="#bac6d5" font-weight="400">Defer optional planning to preserve your supervisor budget. External interruption needs capability validation.</text>
+<rect x="259" y="741" width="154" height="34" rx="8" fill="#c4daf0"/>
+<text x="271" y="763" font-size="12" fill="#162535" font-weight="500">Review suggestion</text>
+<rect x="426" y="741" width="185" height="34" rx="8" fill="#333943"/>
+<text x="438" y="763" font-size="12" fill="#edf0f5" font-weight="500">View local AI activity</text>
+<text x="40" y="855" font-size="13" fill="#a8adb6" font-weight="400">Spend, quotas, compute and attention are separate. Unknown usage is visible. LangSmith export is optional.</text>
+</svg>

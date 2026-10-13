@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1050" viewBox="0 0 1440 1050">
+<rect width="1440" height="1050" fill="#101215"/>
+<style>text{font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif} .muted{fill:#a8adb6}</style>
+<text x="40" y="48" font-size="29" fill="#edf0f5" font-weight="600">FocusPilot</text>
+<text x="40" y="78" font-size="15" fill="#a8adb6" font-weight="400">Native macOS companion · Concept 01 · Design only</text>
+<text x="40" y="122" font-size="12" fill="#a8adb6" font-weight="600">01  PLAN AND RESUME</text>
+<rect x="40" y="140" width="870" height="510" rx="14" fill="#202329" stroke="#444952"/>
+<rect x="40" y="140" width="180" height="510" rx="14" fill="#272b32"/>
+<circle cx="62" cy="163" r="5" fill="#ef6b62"/>
+<circle cx="82" cy="163" r="5" fill="#edc05a"/>
+<circle cx="102" cy="163" r="5" fill="#67c87b"/>
+<text x="60" y="208" font-size="18" fill="#edf0f5" font-weight="600">FocusPilot</text>
+<rect x="52" y="227" width="154" height="34" rx="8" fill="#3b4450"/>
+<text x="66" y="249" font-size="14" fill="#edf0f5" font-weight="500">Today</text>
+<text x="66" y="291" font-size="14" fill="#bec4ce" font-weight="400">Projects</text>
+<text x="66" y="327" font-size="14" fill="#bec4ce" font-weight="400">Review queue   1</text>
+<text x="66" y="363" font-size="14" fill="#bec4ce" font-weight="400">AI Workload</text>
+<text x="66" y="399" font-size="14" fill="#bec4ce" font-weight="400">Memory</text>
+<text x="66" y="605" font-size="14" fill="#bec4ce" font-weight="400">Settings</text>
+<text x="244" y="180" font-size="23" fill="#edf0f5" font-weight="600">Today</text>
+<text x="244" y="207" font-size="13" fill="#a8adb6" font-weight="400">Tuesday, October 13</text>
+<text x="244" y="247" font-size="11" fill="#b4cde8" font-weight="600">NOW · PINNED</text>
+<rect x="239" y="261" width="330" height="150" rx="10" fill="#293440" stroke="#53677e"/>
+<text x="255" y="289" font-size="18" fill="#edf0f5" font-weight="600">Explain baseline results</text>
+<text x="255" y="316" font-size="13" fill="#bac6d5" font-weight="400">NLP report · Next concrete action</text>
+<text x="255" y="343" font-size="12" fill="#bac6d5" font-weight="400">Write the evaluation paragraph in Overleaf.</text>
+<rect x="255" y="360" width="139" height="34" rx="8" fill="#c4daf0"/>
+<text x="267" y="382" font-size="13" fill="#162535" font-weight="500">Start working</text>
+<text x="244" y="445" font-size="11" fill="#a8adb6" font-weight="600">NEXT</text>
+<text x="254" y="475" font-size="15" fill="#edf0f5" font-weight="500">Review experiment output</text>
+<text x="254" y="499" font-size="12" fill="#a8adb6" font-weight="400">Ready for review · stays queued while you write</text>
+<text x="254" y="542" font-size="15" fill="#edf0f5" font-weight="500">Shortlist PhD programs</text>
+<text x="254" y="566" font-size="12" fill="#a8adb6" font-weight="400">Applications · 25-minute planning session</text>
+<path d="M590 155 V632" stroke="#3b4049"/>
+<text x="612" y="180" font-size="18" fill="#edf0f5" font-weight="600">NLP report</text>
+<text x="612" y="216" font-size="10" fill="#a8adb6" font-weight="600">DEADLINE</text>
+<text x="612" y="239" font-size="15" fill="#edf0f5" font-weight="400">Fri, Oct 16 · 23:59</text>
+<text x="612" y="260" font-size="12" fill="#a8adb6" font-weight="400">America/Bogota</text>
+<text x="612" y="298" font-size="10" fill="#a8adb6" font-weight="600">WORK CONTEXT</text>
+<text x="612" y="322" font-size="14" fill="#edf0f5" font-weight="400">Existing NLP project folder</text>
+<text x="612" y="347" font-size="14" fill="#edf0f5" font-weight="400">Herdr · linked workspace</text>
+<text x="612" y="372" font-size="14" fill="#edf0f5" font-weight="400">Overleaf · report document</text>
+<text x="612" y="413" font-size="10" fill="#a8adb6" font-weight="600">AGENTS</text>
+<text x="612" y="438" font-size="14" fill="#edf0f5" font-weight="400">2 working · 1 result ready</text>
+<text x="612" y="462" font-size="11" fill="#a8adb6" font-weight="400">Result queued. Your current action stays pinned.</text>
+<rect x="612" y="486" width="128" height="34" rx="8" fill="#30343c"/>
+<text x="624" y="508" font-size="13" fill="#edf0f5" font-weight="500">Open context</text>
+<text x="612" y="572" font-size="12" fill="#b4cde8" font-weight="500">Why this action?</text>
+<text x="612" y="595" font-size="12" fill="#a8adb6" font-weight="400">You chose writing for this session.</text>
+<text x="946" y="122" font-size="12" fill="#a8adb6" font-weight="600">02  OPTIONAL FOCUS PANEL</text>
+<rect x="946" y="140" width="454" height="210" rx="16" fill="#252c34" stroke="#526071"/>
+<circle cx="969" cy="166" r="4" fill="#97bdab"/>
+<text x="981" y="171" font-size="13" fill="#cfddd5" font-weight="500">Focusing</text>
+<text x="1321" y="171" font-size="18" fill="#edf0f5" font-weight="500">24:08</text>
+<text x="966" y="209" font-size="21" fill="#edf0f5" font-weight="600">Explain baseline results</text>
+<text x="966" y="236" font-size="13" fill="#a8adb6" font-weight="400">Overleaf · NLP report</text>
+<text x="966" y="266" font-size="12" fill="#b9cbdc" font-weight="400">Safari + Chrome protected · 1 result queued</text>
+<rect x="966" y="291" width="80" height="34" rx="8" fill="#30343c"/>
+<text x="978" y="313" font-size="13" fill="#edf0f5" font-weight="500">Pause</text>
+<rect x="1270" y="291" width="110" height="34" rx="8" fill="#c4daf0"/>
+<text x="1282" y="313" font-size="13" fill="#162535" font-weight="500">Complete</text>
+<text x="946" y="393" font-size="12" fill="#a8adb6" font-weight="600">03  DISTRACTION PAGE</text>
+<rect x="946" y="411" width="454" height="239" rx="14" fill="#202329" stroke="#444952"/>
+<text x="971" y="447" font-size="23" fill="#edf0f5" font-weight="600">Back to your next step</text>
+<text x="971" y="478" font-size="14" fill="#a8adb6" font-weight="400">Instagram is blocked for this focus session.</text>
+<text x="971" y="511" font-size="17" fill="#c4daf0" font-weight="500">Explain baseline results</text>
+<text x="971" y="537" font-size="13" fill="#a8adb6" font-weight="400">Your planned break starts in 24 minutes.</text>
+<rect x="971" y="562" width="154" height="34" rx="8" fill="#c4daf0"/>
+<text x="983" y="584" font-size="13" fill="#162535" font-weight="500">Return to task</text>
+<text x="971" y="622" font-size="12" fill="#a8adb6" font-weight="400">Need an exception? Choose a limited duration.</text>
+<text x="40" y="695" font-size="12" fill="#a8adb6" font-weight="600">04  NEW WORKSPACE PREVIEW</text>
+<rect x="40" y="714" width="870" height="235" rx="14" fill="#202329" stroke="#444952"/>
+<text x="63" y="748" font-size="21" fill="#edf0f5" font-weight="600">Prepare an academic task</text>
+<text x="63" y="779" font-size="14" fill="#a8adb6" font-weight="400">Parent folder: your selected Academic root</text>
+<text x="63" y="806" font-size="14" fill="#edf0f5" font-weight="400">New folder: NLP / Final report</text>
+<text x="63" y="833" font-size="14" fill="#edf0f5" font-weight="400">Herdr workspace: NLP Final Report</text>
+<text x="63" y="860" font-size="12" fill="#a8adb6" font-weight="400">Create only the files shown here. Existing projects remain linked.</text>
+<rect x="63" y="889" width="175" height="34" rx="8" fill="#c4daf0"/>
+<text x="75" y="911" font-size="13" fill="#162535" font-weight="500">Create and open</text>
+<rect x="251" y="889" width="108" height="34" rx="8" fill="#30343c"/>
+<text x="263" y="911" font-size="13" fill="#edf0f5" font-weight="500">Edit setup</text>
+<text x="946" y="715" font-size="12" fill="#a8adb6" font-weight="600">DESIGN RULES</text>
+<text x="946" y="750" font-size="14" fill="#edf0f5" font-weight="400">Native controls and readable materials</text>
+<text x="946" y="782" font-size="14" fill="#edf0f5" font-weight="400">One chosen action; results queue quietly</text>
+<text x="946" y="814" font-size="14" fill="#edf0f5" font-weight="400">Truthful protection and connection status</text>
+<text x="946" y="846" font-size="14" fill="#edf0f5" font-weight="400">Your folder roots and workspace grouping</text>
+<text x="946" y="878" font-size="14" fill="#edf0f5" font-weight="400">AI proposes; deterministic code enforces</text>
+<text x="40" y="1005" font-size="13" fill="#a8adb6" font-weight="400">Static layout study. Final typography, materials, accessibility and window behavior will be validated in SwiftUI/AppKit.</text>
+</svg>
