@@ -61,6 +61,40 @@ public actor TaskRepository {
         }
     }
 
+    /// Saves a captured task, filing it under an existing project with the
+    /// same name (ignoring case) or a new one.
+    public func addTask(_ newTask: NewTask) async throws -> TaskRecord {
+        guard newTask.isValid else { throw NewTask.Invalid.missingTitle }
+        return try await ownerDatabase.write { db in
+            var task = TaskRecord(id: nil, title: newTask.title, nextAction: newTask.nextAction)
+            task.deadline = newTask.deadline
+            task.projectId = try newTask.projectName.map { try Self.projectID(named: $0, in: db) }
+            try task.insert(db)
+            return task
+        }
+    }
+
+    /// Every task in capture order. Ordering by priority is not decided yet.
+    public func todayTasks() async throws -> [TodayItem] {
+        try await ownerDatabase.read { db in
+            try TaskRecord
+                .including(optional: TaskRecord.project)
+                .order(Column("id"))
+                .asRequest(of: TaskWithProject.self)
+                .fetchAll(db)
+                .map(\.todayItem)
+        }
+    }
+
+    private static func projectID(named name: String, in db: Database) throws -> Int64 {
+        if let existing = try ProjectRecord.filter(Column("title") == name).fetchOne(db) {
+            return existing.id!
+        }
+        var project = ProjectRecord(id: nil, title: name)
+        try project.insert(db)
+        return project.id!
+    }
+
     // MARK: Cache
 
     public func storeCacheEntry(key: String, value: Data) async throws {
