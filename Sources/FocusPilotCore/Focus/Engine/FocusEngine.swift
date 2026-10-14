@@ -10,6 +10,9 @@ public enum FocusEngine {
         if case .start(let request) = event {
             return try start(request, replacing: session, at: now)
         }
+        if event == .reconcile {
+            return reconcile(session, at: now)
+        }
         guard var session, !session.hasEnded else { throw .noActiveSession }
 
         switch (event, session.phase) {
@@ -40,6 +43,28 @@ public enum FocusEngine {
             startedAt: now, plannedEnd: now.addingTimeInterval(request.duration), phase: .running
         )
         return changed(to: started)
+    }
+
+    private static func reconcile(_ session: FocusSession?, at now: Date) -> FocusTransition {
+        guard let session else { return FocusTransition(session: nil, effects: [.publishPolicy(nil)]) }
+        let (elapsed, notices) = elapse(session, until: now)
+        // Republished even when unchanged: after launch or wake the extensions
+        // may hold a stale policy, and a strict session waits for this confirmation.
+        var effects: [FocusEffect] = elapsed == session ? [] : [.persist(elapsed)]
+        effects.append(.publishPolicy(policy(for: elapsed)))
+        effects += notices.map(FocusEffect.notify)
+        return FocusTransition(session: elapsed, effects: effects)
+    }
+
+    /// Applies the deadlines between the session's last state and `now`.
+    ///
+    /// Ends are recorded at the planned instant, not at `now`, so a Mac that
+    /// slept through the end does not stretch the session.
+    private static func elapse(_ session: FocusSession, until now: Date) -> (FocusSession, [FocusNotice]) {
+        var session = session
+        guard !session.hasEnded, now >= session.plannedEnd else { return (session, []) }
+        session.phase = .ended(at: session.plannedEnd, reason: .reachedPlannedEnd)
+        return (session, [.sessionReachedPlannedEnd])
     }
 
     private static func changed(to session: FocusSession) -> FocusTransition {

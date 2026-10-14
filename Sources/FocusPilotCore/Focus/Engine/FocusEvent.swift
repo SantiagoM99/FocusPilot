@@ -27,4 +27,7 @@ public enum FocusEvent: Equatable, Sendable {
     case startBreak(duration: TimeInterval)
     case endBreak
     case complete
+    /// Time passed: a timer fired, the Mac woke, or the app launched with a
+    /// persisted session. Applies any deadline the clock has crossed.
+    case reconcile
 }
