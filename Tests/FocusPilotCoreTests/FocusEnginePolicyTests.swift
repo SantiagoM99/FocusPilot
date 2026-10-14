@@ -1,0 +1,63 @@
+import Foundation
+import Testing
+@testable import FocusPilotCore
+
+/// Owner decision 2026-10-14: strict sessions keep session rules through pauses
+/// and breaks; normal sessions lift them until the session runs again.
+@Suite("FocusEngine policy")
+struct FocusEnginePolicyTests {
+    var clock = FakeClock()
+
+    func start(_ mode: SessionMode) throws -> FocusSession {
+        let request = SessionRequest(id: UUID(), taskID: 7, action: "Outline the essay", mode: mode, duration: 50 * 60)
+        return try #require(FocusEngine.handle(.start(request), session: nil, at: clock.now).session)
+    }
+
+    func publishedPolicy(_ transition: FocusTransition) -> SessionPolicy?? {
+        for case .publishPolicy(let policy) in transition.effects { return policy }
+        return nil
+    }
+
+    @Test(arguments: [FocusEvent.pause, .startBreak(duration: 5 * 60)])
+    mutating func strictSessionsKeepBlockingWhileInterrupted(by interruption: FocusEvent) throws {
+        let running = try start(.strict)
+        clock.advance(minutes: 10)
+
+        let interrupted = try FocusEngine.handle(interruption, session: running, at: clock.now)
+
+        #expect(publishedPolicy(interrupted) == .some(SessionPolicy(sessionID: running.id, mode: .strict, end: running.plannedEnd)))
+    }
+
+    @Test(arguments: [FocusEvent.pause, .startBreak(duration: 5 * 60)])
+    mutating func normalSessionsLiftSessionRulesWhileInterrupted(by interruption: FocusEvent) throws {
+        let running = try start(.normal)
+        clock.advance(minutes: 10)
+
+        let interrupted = try FocusEngine.handle(interruption, session: running, at: clock.now)
+
+        #expect(publishedPolicy(interrupted) == .some(nil))
+    }
+
+    @Test(arguments: [SessionMode.normal, .strict])
+    mutating func resumingPublishesTheSessionRulesWithTheOriginalEnd(mode: SessionMode) throws {
+        let running = try start(mode)
+        clock.advance(minutes: 10)
+        let paused = try FocusEngine.handle(.pause, session: running, at: clock.now).session
+        clock.advance(minutes: 15)
+
+        let resumed = try FocusEngine.handle(.resume, session: paused, at: clock.now)
+
+        #expect(publishedPolicy(resumed) == .some(SessionPolicy(sessionID: running.id, mode: mode, end: running.plannedEnd)))
+    }
+
+    @Test mutating func aStrictBreakThatRunsOutKeepsTheSamePolicy() throws {
+        let running = try start(.strict)
+        let onBreak = try FocusEngine.handle(.startBreak(duration: 5 * 60), session: running, at: clock.now).session
+        clock.advance(minutes: 6)
+
+        let transition = try FocusEngine.handle(.reconcile, session: onBreak, at: clock.now)
+
+        #expect(publishedPolicy(transition) == .some(SessionPolicy(sessionID: running.id, mode: .strict, end: running.plannedEnd)))
+        #expect(transition.effects.last == .notify(.breakEnded))
+    }
+}

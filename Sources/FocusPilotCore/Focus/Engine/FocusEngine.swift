@@ -82,9 +82,15 @@ public enum FocusEngine {
         FocusTransition(session: session, effects: [.persist(session), .publishPolicy(policy(for: session))])
     }
 
-    /// Session rules apply only while the session runs; pauses and breaks lift them.
+    /// Session rules apply while the session runs. Pauses and breaks lift them
+    /// only in normal sessions; strict sessions keep blocking (owner decision, 2026-10-14).
     static func policy(for session: FocusSession) -> SessionPolicy? {
-        guard session.phase == .running else { return nil }
+        let enforced = switch session.phase {
+        case .running: true
+        case .paused, .onBreak: session.mode == .strict
+        case .ended: false
+        }
+        guard enforced else { return nil }
         return SessionPolicy(sessionID: session.id, mode: session.mode, end: session.plannedEnd)
     }
 }
