@@ -13,7 +13,11 @@ public enum FocusEngine {
         if event == .reconcile {
             return reconcile(session, at: now)
         }
-        guard var session, !session.hasEnded else { throw .noActiveSession }
+        // Owner commands act on the session as it stands now, not as last
+        // persisted; notices are dropped because the owner is already present.
+        guard var session = session.map({ elapse($0, until: now).0 }), !session.hasEnded else {
+            throw .noActiveSession
+        }
 
         switch (event, session.phase) {
         case (.pause, .running):
@@ -62,9 +66,16 @@ public enum FocusEngine {
     /// slept through the end does not stretch the session.
     private static func elapse(_ session: FocusSession, until now: Date) -> (FocusSession, [FocusNotice]) {
         var session = session
-        guard !session.hasEnded, now >= session.plannedEnd else { return (session, []) }
-        session.phase = .ended(at: session.plannedEnd, reason: .reachedPlannedEnd)
-        return (session, [.sessionReachedPlannedEnd])
+        if session.hasEnded { return (session, []) }
+        if now >= session.plannedEnd {
+            session.phase = .ended(at: session.plannedEnd, reason: .reachedPlannedEnd)
+            return (session, [.sessionReachedPlannedEnd])
+        }
+        if case .onBreak(let until) = session.phase, now >= until {
+            session.phase = .running
+            return (session, [.breakEnded])
+        }
+        return (session, [])
     }
 
     private static func changed(to session: FocusSession) -> FocusTransition {
