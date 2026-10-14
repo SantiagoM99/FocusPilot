@@ -40,4 +40,13 @@ struct FocusCoordinatorTests {
 
         #expect(try await coordinator.hasTasks() == true)
     }
+
+    @Test func capturedTaskAppearsInToday() async throws {
+        let repository = try TaskRepository(location: StorageLocation(directory: makeTemporaryDirectory()))
+        let coordinator = FocusCoordinator(repository: repository)
+
+        try await coordinator.capture(NewTask(title: "Submit PhD shortlist"))
+
+        #expect(try await coordinator.todayTasks().map(\.title) == ["Submit PhD shortlist"])
+    }
 }
