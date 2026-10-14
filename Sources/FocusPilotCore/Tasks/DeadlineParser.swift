@@ -25,16 +25,9 @@ public struct DeadlineParser: Sendable {
         guard !tokens.isEmpty else { return nil }
 
         guard let (date, time) = dateThenTime(tokens) ?? timeThenDate(tokens) else { return nil }
-        let day = date ?? today
-
-        guard let time else {
-            return Deadline(due: .dateOnly(day), timeZone: timeZone, originalText: trimmed)
-        }
-        var components = day.components
-        components.hour = time.hour
-        components.minute = time.minute
-        guard let instant = calendar.date(from: components) else { return nil }
-        return Deadline(due: .timed(instant), timeZone: timeZone, originalText: trimmed)
+        let dateOnly = Deadline(due: .dateOnly(date ?? today), timeZone: timeZone, originalText: trimmed)
+        guard let time else { return dateOnly }
+        return dateOnly.addingTime(hour: time.hour, minute: time.minute)
     }
 
     // MARK: Structure
