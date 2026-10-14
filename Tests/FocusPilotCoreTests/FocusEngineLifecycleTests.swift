@@ -55,4 +55,50 @@ struct FocusEngineLifecycleTests {
         #expect(completed.session?.phase == .ended(at: clock.now, reason: .completed))
         #expect(completed.effects == [.persist(completed.session!), .publishPolicy(nil)])
     }
+
+    @Test func eventsWithoutASessionAreRejected() {
+        for event in [FocusEvent.pause, .resume, .startBreak(duration: 300), .endBreak, .complete] {
+            #expect(throws: FocusEngineError.noActiveSession) {
+                try FocusEngine.handle(event, session: nil, at: clock.now)
+            }
+        }
+    }
+
+    @Test func startingWhileASessionIsActiveIsRejected() throws {
+        let running = try FocusEngine.handle(.start(startRequest()), session: nil, at: clock.now).session
+
+        #expect(throws: FocusEngineError.sessionAlreadyActive) {
+            try FocusEngine.handle(.start(startRequest()), session: running, at: clock.now)
+        }
+    }
+
+    @Test func startingAfterTheLastSessionEndedIsAllowed() throws {
+        let running = try FocusEngine.handle(.start(startRequest()), session: nil, at: clock.now).session
+        let ended = try FocusEngine.handle(.complete, session: running, at: clock.now).session
+
+        let next = try FocusEngine.handle(.start(startRequest()), session: ended, at: clock.now)
+
+        #expect(next.session?.phase == .running)
+    }
+
+    @Test func aSessionNeedsAPositiveDuration() {
+        #expect(throws: FocusEngineError.nonPositiveDuration) {
+            try FocusEngine.handle(.start(startRequest(minutes: 0)), session: nil, at: clock.now)
+        }
+    }
+
+    @Test func eventsThatDoNotFitThePhaseAreRejected() throws {
+        let running = try FocusEngine.handle(.start(startRequest()), session: nil, at: clock.now).session
+        let paused = try FocusEngine.handle(.pause, session: running, at: clock.now).session
+
+        #expect(throws: FocusEngineError.notAllowed(.resume, in: .running)) {
+            try FocusEngine.handle(.resume, session: running, at: clock.now)
+        }
+        #expect(throws: FocusEngineError.notAllowed(.endBreak, in: .running)) {
+            try FocusEngine.handle(.endBreak, session: running, at: clock.now)
+        }
+        #expect(throws: FocusEngineError.notAllowed(.startBreak(duration: 300), in: paused!.phase)) {
+            try FocusEngine.handle(.startBreak(duration: 300), session: paused, at: clock.now)
+        }
+    }
 }
