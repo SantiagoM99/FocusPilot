@@ -20,6 +20,14 @@ public enum FocusEngine {
             guard var session else { fatalError("not yet") }
             session.phase = .running
             return changed(to: session)
+        case .startBreak(let duration):
+            guard var session else { fatalError("not yet") }
+            session.phase = .onBreak(until: now.addingTimeInterval(duration))
+            return changed(to: session)
+        case .complete:
+            guard var session else { fatalError("not yet") }
+            session.phase = .ended(at: now, reason: .completed)
+            return changed(to: session)
         default:
             fatalError("not yet")
         }

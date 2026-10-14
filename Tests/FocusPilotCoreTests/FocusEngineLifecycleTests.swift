@@ -42,4 +42,17 @@ struct FocusEngineLifecycleTests {
             .publishPolicy(SessionPolicy(sessionID: sessionID, mode: .normal, end: started!.plannedEnd)),
         ])
     }
+
+    @Test(arguments: [FocusEvent.pause, .startBreak(duration: 300)])
+    mutating func completingEndsTheSessionNowAndClearsSessionRules(from before: FocusEvent) throws {
+        let started = try FocusEngine.handle(.start(startRequest()), session: nil, at: clock.now).session
+        clock.advance(minutes: 10)
+        let interrupted = try FocusEngine.handle(before, session: started, at: clock.now).session
+        clock.advance(minutes: 2)
+
+        let completed = try FocusEngine.handle(.complete, session: interrupted, at: clock.now)
+
+        #expect(completed.session?.phase == .ended(at: clock.now, reason: .completed))
+        #expect(completed.effects == [.persist(completed.session!), .publishPolicy(nil)])
+    }
 }
