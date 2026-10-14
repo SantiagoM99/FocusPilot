@@ -7,3 +7,6 @@ xcuserdata/
 .env.*
 !.env.example
 .worktrees/
+
+# Assembled app bundle (scripts/build-app.sh)
+build/
