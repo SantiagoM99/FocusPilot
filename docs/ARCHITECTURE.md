@@ -86,6 +86,8 @@ When the app cannot update the policy (crashed, quit, or asleep through the end 
 
 Exception expiries apply in both modes; an exception never outlives its expiry because the app is unavailable.
 
+Pauses and breaks (owner decision, 2026-10-14) never move the planned session end. In a strict session, session-only rules stay active during pauses and breaks; in a normal session they lift until the session resumes.
+
 Some rule sets are always active (owner decision, 2026-10-13); others follow a schedule or apply only during focus sessions. Always-on and scheduled rules have no session end: extensions keep enforcing them whether or not the app is running, and evaluate schedule windows against their own clock. Only session-only rules follow the normal/strict behavior above. Changing or removing an always-on rule is an explicit owner action in the app, never a model proposal applied automatically.
 
 Blocked Mac apps (owner decision, 2026-10-14) are enforced by the app itself, not by an extension: when a blocked app is launched or activated while its rule applies, FocusPilot hides it (`NSRunningApplication.hide()`, observed through `NSWorkspace.didActivateApplicationNotification`) and shows a blocked-app panel with the current action, Return to task and a timed exception for the whole app. It never quits the app, so no unsaved work is lost. This works only while FocusPilot is running, so protection status reports browsers and apps as separate facts and never summarizes them as "protected" alone.

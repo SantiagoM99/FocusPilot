@@ -67,6 +67,8 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-13: Some block rules are always active. Rule sets support always, scheduled, or session-only activation; always-on and scheduled rules are enforced by the extensions regardless of app state.
 - 2026-10-14: Blocked Mac apps are hidden (not quit) when opened during an applicable rule, and a FocusPilot panel shows the current action and a timed exception for the whole app. App blocking works only while FocusPilot is running; protection status reports browsers and apps separately. See [Architecture](../ARCHITECTURE.md#enforcement-ownership).
 - 2026-10-14: The Phase 1 interface reference is [docs/design/focuspilot-phase1-design.html](../design/focuspilot-phase1-design.html). The strict-session 60-second wait before an exception is a proposed value awaiting owner confirmation.
+- 2026-10-14: Pausing a session does not move its planned end; the end stays the absolute instant the extensions already hold.
+- 2026-10-14: Strict sessions keep blocking during pauses and breaks; normal sessions lift session-only rules while paused or on a break. Always-on and scheduled rules are unaffected by either.
 
 ## Sources
 
