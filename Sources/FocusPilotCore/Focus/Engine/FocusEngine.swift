@@ -11,13 +11,27 @@ public enum FocusEngine {
                 id: request.id, taskID: request.taskID, action: request.action, mode: request.mode,
                 startedAt: now, plannedEnd: now.addingTimeInterval(request.duration), phase: .running
             )
-            return FocusTransition(session: started, effects: [.persist(started), .publishPolicy(policy(for: started))])
+            return changed(to: started)
+        case .pause:
+            guard var session else { fatalError("not yet") }
+            session.phase = .paused(since: now)
+            return changed(to: session)
+        case .resume:
+            guard var session else { fatalError("not yet") }
+            session.phase = .running
+            return changed(to: session)
         default:
             fatalError("not yet")
         }
     }
 
+    private static func changed(to session: FocusSession) -> FocusTransition {
+        FocusTransition(session: session, effects: [.persist(session), .publishPolicy(policy(for: session))])
+    }
+
+    /// Session rules apply only while the session runs; pauses and breaks lift them.
     static func policy(for session: FocusSession) -> SessionPolicy? {
-        SessionPolicy(sessionID: session.id, mode: session.mode, end: session.plannedEnd)
+        guard session.phase == .running else { return nil }
+        return SessionPolicy(sessionID: session.id, mode: session.mode, end: session.plannedEnd)
     }
 }

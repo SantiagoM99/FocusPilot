@@ -24,4 +24,22 @@ struct FocusEngineLifecycleTests {
             .publishPolicy(SessionPolicy(sessionID: sessionID, mode: .normal, end: expected.plannedEnd)),
         ])
     }
+
+    @Test mutating func pausingLiftsSessionRulesAndResumingRestoresThemWithTheSameEnd() throws {
+        let started = try FocusEngine.handle(.start(startRequest(minutes: 25)), session: nil, at: clock.now).session
+        clock.advance(minutes: 5)
+
+        let paused = try FocusEngine.handle(.pause, session: started, at: clock.now)
+        #expect(paused.session?.phase == .paused(since: clock.now))
+        #expect(paused.effects == [.persist(paused.session!), .publishPolicy(nil)])
+
+        clock.advance(minutes: 3)
+        let resumed = try FocusEngine.handle(.resume, session: paused.session, at: clock.now)
+        #expect(resumed.session?.phase == .running)
+        #expect(resumed.session?.plannedEnd == started?.plannedEnd)
+        #expect(resumed.effects == [
+            .persist(resumed.session!),
+            .publishPolicy(SessionPolicy(sessionID: sessionID, mode: .normal, end: started!.plannedEnd)),
+        ])
+    }
 }
