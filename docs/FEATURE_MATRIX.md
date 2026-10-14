@@ -21,7 +21,7 @@ P0 = first complete focus loop; phase 1 is the platform spikes plus all P0 rows 
 | Supervisor budget | P0, with first model calls | Daily admission cap, one request in flight, quiet fallback; reservations only if concurrency is later allowed | Unresolved usage counts at its conservative estimate and is visible; focus remains active |
 | New environment | P1 | Preview folder/workspace creation under configured root | Existing files never overwritten; partial failures can be reconciled |
 | Priority suggestions | P1 | Explain recommendation using structured inputs | Deadline/state changes invalidate old suggestions |
-| Activity lists | P0 | Seeded allowed tools; owner edits allowed/blocked apps and sites in Settings | Seeded tools never trigger check-ins; edits take effect in the next compiled policy |
+| Activity lists | P0 | Seeded allowed tools; owner edits allowed/blocked apps and sites in Settings | Seeded tools never trigger check-ins; edits take effect in the next compiled policy; a blocked Mac app is hidden (not quit) while FocusPilot runs |
 | Coach | P1 | Low-frequency event-driven check-ins and help with stuck work | Supports relevant activity, switch task, snooze, and break responses |
 | Unknown-app check-in | P1, with Coach | Ask the purpose of an unclassified app or site once after grace | Answer saved by scope; no repeat for that app and task; Distraction requires confirmation before blocking |
 | Memory inspection | P1 | Edit/delete preferences and summaries | Deleted source also invalidates derived search/cache entries |
