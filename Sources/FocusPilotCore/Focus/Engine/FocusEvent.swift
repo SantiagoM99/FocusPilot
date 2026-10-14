@@ -20,6 +20,9 @@ public struct SessionRequest: Equatable, Sendable {
 }
 
 /// Everything that can move a focus session forward.
+///
+/// Exception grants (#14) will arrive as further cases; their expiries then
+/// join `FocusSession.nextDeadline` and the published policy.
 public enum FocusEvent: Equatable, Sendable {
     case start(SessionRequest)
     case pause

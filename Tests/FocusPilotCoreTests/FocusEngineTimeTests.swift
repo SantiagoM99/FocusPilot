@@ -109,4 +109,19 @@ struct FocusEngineTimeTests {
             try FocusEngine.handle(.pause, session: running, at: clock.now)
         }
     }
+
+    @Test mutating func theNextDeadlineIsTheEarlierOfBreakEndAndPlannedEnd() throws {
+        let running = try start(minutes: 25)
+        #expect(running.nextDeadline == running.plannedEnd)
+
+        clock.advance(minutes: 10)
+        let shortBreak = try FocusEngine.handle(.startBreak(duration: 5 * 60), session: running, at: clock.now).session
+        #expect(shortBreak?.nextDeadline == clock.minutes(from: clock.now, 5))
+
+        let longBreak = try FocusEngine.handle(.startBreak(duration: 60 * 60), session: running, at: clock.now).session
+        #expect(longBreak?.nextDeadline == running.plannedEnd)
+
+        let ended = try FocusEngine.handle(.complete, session: running, at: clock.now).session
+        #expect(ended?.nextDeadline == nil)
+    }
 }

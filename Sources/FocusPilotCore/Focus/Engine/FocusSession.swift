@@ -51,4 +51,15 @@ public struct FocusSession: Codable, Equatable, Sendable {
     public var hasEnded: Bool {
         if case .ended = phase { true } else { false }
     }
+
+    /// When the coordinator should next send `.reconcile`, or `nil` if nothing is pending.
+    ///
+    /// Exception expiries (#14) will join this as further deadlines.
+    public var nextDeadline: Date? {
+        switch phase {
+        case .running, .paused: plannedEnd
+        case .onBreak(let until): min(until, plannedEnd)
+        case .ended: nil
+        }
+    }
 }
