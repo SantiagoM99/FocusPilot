@@ -7,7 +7,9 @@ import Observation
 @Observable
 final class AppModel {
     private(set) var snapshot = FocusSnapshot()
+    private(set) var today: [TodayItem] = []
     private(set) var startupError: String?
+    private(set) var taskError: String?
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
     let menuBarPreferences = MenuBarPreferences()
     private let firstLaunch = FirstLaunchWelcome()
@@ -67,5 +69,28 @@ final class AppModel {
     func refresh() async {
         guard let coordinator else { return }
         snapshot = await coordinator.snapshot()
+        do {
+            today = try await coordinator.todayTasks()
+        } catch {
+            taskError = "Could not load tasks: \(error.localizedDescription)"
+        }
+    }
+
+    /// Saves the task and reloads Today. Returns false, with `taskError`
+    /// set, if nothing was saved.
+    func capture(_ newTask: NewTask) async -> Bool {
+        guard let coordinator else {
+            taskError = startupError
+            return false
+        }
+        do {
+            try await coordinator.capture(newTask)
+            taskError = nil
+        } catch {
+            taskError = "Could not save the task: \(error.localizedDescription)"
+            return false
+        }
+        await refresh()
+        return true
     }
 }
