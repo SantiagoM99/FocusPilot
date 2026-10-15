@@ -14,6 +14,7 @@ FocusPilot helps its owner choose a concrete next action, work across Herdr and 
 - [Experience](docs/EXPERIENCE.md): native visual direction, screens, and user flows.
 - [Visual design board](docs/DESIGN_BOARD.svg): static layout studies for planning, focus, blocking, and workspace setup.
 - [Phase 1 interface](docs/design/focuspilot-phase1-design.html): screens, states and SwiftUI component spec for Phase 1 (open in a browser).
+- [Logo](docs/design/focuspilot-logo.html): app icon and menu bar glyph construction (open in a browser).
 - [AI Workload visual study](docs/AI_WORKLOAD_BOARD.svg): agent/task usage, uncertainty and urgent-work recommendations.
 - [Workspace rules](docs/WORKSPACE_RULES.md): existing environments and new folder/workspace provisioning.
 - [Validation plan](docs/VALIDATION_PLAN.md): platform spikes and product experiments before implementation.
