@@ -57,7 +57,7 @@ public struct DeadlineParser: Sendable {
         return (date, time)
     }
 
-    private static let fillerWords: Set<Substring> = ["by", "due", "on", "at", "before"]
+    static let fillerWords: Set<Substring> = ["by", "due", "on", "at", "before", "el", "para"]
 
     private static func tokens(in text: String) -> [Substring] {
         Substring(text.lowercased())

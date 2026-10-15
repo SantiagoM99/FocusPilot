@@ -25,10 +25,10 @@ public struct LocalDate: Hashable, Comparable, Sendable {
         String(format: "%04d-%02d-%02d", year, month, day)
     }
 
+    /// Only the exact form `YYYY-MM-DD` with ASCII digits.
     public init?(isoString: String) {
-        let parts = isoString.split(separator: "-", omittingEmptySubsequences: false)
-        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else { return nil }
-        self.init(year: Int(parts[0])!, month: Int(parts[1])!, day: Int(parts[2])!)
+        guard let match = isoString.wholeMatch(of: /([0-9]{4})-([0-9]{2})-([0-9]{2})/) else { return nil }
+        self.init(year: Int(match.1)!, month: Int(match.2)!, day: Int(match.3)!)
         guard isValid else { return nil }
     }
 

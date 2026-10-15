@@ -1,23 +1,29 @@
 import Foundation
 
-/// The date half of a typed deadline: "today", "tomorrow", a weekday
-/// (optionally "this" or "next"), a month and day with optional year, or an
-/// ISO date.
+/// The date half of a typed deadline: "today"/"hoy", "tomorrow"/"mañana",
+/// "pasado mañana", a weekday (optionally "this" or "next"), a month and day
+/// with optional year, or an ISO date.
 enum DateWords {
     /// Matches a date at the start of `tokens` and returns the unused rest.
     static func match(_ tokens: [Substring], resolver: DeadlineParser) -> (LocalDate, ArraySlice<Substring>)? {
         guard let first = tokens.first else { return nil }
         let rest = tokens.dropFirst()
 
-        if first == "today" { return (resolver.today, rest) }
-        if first == "tomorrow" { return (resolver.today.adding(days: 1), rest) }
+        if first == "today" || first == "hoy" { return (resolver.today, rest) }
+        if first == "tomorrow" || first == "mañana" { return (resolver.today.adding(days: 1), rest) }
+        if first == "pasado" {
+            guard rest.first == "mañana" else { return nil }
+            return (resolver.today.adding(days: 2), rest.dropFirst())
+        }
         if let weekday = weekdays[first] { return (resolver.coming(weekday: weekday), rest) }
         if first == "this" || first == "next" {
             guard let second = rest.first, let weekday = weekdays[second] else { return nil }
             let date = first == "this" ? resolver.coming(weekday: weekday) : resolver.inFollowingWeek(weekday: weekday)
             return (date, rest.dropFirst())
         }
-        if let date = LocalDate(isoString: String(first)) { return (date, rest) }
+        if let date = LocalDate(isoString: String(first)) {
+            return resolver.plausibleYears.contains(date.year) ? (date, rest) : nil
+        }
 
         // "Oct 20 [2026]" or "20 Oct [2026]"
         guard rest.count >= 1 else { return nil }

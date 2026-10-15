@@ -44,7 +44,7 @@ struct DeadlineAdjustmentTests {
 
 @Suite("LocalDate")
 struct LocalDateTests {
-    @Test(arguments: ["2026-10-x-20", "2026-10", "2026--10-20", "2026-1o-20", "2026-02-30", ""])
+    @Test(arguments: ["2026-10-x-20", "2026-10", "2026--10-20", "2026-1o-20", "2026-02-30", "", "2-3-4", "2026-1-05", "+2026-10-20", "２０２６-10-20"])
     func isoStringNeedsExactlyThreeNumericParts(_ text: String) {
         #expect(LocalDate(isoString: text) == nil)
     }

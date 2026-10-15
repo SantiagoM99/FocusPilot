@@ -80,6 +80,22 @@ struct DeadlineParserTests {
             == .dateOnly(LocalDate(year: 2026, month: 12, day: 30)))
     }
 
+    @Test func spanishRelativeDaysAreUnderstood() {
+        #expect(parse("hoy 17:00")?.due == .timed(instant("2026-10-14T17:00:00-05:00")))
+        #expect(parse("mañana 10:00")?.due == .timed(instant("2026-10-15T10:00:00-05:00")))
+        #expect(parse("Mañana")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 15)))
+        #expect(parse("para pasado mañana")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 16)))
+        #expect(parse("el 20 Oct")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 20)))
+    }
+
+    @Test func isoDatesMustBeStrictAndPlausible() {
+        #expect(parse("2-3-4") == nil)
+        #expect(parse("2026-1-5") == nil)
+        #expect(parse("0002-03-04") == nil)
+        #expect(parse("2040-03-04") == nil)
+        #expect(parse("2027-03-04")?.due == .dateOnly(LocalDate(year: 2027, month: 3, day: 4)))
+    }
+
     @Test func yearsAreAcceptedFromLastYearToTenYearsAhead() {
         #expect(parse("Oct 16 2025")?.due == .dateOnly(LocalDate(year: 2025, month: 10, day: 16)))
         #expect(parse("Oct 16 2036")?.due == .dateOnly(LocalDate(year: 2036, month: 10, day: 16)))
