@@ -10,7 +10,7 @@ struct PlanningView: View {
 
     var body: some View {
         ContentUnavailableView(
-            model.snapshot.menuBarTitle,
+            model.snapshot.statusText,
             systemImage: "scope",
             description: Text("Closing this window keeps FocusPilot running in the menu bar.")
         )

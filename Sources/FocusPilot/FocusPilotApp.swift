@@ -8,15 +8,17 @@ struct FocusPilotApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {
-        MenuBarExtra(model.snapshot.menuBarTitle) {
+        MenuBarExtra {
             MenuBarContent(model: model)
+        } label: {
+            MenuBarIcon(model: model)
         }
 
         Window("Planning", id: PlanningView.windowID) {
             PlanningView(model: model)
         }
         // Login launches should not open a window; the menu bar item is the
-        // entry point.
+        // entry point. The first launch is the exception (see MenuBarIcon).
         .defaultLaunchBehavior(.suppressed)
     }
 }
