@@ -13,10 +13,15 @@ public enum FocusEngine {
         if event == .reconcile {
             return reconcile(session, at: now)
         }
-        // Owner commands act on the session as it stands now, not as last
-        // persisted; notices are dropped because the owner is already present.
-        guard var session = session.map({ elapse($0, until: now).0 }), !session.hasEnded else {
-            throw .noActiveSession
+        guard let persisted = session, !persisted.hasEnded else { throw .noActiveSession }
+        // Owner commands act on the session as it stands now, so deadlines the
+        // coordinator has not applied yet are applied first.
+        var session = elapse(persisted, until: now).0
+        if session.hasEnded {
+            // Completing after the planned end records the planned end; any
+            // other command has no session left to act on.
+            guard event == .complete else { throw .noActiveSession }
+            return reconcile(persisted, at: now)
         }
 
         switch (event, session.phase) {
@@ -29,6 +34,9 @@ public enum FocusEngine {
             session.phase = .onBreak(until: now.addingTimeInterval(duration))
         case (.endBreak, .onBreak):
             session.phase = .running
+        case (.endBreak, .running) where persisted.phase != session.phase:
+            // The break ran out before the owner ended it; report that instead.
+            return reconcile(persisted, at: now)
         case (.complete, _):
             session.phase = .ended(at: now, reason: .completed)
         default:

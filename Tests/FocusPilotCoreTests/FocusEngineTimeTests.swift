@@ -124,4 +124,41 @@ struct FocusEngineTimeTests {
         let ended = try FocusEngine.handle(.complete, session: running, at: clock.now).session
         #expect(ended?.nextDeadline == nil)
     }
+
+    @Test mutating func endingABreakThatAlreadyRanOutSucceedsWithTheBreaksOwnEnd() throws {
+        let running = try start(minutes: 50)
+        let onBreak = try #require(FocusEngine.handle(.startBreak(duration: 5 * 60), session: running, at: clock.now).session)
+        clock.advance(minutes: 7)
+
+        let transition = try FocusEngine.handle(.endBreak, session: onBreak, at: clock.now)
+
+        let resumed = try #require(transition.session)
+        #expect(resumed.phase == .running)
+        #expect(transition.effects == [
+            .persist(resumed),
+            .publishPolicy(SessionPolicy(sessionID: running.id, mode: .normal, end: running.plannedEnd)),
+            .notify(.breakEnded),
+        ])
+    }
+
+    @Test(arguments: [25.0, 40.0])
+    mutating func completingAtOrAfterThePlannedEndRecordsThePlannedEnd(minutesLater: Double) throws {
+        let running = try start(minutes: 25)
+        clock.advance(minutes: minutesLater)
+
+        let transition = try FocusEngine.handle(.complete, session: running, at: clock.now)
+
+        let ended = try #require(transition.session)
+        #expect(ended.phase == .ended(at: running.plannedEnd, reason: .reachedPlannedEnd))
+        #expect(transition.effects == [.persist(ended), .publishPolicy(nil), .notify(.sessionReachedPlannedEnd)])
+    }
+
+    @Test mutating func completingASessionThatAlreadyEndedIsRejected() throws {
+        let running = try start(minutes: 25)
+        let ended = try FocusEngine.handle(.complete, session: running, at: clock.now).session
+
+        #expect(throws: FocusEngineError.noActiveSession) {
+            try FocusEngine.handle(.complete, session: ended, at: clock.now)
+        }
+    }
 }
