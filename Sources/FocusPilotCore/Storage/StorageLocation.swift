@@ -21,6 +21,15 @@ public struct StorageLocation: Sendable {
         directory.appending(path: "Cache.sqlite")
     }
 
+    /// The cache database together with its WAL-mode companions. Deleting
+    /// only the main file and leaving a stale `-wal`/`-shm` behind can make
+    /// the next open fail, so the cache is always removed as a set.
+    var cacheDatabaseFiles: [URL] {
+        ["", "-wal", "-shm"].map { suffix in
+            directory.appending(path: "Cache.sqlite\(suffix)")
+        }
+    }
+
     /// `~/Library/Application Support/FocusPilot`.
     public static func applicationSupport() -> StorageLocation {
         StorageLocation(directory: URL.applicationSupportDirectory.appending(path: "FocusPilot", directoryHint: .isDirectory))
