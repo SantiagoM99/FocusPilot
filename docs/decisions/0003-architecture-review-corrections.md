@@ -73,6 +73,8 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-14 (from the PR #24 review, Claude's call under the new review process): owner data and derived cache live in separate SQLite files, so deleting a source and its cache entries is not one transaction. Delete cache rows after the owner commit, and treat cache rows whose source is missing or whose revision is older as invalid on read. A cache file that fails to open is deleted and rebuilt; it never blocks owner data.
 - 2026-10-14 (assumption): the database lives in the unsandboxed `~/Library/Application Support/FocusPilot`. If the app is ever sandboxed, that path moves into the container and needs an explicit migration.
 - 2026-10-14 (from the PR #24 review): `TaskRepository` is an actor, but actors are reentrant across `await`, so each logical change (including read-modify-write such as reordering or revision checks) runs inside a single `ownerDatabase.write` closure.
+- 2026-10-14 (from the PR #26 review): the focus engine emits bare session policies; FocusCoordinator wraps every publish with schema version, revision and effective time, so extensions can reject stale or out-of-order policies (required by #15). A normal-session break publishes the break end, so extensions resume blocking on their own if the app is gone.
+- 2026-10-14 (assumption): a break may run past the planned session end; the session then ends at the planned end.
 
 ## Sources
 
