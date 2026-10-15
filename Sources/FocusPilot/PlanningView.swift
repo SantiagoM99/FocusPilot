@@ -1,3 +1,4 @@
+import AppKit
 import FocusPilotCore
 import SwiftUI
 
@@ -11,10 +12,15 @@ struct PlanningView: View {
     var body: some View {
         ContentUnavailableView(
             model.snapshot.statusText,
-            systemImage: "scope",
+            systemImage: FocusSnapshot.fallbackSymbolName,
             description: Text("Closing this window keeps FocusPilot running in the menu bar.")
         )
         .frame(minWidth: 480, minHeight: 320)
         .task { await model.refresh() }
+        // LSUIElement keeps the app out of the Dock, but while the planning
+        // window is open the owner should be able to find it there and with
+        // Command-Tab like any other window.
+        .onAppear { NSApplication.shared.setActivationPolicy(.regular) }
+        .onDisappear { NSApplication.shared.setActivationPolicy(.accessory) }
     }
 }

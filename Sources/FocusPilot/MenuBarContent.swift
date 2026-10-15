@@ -5,6 +5,7 @@ import SwiftUI
 struct MenuBarContent: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Text(model.snapshot.statusText)
@@ -22,6 +23,12 @@ struct MenuBarContent: View {
         }
 
         LoginItemToggle(settings: model.loginItem)
+
+        Button("Settings…") {
+            openSettings()
+            NSApplication.shared.activate()
+        }
+        .keyboardShortcut(",")
 
         Divider()
 
