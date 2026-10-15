@@ -28,14 +28,27 @@ struct FocusEnginePolicyTests {
         #expect(publishedPolicy(interrupted) == .some(SessionPolicy(sessionID: running.id, mode: .strict, end: running.plannedEnd)))
     }
 
-    @Test(arguments: [FocusEvent.pause, .startBreak(duration: 5 * 60)])
-    mutating func normalSessionsLiftSessionRulesWhileInterrupted(by interruption: FocusEvent) throws {
+    @Test mutating func normalSessionsLiftSessionRulesWhilePaused() throws {
         let running = try start(.normal)
         clock.advance(minutes: 10)
 
-        let interrupted = try FocusEngine.handle(interruption, session: running, at: clock.now)
+        let paused = try FocusEngine.handle(.pause, session: running, at: clock.now)
 
-        #expect(publishedPolicy(interrupted) == .some(nil))
+        #expect(publishedPolicy(paused) == .some(nil))
+    }
+
+    /// The break end travels with the policy so extensions resume blocking on
+    /// their own if the app crashes mid-break.
+    @Test mutating func normalBreaksPublishWhenBlockingResumes() throws {
+        let running = try start(.normal)
+        clock.advance(minutes: 10)
+
+        let onBreak = try FocusEngine.handle(.startBreak(duration: 5 * 60), session: running, at: clock.now)
+
+        let breakEnd = clock.minutes(from: clock.now, 5)
+        #expect(publishedPolicy(onBreak) == .some(SessionPolicy(
+            sessionID: running.id, mode: .normal, end: running.plannedEnd, resumesAt: breakEnd
+        )))
     }
 
     @Test(arguments: [SessionMode.normal, .strict])
