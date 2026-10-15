@@ -69,6 +69,7 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-14: The Phase 1 interface reference is [docs/design/focuspilot-phase1-design.html](../design/focuspilot-phase1-design.html). The strict-session 60-second wait before an exception is a proposed value awaiting owner confirmation.
 - 2026-10-14: Pausing a session does not move its planned end; the end stays the absolute instant the extensions already hold.
 - 2026-10-14: Strict sessions keep blocking during pauses and breaks; normal sessions lift session-only rules while paused or on a break. Always-on and scheduled rules are unaffected by either.
+- 2026-10-14: Review process changed, superseding the two 2026-10-13 entries about the owner reading and merging every pull request. Code still lands only through pull requests. Claude merges a pull request after its tests pass and a separate reviewer agent with fresh context has checked it against the ticket, the design reference and the recorded decisions, and the findings are fixed. The owner reviews two things, without reading code: the behavior of Herdr agent features (what FocusPilot can see and do to agents) before those merge, and the look and feel of screens through screenshots or try-it steps. Every merge gets a plain-language summary.
 
 ## Sources
 

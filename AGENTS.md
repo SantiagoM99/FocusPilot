@@ -16,6 +16,10 @@ Read README.md and the relevant design documents before editing. This project is
 - Independent skeptical review is useful when explicitly requested; record findings and dispositions.
 - Avoid adding unrelated dependencies or writing brittle tests for design documents.
 
+## Review and merge
+
+Code lands through pull requests only. A PR merges after its tests pass and an independent reviewer agent (fresh context) checks it against the ticket, `docs/design/` and the decision records, with findings fixed. The owner does not read code. Before merging, get the owner's sign-off on Herdr agent behavior (described in plain language) and on screens (screenshots or try-it steps). See decision 0003, 2026-10-14.
+
 ## Agent skills
 
 ### Issue tracker
