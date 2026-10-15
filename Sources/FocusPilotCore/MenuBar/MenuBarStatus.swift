@@ -6,7 +6,7 @@ public struct MenuBarStatus: Equatable, Sendable {
     /// Time left in the session, or `nil` when the owner keeps it hidden or
     /// no session is active.
     public var timeText: String?
-    /// The logo design dims the time while paused.
+    /// The logo design dims the time while paused; breaks share the paused glyph.
     public var isTimeDimmed: Bool
     public var accessibilityLabel: String
 
@@ -14,7 +14,7 @@ public struct MenuBarStatus: Equatable, Sendable {
         let session = snapshot.activeSession
         glyph = Self.glyph(phase: session?.phase, isObserveOnly: snapshot.isObserveOnly)
         timeText = session.flatMap { showsTime ? Self.format(remaining: $0.plannedEnd.timeIntervalSince(now)) : nil }
-        if case .paused = session?.phase { isTimeDimmed = true } else { isTimeDimmed = false }
+        isTimeDimmed = glyph == .paused
 
         let state = Self.spokenState(phase: session?.phase, isObserveOnly: snapshot.isObserveOnly, status: snapshot.statusText)
         accessibilityLabel = ["FocusPilot: \(state)", timeText.map { "\($0) left" }].compactMap(\.self).joined(separator: ", ")

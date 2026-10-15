@@ -60,9 +60,11 @@ struct MenuBarStatusTests {
         #expect(status(FocusSnapshot(), showsTime: true).timeText == nil)
     }
 
-    @Test func timeIsDimmedOnlyWhilePaused() {
+    @Test func timeIsDimmedWheneverTheGlyphShowsPaused() {
         let paused = FocusSnapshot(session: .sample(phase: .paused(since: start)))
+        let onBreak = FocusSnapshot(session: .sample(phase: .onBreak(until: start.addingTimeInterval(5 * 60))))
         #expect(status(paused, showsTime: true).isTimeDimmed)
+        #expect(status(onBreak, showsTime: true).isTimeDimmed)
         #expect(!status(FocusSnapshot(session: .sample(phase: .running)), showsTime: true).isTimeDimmed)
     }
 
