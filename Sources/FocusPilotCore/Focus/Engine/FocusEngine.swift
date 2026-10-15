@@ -68,22 +68,24 @@ public enum FocusEngine {
         return FocusTransition(session: elapsed, effects: effects)
     }
 
-    /// Applies the deadlines between the session's last state and `now`.
+    /// Applies, in time order, every deadline between the session's last
+    /// state and `now`.
     ///
     /// Ends are recorded at the planned instant, not at `now`, so a Mac that
-    /// slept through the end does not stretch the session.
+    /// slept through the end does not stretch the session. Once the session
+    /// has ended, earlier notices (a break running out) are no longer news.
     private static func elapse(_ session: FocusSession, until now: Date) -> (FocusSession, [FocusNotice]) {
         var session = session
-        if session.hasEnded { return (session, []) }
-        if now >= session.plannedEnd {
-            session.phase = .ended(at: session.plannedEnd, reason: .reachedPlannedEnd)
-            return (session, [.sessionReachedPlannedEnd])
-        }
-        if case .onBreak(let until) = session.phase, now >= until {
+        var notices: [FocusNotice] = []
+        while let deadline = session.nextDeadline, deadline <= now {
+            if deadline >= session.plannedEnd {
+                session.phase = .ended(at: session.plannedEnd, reason: .reachedPlannedEnd)
+                return (session, [.sessionReachedPlannedEnd])
+            }
             session.phase = .running
-            return (session, [.breakEnded])
+            notices.append(.breakEnded)
         }
-        return (session, [])
+        return (session, notices)
     }
 
     private static func changed(to session: FocusSession) -> FocusTransition {

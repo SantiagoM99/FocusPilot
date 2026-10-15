@@ -86,8 +86,10 @@ struct FocusEngineTimeTests {
 
         let transition = try FocusEngine.handle(.reconcile, session: onBreak, at: clock.now)
 
-        #expect(transition.session?.phase == .ended(at: running.plannedEnd, reason: .reachedPlannedEnd))
-        #expect(transition.effects.filter { if case .notify = $0 { true } else { false } } == [.notify(.sessionReachedPlannedEnd)])
+        // Both deadlines were crossed: the break ended at minute 23, the session at 25.
+        let ended = try #require(transition.session)
+        #expect(ended.phase == .ended(at: running.plannedEnd, reason: .reachedPlannedEnd))
+        #expect(transition.effects == [.persist(ended), .publishPolicy(nil), .notify(.sessionReachedPlannedEnd)])
     }
 
     @Test mutating func aPauseDoesNotMoveThePlannedEnd() throws {
