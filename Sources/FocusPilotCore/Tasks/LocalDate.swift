@@ -26,9 +26,9 @@ public struct LocalDate: Hashable, Comparable, Sendable {
     }
 
     public init?(isoString: String) {
-        let parts = isoString.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3 else { return nil }
-        self.init(year: parts[0], month: parts[1], day: parts[2])
+        let parts = isoString.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else { return nil }
+        self.init(year: Int(parts[0])!, month: Int(parts[1])!, day: Int(parts[2])!)
         guard isValid else { return nil }
     }
 

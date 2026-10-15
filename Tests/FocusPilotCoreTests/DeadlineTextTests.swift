@@ -56,17 +56,24 @@ struct DeadlineTextTests {
         #expect(text(typed).relative(at: wednesdayMorningInBogota) == label)
     }
 
-    @Test func pastDeadlinesReadAsOverdueWithTheirExactTime() {
-        #expect(text("Oct 13 18:00").relative(at: wednesdayMorningInBogota) == "Overdue · Tue 13 Oct, 18:00")
-        #expect(text("8:00").relative(at: wednesdayMorningInBogota) == "Overdue · today 08:00")
-        #expect(text("2026-10-01").relative(at: wednesdayMorningInBogota) == "Overdue · Thu 1 Oct")
+    @Test func pastDeadlinesReadAsOverdueWithTheirExactTimeAndCity() {
+        #expect(text("Oct 13 18:00").relative(at: wednesdayMorningInBogota) == "Overdue · Tue 13 Oct, 18:00 · Bogotá")
+        #expect(text("8:00").relative(at: wednesdayMorningInBogota) == "Overdue · today 08:00 · Bogotá")
+        #expect(text("2026-10-01").relative(at: wednesdayMorningInBogota) == "Overdue · Thu 1 Oct · Bogotá")
+    }
+
+    @Test func previewWarnsOnlyWhenTheDeadlineHasPassed() {
+        #expect(text("wed 9am").pastWarning(at: wednesdayMorningInBogota) == "In the past")
+        #expect(text("2026-10-01").pastWarning(at: wednesdayMorningInBogota) == "In the past")
+        #expect(text("today").pastWarning(at: wednesdayMorningInBogota) == nil)
+        #expect(text("wed 11am").pastWarning(at: wednesdayMorningInBogota) == nil)
     }
 
     @Test func dateOnlyDeadlineIsNotOverdueUntilItsDayEnds() {
         let lateToday = instant("2026-10-14T23:59:00-05:00")
 
         #expect(text("today").relative(at: lateToday) == "Due today")
-        #expect(text("today").relative(at: instant("2026-10-15T00:00:00-05:00")) == "Overdue · Wed 14 Oct")
+        #expect(text("today").relative(at: instant("2026-10-15T00:00:00-05:00")) == "Overdue · Wed 14 Oct · Bogotá")
     }
 
     @Test func inspectionShowsExactDateTimeAndZone() {

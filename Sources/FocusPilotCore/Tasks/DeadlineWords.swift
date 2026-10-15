@@ -1,7 +1,8 @@
 import Foundation
 
-/// The date half of a typed deadline: "today", "tomorrow", a weekday, a month
-/// and day with optional year, or an ISO date.
+/// The date half of a typed deadline: "today", "tomorrow", a weekday
+/// (optionally "this" or "next"), a month and day with optional year, or an
+/// ISO date.
 enum DateWords {
     /// Matches a date at the start of `tokens` and returns the unused rest.
     static func match(_ tokens: [Substring], resolver: DeadlineParser) -> (LocalDate, ArraySlice<Substring>)? {
@@ -11,6 +12,11 @@ enum DateWords {
         if first == "today" { return (resolver.today, rest) }
         if first == "tomorrow" { return (resolver.today.adding(days: 1), rest) }
         if let weekday = weekdays[first] { return (resolver.coming(weekday: weekday), rest) }
+        if first == "this" || first == "next" {
+            guard let second = rest.first, let weekday = weekdays[second] else { return nil }
+            let date = first == "this" ? resolver.coming(weekday: weekday) : resolver.inFollowingWeek(weekday: weekday)
+            return (date, rest.dropFirst())
+        }
         if let date = LocalDate(isoString: String(first)) { return (date, rest) }
 
         // "Oct 20 [2026]" or "20 Oct [2026]"
@@ -22,11 +28,15 @@ enum DateWords {
         guard let month, let day else { return nil }
 
         let afterDay = rest.dropFirst()
+        // A four-digit number is a year only in a plausible range, so a
+        // 24-hour time typed without a colon ("Oct 16 2359") is rejected
+        // rather than read as the year 2359.
         if let yearToken = afterDay.first, yearToken.count == 4, let year = Int(yearToken) {
             let date = LocalDate(year: year, month: month, day: day)
-            return date.isValid ? (date, afterDay.dropFirst()) : nil
+            guard resolver.plausibleYears.contains(year), date.isValid else { return nil }
+            return (date, afterDay.dropFirst())
         }
-        guard let date = resolver.nearest(month: month, day: day) else { return nil }
+        guard let date = resolver.nextOccurrence(month: month, day: day) else { return nil }
         return (date, afterDay)
     }
 
@@ -83,7 +93,9 @@ struct TimeOfDay: Equatable {
 
     private static func twelveHour(_ token: Substring, isPM: Bool) -> TimeOfDay? {
         let time = token.contains(":") ? clock(token) : Int(token).map { TimeOfDay(hour: $0, minute: 0) }
-        guard let time, (1...12).contains(time.hour) else { return nil }
+        // "12am" is rejected: people usually mean the end of that day, which
+        // is 00:00 of the next one. DeadlineParser.hint explains this.
+        guard let time, (1...12).contains(time.hour), isPM || time.hour != 12 else { return nil }
         let hour = time.hour % 12 + (isPM ? 12 : 0)
         return TimeOfDay(hour: hour, minute: time.minute)
     }

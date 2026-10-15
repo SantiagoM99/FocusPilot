@@ -39,6 +39,12 @@ public struct DeadlineText: Sendable {
         }
     }
 
+    /// "In the past" when the deadline has already passed at `now`, so a
+    /// typo like "wed 9am" typed at 10:00 is noticed before saving.
+    public func pastWarning(at now: Date) -> String? {
+        deadline.isOverdue(at: now) ? "In the past" : nil
+    }
+
     // MARK: Today list
 
     /// "Due Fri 23:59", "Due tomorrow", "Overdue · Tue 13 Oct, 18:00", ...
@@ -48,7 +54,8 @@ public struct DeadlineText: Sendable {
             .dateComponents([.day], from: today.start(in: deadline.timeZone), to: dayStart).day!
 
         if deadline.isOverdue(at: now) {
-            return "Overdue · " + (days == 0 ? "today" + time(" ") : dayAndMonth(today: today) + time(", "))
+            let when = days == 0 ? "today" + time(" ") : dayAndMonth(today: today) + time(", ")
+            return "Overdue · \(when) · \(city)"
         }
         switch days {
         case 0: return "Due today" + time(" ")
@@ -67,6 +74,15 @@ public struct DeadlineText: Sendable {
     }
 
     // MARK: Pieces
+
+    /// The time zone's city as people write it: "Bogotá", "New York".
+    private var city: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en")
+        formatter.timeZone = deadline.timeZone
+        formatter.dateFormat = "VVV"
+        return formatter.string(from: dayStart)
+    }
 
     private var dayStart: Date { deadline.localDate.start(in: deadline.timeZone) }
 

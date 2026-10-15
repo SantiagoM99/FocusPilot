@@ -41,3 +41,16 @@ struct DeadlineAdjustmentTests {
         #expect(oct20.moving(to: LocalDate(year: 2026, month: 11, day: 3)).due == .dateOnly(LocalDate(year: 2026, month: 11, day: 3)))
     }
 }
+
+@Suite("LocalDate")
+struct LocalDateTests {
+    @Test(arguments: ["2026-10-x-20", "2026-10", "2026--10-20", "2026-1o-20", "2026-02-30", ""])
+    func isoStringNeedsExactlyThreeNumericParts(_ text: String) {
+        #expect(LocalDate(isoString: text) == nil)
+    }
+
+    @Test func isoStringRoundTrips() {
+        #expect(LocalDate(isoString: "2026-10-20") == LocalDate(year: 2026, month: 10, day: 20))
+        #expect(LocalDate(year: 2026, month: 1, day: 5).isoString == "2026-01-05")
+    }
+}

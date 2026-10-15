@@ -9,7 +9,8 @@ import Foundation
 /// result, so date-only and timed deadlines cannot be told apart.
 ///
 /// The whole text must be understood. Anything else (including ambiguous
-/// phrases like "next fri") returns nil rather than a guess.
+/// times like "12am") returns nil rather than a guess; `hint(for:)` says
+/// what to type instead.
 public struct DeadlineParser: Sendable {
     public var now: Date
     public var timeZone: TimeZone
@@ -28,6 +29,14 @@ public struct DeadlineParser: Sendable {
         let dateOnly = Deadline(due: .dateOnly(date ?? today), timeZone: timeZone, originalText: trimmed)
         guard let time else { return dateOnly }
         return dateOnly.addingTime(hour: time.hour, minute: time.minute)
+    }
+
+    /// What to tell the owner when `parse` returned nil for `text`.
+    public static func hint(for text: String) -> String {
+        if text.lowercased().contains(/midnight|\b12(:00)?\s*am\b/) {
+            return "“12am” and “midnight” are ambiguous. Type 23:59 for the end of a day, or 00:00 with the next day's date."
+        }
+        return "Could not read this deadline. Try “fri 23:59”, “Oct 20” or “2026-10-20”."
     }
 
     // MARK: Structure
@@ -68,17 +77,26 @@ public struct DeadlineParser: Sendable {
         return today.adding(days: (weekday - todayWeekday + 7) % 7)
     }
 
-    /// A month and day without a year: the occurrence nearest to today, so
-    /// "Jan 5" in October means next January and "Oct 13" means yesterday.
-    func nearest(month: Int, day: Int) -> LocalDate? {
-        let today = today
-        return (today.year - 1 ... today.year + 1)
-            .map { LocalDate(year: $0, month: month, day: day) }
-            .filter(\.isValid)
-            .min { distance(today, $0) < distance(today, $1) }
+    /// "next fri": that weekday in the week after this one, weeks starting
+    /// on Monday. On Wednesday 14 Oct, "next mon" is 19 Oct and "next fri"
+    /// is 23 Oct.
+    func inFollowingWeek(weekday: Int) -> LocalDate {
+        let daysSinceMonday = (calendar.component(.weekday, from: now) + 5) % 7
+        let nextMonday = today.adding(days: 7 - daysSinceMonday)
+        return nextMonday.adding(days: (weekday + 5) % 7)
     }
 
-    private func distance(_ a: LocalDate, _ b: LocalDate) -> Int {
-        abs(calendar.dateComponents([.day], from: a.start(in: timeZone), to: b.start(in: timeZone)).day!)
+    /// Years a typed deadline may name: last year to ten years ahead.
+    var plausibleYears: ClosedRange<Int> { today.year - 1 ... today.year + 10 }
+
+    /// A month and day without a year: the next occurrence, looking back up
+    /// to a week so a just-missed deadline ("Oct 13" on 14 Oct) stays in the
+    /// past instead of moving a year ahead.
+    func nextOccurrence(month: Int, day: Int) -> LocalDate? {
+        let earliest = today.adding(days: -7)
+        return (today.year - 1 ... today.year + 1)
+            .map { LocalDate(year: $0, month: month, day: day) }
+            .filter { $0.isValid && $0 >= earliest }
+            .min()
     }
 }
