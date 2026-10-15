@@ -21,6 +21,12 @@ let package = Package(
             name: "FocusPilot",
             dependencies: ["FocusPilotCore"]
         ),
+        // Build-time tool: writes AppIcon.icon for scripts/build-app.sh and
+        // renders review images. Not part of the app.
+        .executableTarget(
+            name: "RenderArtwork",
+            dependencies: ["FocusPilotCore"]
+        ),
         .testTarget(
             name: "FocusPilotCoreTests",
             dependencies: ["FocusPilotCore", .product(name: "GRDB", package: "GRDB.swift")]
