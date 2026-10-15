@@ -1,20 +1,17 @@
 import FocusPilotCore
 import SwiftUI
 
-/// The "New task" sheet: title, deadline with a live preview of how it was
-/// read, optional project and next action. Only the title is required.
+/// The "New task" sheet. The owner types the task and its deadline in one
+/// field ("Write NLP report by Friday 11pm"); the sheet previews the split
+/// title and the deadline's reading, both correctable, before saving.
 struct QuickCaptureSheet: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var title = ""
-    @State private var deadlineText = ""
-    /// The owner's correction of the parsed deadline; cleared when the
-    /// deadline text changes, so the preview always follows the text.
-    @State private var correctedDeadline: Deadline?
+    @State private var text = ""
+    /// Split and parsed once per text change; Save stores exactly this.
+    @State private var draft = CaptureDraft()
     @State private var isEditingDeadline = false
-    @State private var projectName = ""
-    @State private var nextAction = ""
     @State private var isSaving = false
 
     var body: some View {
@@ -25,29 +22,38 @@ struct QuickCaptureSheet: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
+            TextField("Task", text: $text)
+                .font(.title3)
+
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 12) {
                 GridRow {
                     fieldLabel("Title")
-                    TextField("Title", text: $title, prompt: Text("Write NLP report"))
-                        .font(.title3)
+                    TextField("Title", text: $draft.title, prompt: Text(""))
                 }
                 GridRow {
                     fieldLabel("Deadline")
                     VStack(alignment: .leading, spacing: 8) {
-                        TextField("Deadline", text: $deadlineText, prompt: Text("by Friday 11pm"))
-                        DeadlinePreview(typedText: deadlineText, deadline: deadline)
-                        if isEditingDeadline, let deadline {
-                            DeadlineEditor(deadline: Binding(get: { deadline }, set: { correctedDeadline = $0 }))
+                        DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
+                        if draft.deadlineText != nil {
+                            Button("Remove deadline") {
+                                draft.removeDeadline()
+                                isEditingDeadline = false
+                            }
+                            .buttonStyle(.link)
+                        }
+                        if isEditingDeadline, let deadline = draft.deadline {
+                            DeadlineEditor(deadline: Binding(get: { deadline }, set: { draft.correctDeadline($0) }))
                         }
                     }
                 }
                 GridRow {
                     fieldLabel("Project")
-                    TextField("Project", text: $projectName, prompt: Text("Optional"))
+                    ProjectPicker(projectTitles: model.projectTitles, projectName: $draft.projectName)
                 }
                 GridRow {
                     fieldLabel("Next action")
-                    TextField("Next action", text: $nextAction, prompt: Text("Optional"))
+                    TextField("Next action", text: Binding(get: { draft.nextAction ?? "" }, set: { draft.nextAction = $0 }),
+                              prompt: Text("Optional"))
                 }
             }
 
@@ -58,23 +64,34 @@ struct QuickCaptureSheet: View {
             }
 
             HStack(spacing: 8) {
-                if let deadline {
+                if let deadline = draft.deadline {
                     Button(deadline.wallClockTime == nil ? "Add a time…" : "Change date or time zone…") {
                         isEditingDeadline.toggle()
                     }
                 }
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Save", action: save)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!canSave)
+                Button(role: .cancel) { dismiss() } label: {
+                    HStack(spacing: 6) {
+                        Text("Cancel")
+                        KeyHint("esc")
+                    }
+                }
+                .keyboardShortcut(.cancelAction)
+                Button(action: save) {
+                    HStack(spacing: 6) {
+                        Text("Save")
+                        KeyHint("⏎")
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(draft.newTask == nil || isSaving)
             }
         }
         .padding(16)
         .frame(width: 520)
-        .onChange(of: deadlineText) {
-            correctedDeadline = nil
+        .onChange(of: text) {
+            draft.setText(text, now: .now, timeZone: .current)
+            isEditingDeadline = false
         }
     }
 
@@ -84,25 +101,8 @@ struct QuickCaptureSheet: View {
             .gridColumnAlignment(.trailing)
     }
 
-    // MARK: State
-
-    private var deadline: Deadline? {
-        correctedDeadline ?? DeadlineParser(now: .now, timeZone: .current).parse(deadlineText)
-    }
-
-    private var newTask: NewTask {
-        NewTask(title: title, projectName: projectName, deadline: deadline, nextAction: nextAction)
-    }
-
-    /// Typed deadline text that could not be read blocks saving: saving
-    /// without it would silently drop what the owner typed.
-    private var canSave: Bool {
-        let deadlineUnreadable = !deadlineText.trimmingCharacters(in: .whitespaces).isEmpty && deadline == nil
-        return newTask.isValid && !deadlineUnreadable && !isSaving
-    }
-
     private func save() {
-        guard canSave else { return }
+        guard let newTask = draft.newTask, !isSaving else { return }
         isSaving = true
         Task {
             if await model.capture(newTask) {
@@ -110,5 +110,23 @@ struct QuickCaptureSheet: View {
             }
             isSaving = false
         }
+    }
+}
+
+/// A keyboard shortcut chip shown inside a button, e.g. "esc" or "⏎".
+private struct KeyHint: View {
+    let key: String
+
+    init(_ key: String) {
+        self.key = key
+    }
+
+    var body: some View {
+        Text(key)
+            .font(.subheadline)
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 4)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(.separator))
+            .accessibilityHidden(true)
     }
 }

@@ -1,11 +1,11 @@
 import FocusPilotCore
 import SwiftUI
 
-/// Shows how the typed deadline was read, before anything is saved: exact
-/// date (and time), whether it is date-only or timed, its time zone, and the
-/// text it came from.
+/// Shows how the deadline phrase was read, before anything is saved: exact
+/// date (and time), whether it is date-only or timed, its time zone, the
+/// text it came from, and a warning if it is already in the past.
 struct DeadlinePreview: View {
-    let typedText: String
+    let deadlineText: String?
     let deadline: Deadline?
 
     var body: some View {
@@ -23,18 +23,21 @@ struct DeadlinePreview: View {
                     Text(text.source)
                         .font(.callout)
                         .foregroundStyle(.tertiary)
+                    if let warning = text.pastWarning(at: .now) {
+                        Text(warning)
+                            .font(.callout)
+                            .foregroundStyle(.red)
+                    }
                 }
             }
             .accessibilityElement(children: .combine)
-        } else if typedText.trimmingCharacters(in: .whitespaces).isEmpty {
-            Text("Optional. For example “fri 23:59” or “Oct 20”.")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
-        } else {
-            Label("Could not read this deadline. Try “fri 23:59”, “Oct 20” or “2026-10-20”.",
-                  systemImage: "exclamationmark.triangle.fill")
+        } else if let deadlineText {
+            Label(DeadlineParser.hint(for: deadlineText), systemImage: "exclamationmark.triangle.fill")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        } else {
+            Text("None")
+                .foregroundStyle(.tertiary)
         }
     }
 }
