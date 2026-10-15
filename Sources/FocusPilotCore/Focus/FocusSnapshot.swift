@@ -1,23 +1,29 @@
 /// An immutable picture of FocusCoordinator state for the UI to display.
 public struct FocusSnapshot: Equatable, Sendable {
-    /// The menu bar shows an icon, never text: macOS hides menu bar items
-    /// behind the notch when the bar is crowded, and a long text item is the
-    /// first to go, which makes the app look as if it had quit.
-    public static let menuBarSymbolName = "scope"
+    /// SF Symbol used inside the app where the custom glyph is not drawn yet
+    /// (logo design 2d). The menu bar uses `MenuBarGlyph` instead.
+    public static let fallbackSymbolName = "scope"
 
     public var currentTaskTitle: String?
+    /// The latest session, which may have ended; `nil` before the first one.
+    public var session: FocusSession?
+    /// Observe-only mode measures without blocking (P0, ticket T13).
+    public var isObserveOnly: Bool
 
-    public init(currentTaskTitle: String? = nil) {
+    public init(currentTaskTitle: String? = nil, session: FocusSession? = nil, isObserveOnly: Bool = false) {
         self.currentTaskTitle = currentTaskTitle
+        self.session = session
+        self.isObserveOnly = isObserveOnly
+    }
+
+    /// The session that is still running, paused or on a break.
+    public var activeSession: FocusSession? {
+        guard let session, !session.hasEnded else { return nil }
+        return session
     }
 
     /// The state line shown inside the menu and the planning window.
     public var statusText: String {
-        currentTaskTitle ?? "No current task"
-    }
-
-    /// What VoiceOver reads for the menu bar icon, which has no visible text.
-    public var menuBarAccessibilityLabel: String {
-        "FocusPilot: \(statusText)"
+        activeSession?.action ?? currentTaskTitle ?? "No current task"
     }
 }
