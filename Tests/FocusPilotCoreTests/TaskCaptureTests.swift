@@ -10,7 +10,7 @@ struct TaskCaptureTests {
 
     init() throws {
         location = StorageLocation(directory: try makeTemporaryDirectory())
-        repository = try TaskRepository(location: location)
+        repository = try TaskRepository(location: location, now: { wednesdayMorningInBogota })
     }
 
     private func deadline(_ text: String) -> Deadline {
@@ -25,6 +25,29 @@ struct TaskCaptureTests {
         #expect(item.projectTitle == nil)
         #expect(item.nextAction == nil)
         #expect(item.deadline == nil)
+    }
+
+    @Test func newTaskStartsAtRevisionOneStampedWithTheClock() async throws {
+        let task = try await repository.addTask(NewTask(title: "Write NLP report"))
+
+        let stored = try #require(try await repository.tasks().first)
+        #expect(task == stored)
+        #expect(stored.revision == 1)
+        #expect(stored.createdAt == wednesdayMorningInBogota)
+        #expect(stored.updatedAt == wednesdayMorningInBogota)
+    }
+
+    @Test func rowsWrittenWithoutBookkeepingGetDatabaseDefaults() async throws {
+        let queue = try DatabaseQueue(path: location.ownerDatabaseURL.path)
+        try await queue.write { db in
+            try db.execute(sql: "INSERT INTO task (title) VALUES ('Raw')")
+        }
+        try queue.close()
+
+        let stored = try #require(try await repository.tasks().first)
+        #expect(stored.revision == 1)
+        #expect(abs(stored.createdAt.timeIntervalSinceNow) < 60)
+        #expect(stored.updatedAt == stored.createdAt)
     }
 
     @Test func blankTitleIsRejected() async throws {
@@ -115,5 +138,21 @@ struct OwnerMigrationTests {
 
         #expect(tasks.map(\.title) == ["Read chapter 3"])
         #expect(tasks.first?.deadline == nil)
+    }
+
+    @Test func tasksSavedBeforeV2GetRevisionOneAndTheMigrationTime() async throws {
+        let location = StorageLocation(directory: try makeTemporaryDirectory())
+        let oldDatabase = try DatabaseQueue(path: location.ownerDatabaseURL.path)
+        try OwnerSchema.migrator.migrate(oldDatabase, upTo: "owner-v1-task")
+        try await oldDatabase.write { db in
+            try db.execute(sql: "INSERT INTO task (title) VALUES ('Read chapter 3')")
+        }
+        try oldDatabase.close()
+
+        let task = try #require(try await TaskRepository(location: location).tasks().first)
+
+        #expect(task.revision == 1)
+        #expect(abs(task.createdAt.timeIntervalSinceNow) < 60)
+        #expect(task.updatedAt == task.createdAt)
     }
 }

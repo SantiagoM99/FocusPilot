@@ -14,14 +14,17 @@ import GRDB
 public actor TaskRepository {
     private let ownerDatabase: DatabasePool
     private let cacheDatabase: DatabasePool
+    private let now: @Sendable () -> Date
 
     /// Opens (creating if needed) both databases in `location` and brings each
-    /// up to date with its own migrations.
+    /// up to date with its own migrations. `now` stamps created and updated
+    /// times; tests pass a fixed clock.
     ///
     /// Only a failure of the owner database is thrown. A cache that cannot be
     /// opened or migrated is deleted and recreated empty, because losing
     /// derived values is cheap and must never keep the owner from their data.
-    public init(location: StorageLocation) throws {
+    public init(location: StorageLocation, now: @escaping @Sendable () -> Date = Date.init) throws {
+        self.now = now
         try FileManager.default.createDirectory(at: location.directory, withIntermediateDirectories: true)
         ownerDatabase = try DatabasePool(path: location.ownerDatabaseURL.path)
         try OwnerSchema.migrator.migrate(ownerDatabase)
@@ -48,11 +51,7 @@ public actor TaskRepository {
     // MARK: Owner data
 
     public func addTask(title: String) async throws -> TaskRecord {
-        try await ownerDatabase.write { db in
-            var task = TaskRecord(id: nil, title: title)
-            try task.insert(db)
-            return task
-        }
+        try await addTask(NewTask(title: title))
     }
 
     public func tasks() async throws -> [TaskRecord] {
@@ -65,8 +64,11 @@ public actor TaskRepository {
     /// same name (ignoring case) or a new one.
     public func addTask(_ newTask: NewTask) async throws -> TaskRecord {
         guard newTask.isValid else { throw NewTask.Invalid.missingTitle }
+        let createdAt = now()
+        // One write closure: the project and the task commit together or not at all.
         return try await ownerDatabase.write { db in
-            var task = TaskRecord(id: nil, title: newTask.title, nextAction: newTask.nextAction)
+            var task = TaskRecord(id: nil, title: newTask.title, nextAction: newTask.nextAction,
+                                  createdAt: createdAt, updatedAt: createdAt)
             task.deadline = newTask.deadline
             task.projectId = try newTask.projectName.map { try Self.projectID(named: $0, in: db) }
             try task.insert(db)

@@ -8,11 +8,17 @@ import GRDB
 /// (timed, UTC) is set, together with its time zone and the original text.
 /// A CHECK constraint in `OwnerSchema` enforces that; `deadline` is the typed
 /// view of those columns.
+///
+/// `revision` starts at 1 and is meant to grow with every change to the
+/// task, so derived values can tell they are stale; nothing edits tasks yet.
 public struct TaskRecord: Codable, Equatable, Sendable {
     public var id: Int64?
     public var title: String
     public var projectId: Int64? = nil
     public var nextAction: String? = nil
+    public var revision = 1
+    public var createdAt: Date
+    public var updatedAt: Date
     var deadlineLocalDate: String? = nil
     var deadlineInstant: Date? = nil
     var deadlineTimeZone: String? = nil
