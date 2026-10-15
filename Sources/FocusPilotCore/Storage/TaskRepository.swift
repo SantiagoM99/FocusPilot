@@ -61,7 +61,7 @@ public actor TaskRepository {
     }
 
     /// Saves a captured task, filing it under an existing project with the
-    /// same name (ignoring case) or a new one.
+    /// same name (ignoring case and accents) or a new one.
     public func addTask(_ newTask: NewTask) async throws -> TaskRecord {
         guard newTask.isValid else { throw NewTask.Invalid.missingTitle }
         let createdAt = now()
@@ -88,8 +88,22 @@ public actor TaskRepository {
         }
     }
 
+    /// Project titles for the capture sheet's popup, in alphabetical order.
+    public func projectTitles() async throws -> [String] {
+        try await ownerDatabase.read { db in
+            try ProjectRecord.fetchAll(db).map(\.title).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        }
+    }
+
+    /// Runs inside the caller's write, so the lookup and the insert cannot
+    /// be interleaved with another capture. Matching ignores case and accents
+    /// in Swift because SQLite's NOCASE only folds ASCII: "INVESTIGACIÓN"
+    /// files under "Investigación".
     private static func projectID(named name: String, in db: Database) throws -> Int64 {
-        if let existing = try ProjectRecord.filter(Column("title") == name).fetchOne(db) {
+        let existing = try ProjectRecord.fetchAll(db).first {
+            $0.title.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
+        if let existing {
             return existing.id!
         }
         var project = ProjectRecord(id: nil, title: name)

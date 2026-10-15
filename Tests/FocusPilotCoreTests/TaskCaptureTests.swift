@@ -94,6 +94,17 @@ struct TaskCaptureTests {
         #expect(try await repository.todayTasks().map(\.projectTitle) == ["NLP report", "NLP report"])
     }
 
+    @Test func spanishProjectNamesMatchIgnoringCaseAndAccents() async throws {
+        let first = try await repository.addTask(NewTask(title: "A", projectName: "Investigación"))
+        let second = try await repository.addTask(NewTask(title: "B", projectName: "INVESTIGACIÓN"))
+        let third = try await repository.addTask(NewTask(title: "C", projectName: "investigacion"))
+        let other = try await repository.addTask(NewTask(title: "D", projectName: "Año sabático"))
+
+        #expect(Set([first.projectId, second.projectId, third.projectId]).count == 1)
+        #expect(other.projectId != first.projectId)
+        #expect(try await repository.projectTitles() == ["Año sabático", "Investigación"])
+    }
+
     @Test func databaseRejectsADeadlineThatIsBothDateOnlyAndTimed() throws {
         let queue = try DatabaseQueue(path: location.ownerDatabaseURL.path)
 

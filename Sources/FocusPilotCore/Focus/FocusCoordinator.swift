@@ -31,4 +31,8 @@ public actor FocusCoordinator {
     public func todayTasks() async throws -> [TodayItem] {
         try await repository.todayTasks()
     }
+
+    public func projectTitles() async throws -> [String] {
+        try await repository.projectTitles()
+    }
 }

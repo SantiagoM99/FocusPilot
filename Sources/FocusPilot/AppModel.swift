@@ -8,6 +8,7 @@ import Observation
 final class AppModel {
     private(set) var snapshot = FocusSnapshot()
     private(set) var today: [TodayItem] = []
+    private(set) var projectTitles: [String] = []
     private(set) var startupError: String?
     private(set) var taskError: String?
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
@@ -71,6 +72,8 @@ final class AppModel {
         snapshot = await coordinator.snapshot()
         do {
             today = try await coordinator.todayTasks()
+            projectTitles = try await coordinator.projectTitles()
+            taskError = nil
         } catch {
             taskError = "Could not load tasks: \(error.localizedDescription)"
         }
