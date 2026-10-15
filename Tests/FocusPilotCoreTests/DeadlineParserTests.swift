@@ -88,6 +88,17 @@ struct DeadlineParserTests {
         #expect(parse("el 20 Oct")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 20)))
     }
 
+    @Test func spanishWeekdaysAndMonthsAreUnderstood() {
+        #expect(parse("el viernes")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 16)))
+        #expect(parse("para el miércoles 9:00")?.due == .timed(instant("2026-10-14T09:00:00-05:00")))
+        #expect(parse("el miercoles")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 14)))
+        #expect(parse("antes del sábado")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 17)))
+        #expect(parse("el sabado 18:00")?.due == .timed(instant("2026-10-17T18:00:00-05:00")))
+        #expect(parse("para el 20 de octubre")?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 20)))
+        #expect(parse("el 3 de enero de 2027")?.due == .dateOnly(LocalDate(year: 2027, month: 1, day: 3)))
+        #expect(parse("el 15 de setiembre")?.due == .dateOnly(LocalDate(year: 2027, month: 9, day: 15)))
+    }
+
     @Test func isoDatesMustBeStrictAndPlausible() {
         #expect(parse("2-3-4") == nil)
         #expect(parse("2026-1-5") == nil)

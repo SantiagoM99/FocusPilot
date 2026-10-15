@@ -2,7 +2,8 @@ import Foundation
 
 /// The date half of a typed deadline: "today"/"hoy", "tomorrow"/"mañana",
 /// "pasado mañana", a weekday (optionally "this" or "next"), a month and day
-/// with optional year, or an ISO date.
+/// with optional year, or an ISO date. Weekdays and months may be English or
+/// Spanish, with or without accents ("miércoles", "miercoles").
 enum DateWords {
     /// Matches a date at the start of `tokens` and returns the unused rest.
     static func match(_ tokens: [Substring], resolver: DeadlineParser) -> (LocalDate, ArraySlice<Substring>)? {
@@ -54,7 +55,7 @@ enum DateWords {
         return day
     }
 
-    private static let weekdays: [Substring: Int] = [
+    static let weekdays: [Substring: Int] = [
         "sun": 1, "sunday": 1,
         "mon": 2, "monday": 2,
         "tue": 3, "tues": 3, "tuesday": 3,
@@ -62,13 +63,17 @@ enum DateWords {
         "thu": 5, "thur": 5, "thurs": 5, "thursday": 5,
         "fri": 6, "friday": 6,
         "sat": 7, "saturday": 7,
+        "domingo": 1, "lunes": 2, "martes": 3, "miércoles": 4, "miercoles": 4,
+        "jueves": 5, "viernes": 6, "sábado": 7, "sabado": 7,
     ]
 
-    private static let months: [Substring: Int] = [
+    static let months: [Substring: Int] = [
         "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
         "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
         "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
         "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
+        "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
     ]
 }
 

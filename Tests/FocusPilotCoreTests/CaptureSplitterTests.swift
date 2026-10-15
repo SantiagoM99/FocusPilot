@@ -31,6 +31,19 @@ struct CaptureSplitterTests {
         ("Hand in essay due next mon 9:00", "Hand in essay", "due next mon 9:00"),
         ("Renew library access before 2026-10-31", "Renew library access", "before 2026-10-31"),
         ("Call bank, by tomorrow", "Call bank", "by tomorrow"),
+        // An ordinary word close to a date name stays in the title.
+        ("Fix the match by Friday", "Fix the match", "by Friday"),
+        ("Clean the fridge by Friday", "Clean the fridge", "by Friday"),
+        ("Pay money by Friday", "Pay money", "by Friday"),
+        ("Update total by 5pm", "Update total", "by 5pm"),
+        // A misspelling never overrides a readable phrase.
+        ("Present fryday by 10:00", "Present fryday", "by 10:00"),
+        // A bare time opens the phrase when a date word follows it.
+        ("Submit 12 pm Friday", "Submit", "12 pm Friday"),
+        // Spanish weekdays and months after el, para or antes del.
+        ("Llamar a Ana el viernes", "Llamar a Ana", "el viernes"),
+        ("Entregar informe para el 20 de octubre", "Entregar informe", "para el 20 de octubre"),
+        ("Pagar arriendo antes del lunes 9:00", "Pagar arriendo", "antes del lunes 9:00"),
     ])
     func onlyTheReadableTrailingPhraseBecomesTheDeadline(text: String, title: String, deadlineText: String) {
         let result = split(text)
@@ -40,6 +53,14 @@ struct CaptureSplitterTests {
         #expect(result.deadline != nil)
     }
 
+    @Test func timeBeforeTheDateIsKept() {
+        let result = split("Submit 12pm Friday")
+
+        #expect(result.title == "Submit")
+        #expect(result.deadlineText == "12pm Friday")
+        #expect(result.deadline?.due == .timed(instant("2026-10-16T12:00:00-05:00")))
+    }
+
     @Test(arguments: [
         "Email Ana", "Read paper by Smith", "Work on parser", "Work on 3 chapters", "tomorrow", "Plan 2027",
         // Abbreviations and "N pm" count only after a marker word.
@@ -47,6 +68,11 @@ struct CaptureSplitterTests {
         "Submit PhD shortlist Oct 20", "Meet Ana 10:00", "Pin 2-3-4",
         // A marker followed by ordinary words is part of the title.
         "Go running on Sundays", "Write report on today's meeting", "Read article on May Day", "Comment on 3rd draft",
+        // Ordinary words close to a date name are not misspellings.
+        "Compute total", "Watch the match", "Buy banana", "Feed the monkey", "Buy Sundae",
+        "Meet at lunch", "Comment on match", "Comprar el marco", "Jugar el domino",
+        // Spanish names need a marker: "Domingo" is also a name.
+        "Llamar a Domingo", "Entregar informe viernes",
     ])
     func textWithoutADeadlinePhraseIsAllTitle(_ text: String) {
         let result = split(text)
@@ -62,7 +88,8 @@ struct CaptureSplitterTests {
         ("Send slides by next tuesdy", "Send slides", "by next tuesdy"),
         ("Present on fryday 10:00", "Present", "on fryday 10:00"),
         ("Llamar a Ana mañnana 10:00", "Llamar a Ana", "mañnana 10:00"),
-        ("Present fryday by 10:00", "Present", "fryday by 10:00"),
+        ("Present fryday 10:00", "Present", "fryday 10:00"),
+        ("Llamar a Ana el vierns 10:00", "Llamar a Ana", "el vierns 10:00"),
     ])
     func phraseThatLooksLikeADeadlineButCannotBeReadIsKeptAsUnreadable(text: String, title: String, deadlineText: String) {
         let result = split(text)
