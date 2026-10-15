@@ -1,6 +1,6 @@
 # FocusPilot
 
-Working name for a native macOS focus assistant. Design phase; no app has been implemented.
+Working name for a native macOS focus assistant. Phase 1 implementation has started; see [BUILDING.md](BUILDING.md) to build, run and test it.
 
 FocusPilot helps its owner choose a concrete next action, work across Herdr and browser tools, and return from distraction. It supports existing project folders and creates new task environments only under user-configured parent folders.
 
