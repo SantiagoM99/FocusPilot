@@ -7,7 +7,7 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text(model.snapshot.menuBarTitle)
+        Text(model.snapshot.statusText)
         if let startupError = model.startupError {
             Text(startupError)
         }

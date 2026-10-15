@@ -9,6 +9,7 @@ final class AppModel {
     private(set) var snapshot = FocusSnapshot()
     private(set) var startupError: String?
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
+    private let firstLaunch = FirstLaunchWelcome()
 
     private let coordinator: FocusCoordinator?
 
@@ -33,6 +34,12 @@ final class AppModel {
                 loginItem.refresh()
             }
         }
+    }
+
+    /// True once, on the first launch with no tasks; see `FirstLaunchWelcome`.
+    func claimPlanningWindowAtLaunch() async -> Bool {
+        guard let coordinator, let hasTasks = try? await coordinator.hasTasks() else { return false }
+        return firstLaunch.claimPlanningWindowOpening(hasTasks: hasTasks)
     }
 
     func refresh() async {

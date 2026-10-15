@@ -17,4 +17,8 @@ public actor FocusCoordinator {
     public func snapshot() -> FocusSnapshot {
         current
     }
+
+    public func hasTasks() async throws -> Bool {
+        try await !repository.tasks().isEmpty
+    }
 }
