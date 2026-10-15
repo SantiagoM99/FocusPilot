@@ -82,6 +82,7 @@ public enum FocusEngine {
                 session.phase = .ended(at: session.plannedEnd, reason: .reachedPlannedEnd)
                 return (session, [.sessionReachedPlannedEnd])
             }
+            // Until exceptions (#14) add deadlines, only a break ends earlier.
             session.phase = .running
             notices.append(.breakEnded)
         }

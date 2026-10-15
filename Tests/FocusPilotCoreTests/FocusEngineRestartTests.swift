@@ -59,3 +59,44 @@ struct FocusEngineRestartTests {
         #expect(transition.effects == [.publishPolicy(nil)])
     }
 }
+
+/// Fixed JSON for persisted sessions: renaming a case, label or property must
+/// fail here rather than silently break restoring sessions saved earlier.
+@Suite("FocusSession golden JSON")
+struct FocusSessionGoldenJSONTests {
+    func decode(phase: String) throws -> FocusSession {
+        let json = """
+        {"id":"0B7A3C2E-5D41-4F6A-9E8B-1C2D3E4F5A6B","taskID":7,"action":"Outline the essay",
+         "mode":"strict","startedAt":800000000,"plannedEnd":800001500,"phase":\(phase)}
+        """
+        return try JSONDecoder().decode(FocusSession.self, from: Data(json.utf8))
+    }
+
+    func instant(_ seconds: TimeInterval) -> Date {
+        Date(timeIntervalSinceReferenceDate: seconds)
+    }
+
+    @Test func decodesTheSessionFields() throws {
+        let session = try decode(phase: #"{"kind":"running"}"#)
+
+        #expect(session == FocusSession(
+            id: UUID(uuidString: "0B7A3C2E-5D41-4F6A-9E8B-1C2D3E4F5A6B")!, taskID: 7, action: "Outline the essay",
+            mode: .strict, startedAt: instant(800_000_000), plannedEnd: instant(800_001_500), phase: .running
+        ))
+    }
+
+    @Test func decodesEveryPhase() throws {
+        #expect(try decode(phase: #"{"kind":"paused","since":800000600}"#).phase == .paused(since: instant(800_000_600)))
+        #expect(try decode(phase: #"{"kind":"onBreak","until":800000900}"#).phase == .onBreak(until: instant(800_000_900)))
+        #expect(try decode(phase: #"{"kind":"ended","at":800001500,"reason":"reachedPlannedEnd"}"#).phase
+            == .ended(at: instant(800_001_500), reason: .reachedPlannedEnd))
+        #expect(try decode(phase: #"{"kind":"ended","at":800001200,"reason":"completed"}"#).phase
+            == .ended(at: instant(800_001_200), reason: .completed))
+    }
+
+    @Test func normalModeIsStoredByName() throws {
+        let json = try JSONEncoder().encode(SessionMode.normal)
+
+        #expect(String(decoding: json, as: UTF8.self) == #""normal""#)
+    }
+}

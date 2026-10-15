@@ -4,18 +4,19 @@ import Foundation
 /// 2026-10-13, ARCHITECTURE.md "Enforcement ownership").
 public enum SessionMode: String, Codable, Sendable {
     /// Extensions stop blocking at the planned end on their own.
-    case normal
+    case normal = "normal"
     /// Extensions keep blocking past the planned end until the app confirms the end.
-    case strict
+    case strict = "strict"
 }
 
 /// Why a session stopped.
 public enum EndReason: String, Codable, Sendable {
-    case completed
-    case reachedPlannedEnd
+    case completed = "completed"
+    case reachedPlannedEnd = "reachedPlannedEnd"
 }
 
-public enum SessionPhase: Codable, Equatable, Sendable {
+/// Persisted with explicit keys; see `SessionPhase+Codable.swift`.
+public enum SessionPhase: Equatable, Sendable {
     case running
     case paused(since: Date)
     case onBreak(until: Date)
@@ -46,6 +47,11 @@ public struct FocusSession: Codable, Equatable, Sendable {
         self.startedAt = startedAt
         self.plannedEnd = plannedEnd
         self.phase = phase
+    }
+
+    // Spelled out so renaming a property cannot silently change stored JSON.
+    enum CodingKeys: String, CodingKey {
+        case id, taskID, action, mode, startedAt, plannedEnd, phase
     }
 
     public var hasEnded: Bool {
