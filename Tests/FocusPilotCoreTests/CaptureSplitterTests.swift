@@ -20,7 +20,14 @@ struct CaptureSplitterTests {
     @Test(arguments: [
         ("Read paper by Smith by Oct 20", "Read paper by Smith", "by Oct 20"),
         ("Prepare 2026 budget by fri", "Prepare 2026 budget", "by fri"),
-        ("Submit PhD shortlist Oct 20", "Submit PhD shortlist", "Oct 20"),
+        ("Submit PhD shortlist October 20", "Submit PhD shortlist", "October 20"),
+        ("Buy milk tomorrow", "Buy milk", "tomorrow"),
+        ("Plan trip 2026-11-02", "Plan trip", "2026-11-02"),
+        ("Llamar a Ana mañana 10:00", "Llamar a Ana", "mañana 10:00"),
+        ("Entregar informe para pasado mañana", "Entregar informe", "para pasado mañana"),
+        ("Revisar notas hoy 18:00", "Revisar notas", "hoy 18:00"),
+        ("Meet Ana at 3 pm", "Meet Ana", "at 3 pm"),
+        ("Reschedule March by Friday", "Reschedule March", "by Friday"),
         ("Hand in essay due next mon 9:00", "Hand in essay", "due next mon 9:00"),
         ("Renew library access before 2026-10-31", "Renew library access", "before 2026-10-31"),
         ("Call bank, by tomorrow", "Call bank", "by tomorrow"),
@@ -33,7 +40,14 @@ struct CaptureSplitterTests {
         #expect(result.deadline != nil)
     }
 
-    @Test(arguments: ["Email Ana", "Read paper by Smith", "Work on parser", "Work on 3 chapters", "tomorrow", "Plan 2027"])
+    @Test(arguments: [
+        "Email Ana", "Read paper by Smith", "Work on parser", "Work on 3 chapters", "tomorrow", "Plan 2027",
+        // Abbreviations and "N pm" count only after a marker word.
+        "Read The Sun", "Ir al mar 3", "Call Jan 3", "Read page 3 pm", "Read chapter 12 pm",
+        "Submit PhD shortlist Oct 20", "Meet Ana 10:00", "Pin 2-3-4",
+        // A marker followed by ordinary words is part of the title.
+        "Go running on Sundays", "Write report on today's meeting", "Read article on May Day", "Comment on 3rd draft",
+    ])
     func textWithoutADeadlinePhraseIsAllTitle(_ text: String) {
         let result = split(text)
 
@@ -47,6 +61,8 @@ struct CaptureSplitterTests {
         ("Finish draft due 12am", "Finish draft", "due 12am"),
         ("Send slides by next tuesdy", "Send slides", "by next tuesdy"),
         ("Present on fryday 10:00", "Present", "on fryday 10:00"),
+        ("Llamar a Ana mañnana 10:00", "Llamar a Ana", "mañnana 10:00"),
+        ("Present fryday by 10:00", "Present", "fryday by 10:00"),
     ])
     func phraseThatLooksLikeADeadlineButCannotBeReadIsKeptAsUnreadable(text: String, title: String, deadlineText: String) {
         let result = split(text)

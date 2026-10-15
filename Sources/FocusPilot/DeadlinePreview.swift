@@ -23,10 +23,14 @@ struct DeadlinePreview: View {
                     Text(text.source)
                         .font(.callout)
                         .foregroundStyle(.tertiary)
-                    if let warning = text.pastWarning(at: .now) {
-                        Text(warning)
-                            .font(.callout)
-                            .foregroundStyle(.red)
+                    // Re-evaluated every minute, so a deadline that passes
+                    // while the sheet is open gains the warning.
+                    TimelineView(.everyMinute) { context in
+                        if let warning = text.pastWarning(at: context.date) {
+                            Text(warning)
+                                .font(.callout)
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
             }

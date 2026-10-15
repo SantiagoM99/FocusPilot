@@ -12,12 +12,17 @@ public struct CaptureSplit: Equatable, Sendable {
 /// Splits "Write NLP report by Friday 11pm" into the title "Write NLP
 /// report" and the deadline "by Friday 11pm".
 ///
-/// The deadline is the longest trailing phrase the parser fully reads, so
-/// "by" or a year inside the title stays there ("Read paper by Smith by Oct
-/// 20", "Prepare 2026 budget by fri"). If nothing is readable but the end
-/// looks like an attempt at a deadline ("by Oct 32", "on fryday 10:00"), that
-/// phrase is returned without a deadline so the sheet can warn and block
-/// saving. Otherwise the whole text is the title.
+/// The deadline is the longest trailing phrase the parser fully reads, if
+/// it starts with a marker word (by, due, on, at, before, el, para) or,
+/// without one, with an unambiguous date word: a full weekday or month name,
+/// today/tomorrow/hoy/mañana/pasado, or an ISO date. Abbreviations and bare
+/// times are too common in titles ("Read The Sun", "Call Jan 3", "Read page
+/// 3 pm") to count without a marker.
+///
+/// When nothing is accepted but the end looks like an attempt at a deadline
+/// ("by Oct 32", "on fryday 10:00", "mañnana 10:00"), that phrase is returned
+/// without a deadline so the sheet can warn and block saving. Otherwise the
+/// whole text is the title.
 public struct CaptureSplitter: Sendable {
     public var parser: DeadlineParser
 
@@ -26,12 +31,13 @@ public struct CaptureSplitter: Sendable {
     }
 
     public func split(_ text: String) -> CaptureSplit {
-        let words = text.ranges(of: /\S+/)
-        if let readable = longestReadableSuffix(text, words) {
-            // "Present on fryday 10:00": "10:00" reads, but the misspelled
-            // day before it shows the deadline started earlier.
-            let wordBefore = text[words[readable.index - 1]]
-            if Self.looksLikeDate(wordBefore), let unreadable = unreadablePhrase(text, words) {
+        let words = text.ranges(of: /\S+/).map { text[$0] }
+        if let readable = acceptedReadablePhrase(text, words) {
+            // "Present fryday by 10:00": the misspelled day before the phrase
+            // shows the deadline started earlier. An exact name before it is
+            // just part of the title ("Reschedule March by Friday").
+            if DateVocabulary.isMisspelledName(words[readable.index - 1]),
+               let unreadable = unreadablePhrase(text, words) {
                 return unreadable
             }
             return readable.split
@@ -39,12 +45,12 @@ public struct CaptureSplitter: Sendable {
         return unreadablePhrase(text, words) ?? CaptureSplit(title: Self.title(text[...]), deadlineText: nil, deadline: nil)
     }
 
-    private func longestReadableSuffix(_ text: String, _ words: [Range<String.Index>]) -> (index: Int, split: CaptureSplit)? {
+    private func acceptedReadablePhrase(_ text: String, _ words: [Substring]) -> (index: Int, split: CaptureSplit)? {
         // Start at 1: the title keeps at least one word.
         for index in words.indices.dropFirst() {
-            let title = Self.title(text[..<words[index].lowerBound])
-            guard !title.isEmpty else { continue }
-            let phrase = String(text[words[index].lowerBound...])
+            let title = Self.title(text[..<words[index].startIndex])
+            guard !title.isEmpty, Self.mayStartDeadline(words[index]) else { continue }
+            let phrase = String(text[words[index].startIndex...])
             if let deadline = parser.parse(phrase) {
                 return (index, CaptureSplit(title: title, deadlineText: phrase, deadline: deadline))
             }
@@ -52,57 +58,36 @@ public struct CaptureSplitter: Sendable {
         return nil
     }
 
-    /// The phrase from the last by/due/before/on that is followed by
-    /// something date-like.
-    private func unreadablePhrase(_ text: String, _ words: [Range<String.Index>]) -> CaptureSplit? {
-        for index in words.indices.dropFirst().reversed() where Self.markers.contains(text[words[index]].lowercased()) {
-            let after = words[(index + 1)...].map { text[$0] }
-            guard after.contains(where: Self.looksLikeDate) else { continue }
-            return CaptureSplit(title: Self.title(text[..<words[index].lowerBound]),
-                                deadlineText: String(text[words[index].lowerBound...]), deadline: nil)
+    private static func mayStartDeadline(_ word: Substring) -> Bool {
+        let word = DateVocabulary.normalized(word)
+        return DeadlineParser.fillerWords.contains(Substring(word))
+            || DateVocabulary.unambiguousStarts.contains(word)
+            || LocalDate(isoString: word) != nil
+    }
+
+    /// The longest trailing phrase that starts at a marker followed directly
+    /// by a date-like word, or at a misspelled date name, and whose remaining
+    /// words could all belong to a date. "on May Day" and "on 3rd draft" fail
+    /// the last test and stay in the title.
+    private func unreadablePhrase(_ text: String, _ words: [Substring]) -> CaptureSplit? {
+        for index in words.indices.dropFirst() {
+            let rest = words[(index + 1)...]
+            let startsAttempt: Bool
+            if DeadlineParser.fillerWords.contains(Substring(DateVocabulary.normalized(words[index]))) {
+                startsAttempt = DateVocabulary.beginsDate(rest)
+            } else {
+                startsAttempt = DateVocabulary.isMisspelledName(words[index])
+            }
+            guard startsAttempt, rest.allSatisfy(DateVocabulary.couldBelongToDate) else { continue }
+            let title = Self.title(text[..<words[index].startIndex])
+            guard !title.isEmpty else { continue }
+            return CaptureSplit(title: title, deadlineText: String(text[words[index].startIndex...]), deadline: nil)
         }
         return nil
     }
 
-    private static let markers: Set<String> = ["by", "due", "before", "on"]
-
     /// The title without trailing separators: "Call bank," becomes "Call bank".
     private static func title(_ text: Substring) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:-–—")))
-    }
-
-    // MARK: Looking like a date
-
-    private static func looksLikeDate(_ word: Substring) -> Bool {
-        let word = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
-        if dateNames.contains(word) { return true }
-        if word.contains(/^\d{1,2}(:\d{2})?(am|pm)$|^\d{1,2}:\d{2}$|^\d{4}-\d|^\d{1,2}(st|nd|rd|th)$/) { return true }
-        // A close misspelling of a long name: "fryday", "tuesdy", "tomorow".
-        return word.count >= 5 && longDateNames.contains { editDistance(word, $0) <= 2 }
-    }
-
-    private static let longDateNames = [
-        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-        "january", "february", "march", "april", "june", "july", "august",
-        "september", "october", "november", "december", "today", "tomorrow", "tonight",
-    ]
-
-    private static let dateNames = Set(longDateNames + [
-        "mon", "tue", "tues", "wed", "thu", "thur", "thurs", "fri", "sat", "sun",
-        "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
-        "noon", "midnight",
-    ])
-
-    private static func editDistance(_ a: String, _ b: String) -> Int {
-        let a = Array(a), b = Array(b)
-        var previous = Array(0...b.count)
-        for i in 1...a.count {
-            var current = [i] + Array(repeating: 0, count: b.count)
-            for j in 1...b.count {
-                current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1))
-            }
-            previous = current
-        }
-        return previous[b.count]
     }
 }
