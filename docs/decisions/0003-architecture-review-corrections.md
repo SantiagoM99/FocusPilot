@@ -75,6 +75,7 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-14 (from the PR #24 review): `TaskRepository` is an actor, but actors are reentrant across `await`, so each logical change (including read-modify-write such as reordering or revision checks) runs inside a single `ownerDatabase.write` closure.
 - 2026-10-14 (from the PR #26 review): the focus engine emits bare session policies; FocusCoordinator wraps every publish with schema version, revision and effective time, so extensions can reject stale or out-of-order policies (required by #15). A normal-session break publishes the break end, so extensions resume blocking on their own if the app is gone.
 - 2026-10-14 (assumption): a break may run past the planned session end; the session then ends at the planned end.
+- 2026-10-14: Quick capture uses one field, as in the design reference: the app splits a trailing deadline phrase off the title and previews both before saving.
 
 ## Sources
 
