@@ -20,13 +20,15 @@ struct FocusCoordinatorTests {
         #expect(snapshot.statusText == "Write the essay")
     }
 
-    @Test func menuBarAccessibilityLabelNamesTheAppAndTheState() {
-        #expect(FocusSnapshot().menuBarAccessibilityLabel == "FocusPilot: No current task")
-        #expect(FocusSnapshot(currentTaskTitle: "Write the essay").menuBarAccessibilityLabel == "FocusPilot: Write the essay")
+    @Test func statusTextShowsTheActionOfAnActiveSession() {
+        let session = FocusSession.sample(action: "Outline section 2", phase: .running)
+        let snapshot = FocusSnapshot(currentTaskTitle: "Write the essay", session: session)
+
+        #expect(snapshot.statusText == "Outline section 2")
     }
 
-    @Test func menuBarSymbolExistsInSFSymbols() {
-        #expect(NSImage(systemSymbolName: FocusSnapshot.menuBarSymbolName, accessibilityDescription: nil) != nil)
+    @Test func fallbackSymbolExistsInSFSymbols() {
+        #expect(NSImage(systemSymbolName: FocusSnapshot.fallbackSymbolName, accessibilityDescription: nil) != nil)
     }
 
     @Test func reportsWhetherAnyTaskExists() async throws {

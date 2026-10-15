@@ -9,6 +9,7 @@ final class AppModel {
     private(set) var snapshot = FocusSnapshot()
     private(set) var startupError: String?
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
+    let menuBarPreferences = MenuBarPreferences()
     private let firstLaunch = FirstLaunchWelcome()
 
     private let coordinator: FocusCoordinator?
@@ -23,6 +24,7 @@ final class AppModel {
         }
         refreshLoginItem(on: NSMenu.didBeginTrackingNotification)
         refreshLoginItem(on: NSApplication.didBecomeActiveNotification)
+        tickWhileTimeIsShown()
     }
 
     // The owner can change the login item in System Settings while the app
@@ -40,6 +42,26 @@ final class AppModel {
     func claimPlanningWindowAtLaunch() async -> Bool {
         guard let coordinator, let hasTasks = try? await coordinator.hasTasks() else { return false }
         return firstLaunch.claimPlanningWindowOpening(hasTasks: hasTasks)
+    }
+
+    /// The instant the menu bar time label is computed for.
+    private var now = Date.now
+
+    var menuBarStatus: MenuBarStatus {
+        MenuBarStatus(snapshot: snapshot, now: now, showsTime: menuBarPreferences.showsTime)
+    }
+
+    // Advances `now` once a second, but only while a time label is visible,
+    // so an idle menu bar item is not redrawn every second.
+    private func tickWhileTimeIsShown() {
+        Task { [weak self] in
+            while let self {
+                try? await Task.sleep(for: .seconds(1))
+                if menuBarStatus.timeText != nil {
+                    now = .now
+                }
+            }
+        }
     }
 
     func refresh() async {
