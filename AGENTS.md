@@ -1,6 +1,6 @@
 # Working on FocusPilot
 
-Read README.md and the relevant design documents before editing. This project is in design phase. Do not introduce an implementation framework or application scaffold unless requested.
+Read README.md and the relevant design documents before editing. Phase 1 implementation is under way (owner decision, 2026-10-13): build what a ticket asks for, and do not add frameworks or dependencies beyond the recorded decisions (GRDB is the only storage dependency).
 
 - Preserve user-configured folder boundaries. Never reorganize unrelated projects.
 - Distinguish confirmed decisions, proposals, and platform assumptions requiring validation.
