@@ -40,7 +40,6 @@ private struct LoginItemToggle: View {
             get: { settings.isEnabled },
             set: { settings.setEnabled($0) }
         ))
-        .onAppear { settings.refresh() }
 
         if settings.needsApproval {
             Button("Allow in System Settings…") {
