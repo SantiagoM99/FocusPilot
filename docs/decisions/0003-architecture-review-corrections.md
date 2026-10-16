@@ -81,7 +81,7 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-15: Safari spike S1: an ad hoc signed app with a `group.` App Group triggers the macOS 15+ consent prompt on every container access. Shipping the App Group needs a Team ID prefix (paid developer account) or an authorizing profile; the spike's fallback is a shared folder through the extension's home-relative temporary exception (see #1).
 - 2026-10-15: A project links to at most one Herdr workspace (or none). Projects can be imported from Herdr workspaces, and while FocusPilot runs, a new Herdr workspace with no project automatically becomes a linked project (once per workspace; unlinked or deleted projects are not recreated). FocusPilot only reads Herdr for this.
 - 2026-10-15: Tasks can be added and read from Herdr panes (owner or agents) through a `focuspilot` CLI. Adds go straight to the end of Next in the workspace's linked project, marked "from Herdr" and undoable; the CLI can never change Now, order, deadlines, or existing tasks. Reads are limited to the caller workspace's project plus the current Now action.
-- 2026-10-15: All user-facing text in FocusPilot is Spanish only: labels, placeholders, menus, menu bar, Settings, hints, markers ("desde Herdr"), accessibility labels and dates (es-CO formatting). Typed capture input is still parsed in Spanish or English. Code, docs and tickets stay in English. The design reference's English strings are to be translated.
+- 2026-10-15: All user-facing text in FocusPilot is in English, placeholders included; typed capture input is still parsed in Spanish or English. (A Spanish-only request earlier the same day was withdrawn by the owner.)
 
 ## Sources
 
