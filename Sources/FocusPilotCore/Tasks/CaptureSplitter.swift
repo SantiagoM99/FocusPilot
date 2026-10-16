@@ -26,14 +26,16 @@ public struct CaptureSplit: Equatable, Sendable {
 /// are too common in titles ("Read The Sun", "Llamar a Domingo", "Read page
 /// 3 pm").
 ///
-/// A guessed misspelling never blocks saving or takes words out of the
-/// title. When a near-miss date word that `isKnownWord` does not know
-/// ("fryday", but not "match") sits right before the phrase, the whole text
-/// stays the title and the word is named for a hint.
+/// A guessed misspelling never blocks saving, drops a readable deadline or
+/// takes words out of the title. When no deadline was read, a near-miss
+/// date word ("fryday") is named for a quiet hint, unless it is a real word
+/// or name: in `NearMissWords`, known to `isKnownWord` (asked with the word
+/// as typed), or capitalized mid-sentence ("Call Martha").
 ///
 /// Saving is blocked only for a clear date attempt after a marker that has
 /// impossible values ("by Feb 30", "para el 31 de febrero", "at 25:00"):
-/// that phrase is returned without a deadline so the sheet can warn.
+/// that phrase is returned without a deadline so the sheet can warn, even
+/// when it is the whole text.
 public struct CaptureSplitter: Sendable {
     public var parser: DeadlineParser
 
@@ -43,32 +45,38 @@ public struct CaptureSplitter: Sendable {
 
     public func split(_ text: String, isKnownWord: (String) -> Bool) -> CaptureSplit {
         let words = text.ranges(of: /\S+/).map { text[$0] }
-        func isTypo(_ word: Substring) -> Bool {
-            DateVocabulary.isMisspelledName(word) && !isKnownWord(DateVocabulary.normalized(word))
+        if let start = readablePhrase(text, words) {
+            let phrase = String(text[words[start].startIndex...])
+            return CaptureSplit(title: Self.title(text[..<words[start].startIndex]), deadlineText: phrase,
+                                deadline: parser.parse(phrase))
         }
-        let start = readablePhrase(text, words, isTypo: isTypo) ?? unreadablePhrase(text, words)
+        let start = unreadablePhrase(text, words)
         var result = CaptureSplit(title: Self.title(text[...]), deadlineText: nil, deadline: nil)
         if let start {
-            let phrase = String(text[words[start].startIndex...])
-            result = CaptureSplit(title: Self.title(text[..<words[start].startIndex]), deadlineText: phrase,
-                                  deadline: parser.parse(phrase))
+            result = CaptureSplit(title: Self.title(text[..<words[start].startIndex]),
+                                  deadlineText: String(text[words[start].startIndex...]), deadline: nil)
         }
         result.unrecognizedWord = (0..<(start ?? words.count))
-            .first { isTypo(words[$0]) && DateVocabulary.isInDatePosition(words, $0) }
+            .first { Self.isTypo(words, $0, isKnownWord) && DateVocabulary.isInDatePosition(words, $0) }
             .map { words[$0].trimmingCharacters(in: .punctuationCharacters) }
         return result
     }
 
+    /// A near-miss date word that is not a real word or a name.
+    private static func isTypo(_ words: [Substring], _ index: Int, _ isKnownWord: (String) -> Bool) -> Bool {
+        let word = words[index]
+        let asTyped = word.trimmingCharacters(in: .punctuationCharacters)
+        let isCapitalizedMidSentence = index > 0 && word.first?.isUppercase == true
+        return DateVocabulary.isMisspelledName(word) && !isCapitalizedMidSentence
+            && !NearMissWords.contains(asTyped) && !isKnownWord(asTyped)
+    }
+
     /// Where the readable phrase starts, if any.
-    private func readablePhrase(_ text: String, _ words: [Substring], isTypo: (Substring) -> Bool) -> Int? {
+    private func readablePhrase(_ text: String, _ words: [Substring]) -> Int? {
         // Start at 1: the title keeps at least one word.
-        for index in words.indices.dropFirst() where Self.mayStartDeadline(words[index...]) {
-            guard parser.parse(String(text[words[index].startIndex...])) != nil else { continue }
-            // "Present fryday by 10:00": the misspelled word probably belongs
-            // to the deadline, so reading only "by 10:00" would be a guess.
-            return isTypo(words[index - 1]) ? nil : index
+        words.indices.dropFirst().first { index in
+            Self.mayStartDeadline(words[index...]) && parser.parse(String(text[words[index].startIndex...])) != nil
         }
-        return nil
     }
 
     private static func mayStartDeadline(_ words: ArraySlice<Substring>) -> Bool {
@@ -93,7 +101,8 @@ public struct CaptureSplitter: Sendable {
     /// 32", "at 13pm"). "on May Day" and "on 3rd draft" contain other words
     /// and stay in the title.
     private func unreadablePhrase(_ text: String, _ words: [Substring]) -> Int? {
-        words.indices.dropFirst().first { index in
+        // From 0: "by Feb 30" alone is still impossible.
+        words.indices.first { index in
             let rest = words[(index + 1)...]
             return DateVocabulary.isMarker(words[index])
                 && DateVocabulary.beginsDate(rest)
