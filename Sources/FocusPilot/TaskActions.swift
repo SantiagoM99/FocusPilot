@@ -21,14 +21,17 @@ extension FocusedValues {
     @Entry var quickCapture: (() -> Void)?
 }
 
-/// The Task menu (design 09). Start Focus, Pause, Complete and Open Context
-/// arrive with their tickets.
+/// The Task menu (design 09). Open Context and Locate arrive with #18.
 struct TaskCommands: Commands {
+    let model: AppModel
     @FocusedValue(\.taskActions) private var actions
     @FocusedValue(\.quickCapture) private var quickCapture
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandMenu("Task") {
+            sessionItems
+            Divider()
             Button("Quick Capture") { quickCapture?() }
                 .keyboardShortcut("n")
                 .disabled(quickCapture == nil)
@@ -39,6 +42,30 @@ struct TaskCommands: Commands {
             item("Move Up", .up, KeyboardShortcut(.upArrow, modifiers: [.command, .option]))
             item("Move Down", .down, KeyboardShortcut(.downArrow, modifiers: [.command, .option]))
         }
+    }
+
+    /// Start Focus ⌘⏎, Pause ⌥⌘P (Resume while paused), Complete ⇧⌘⏎.
+    /// Complete on a strict session ending early starts its wait; the
+    /// countdown and confirmation live in the popover, panel and Now card.
+    @ViewBuilder private var sessionItems: some View {
+        let session = model.snapshot.activeSession
+        Button("Start Focus…") {
+            model.requestStartFocus()
+            openWindow(id: PlanningView.windowID)
+        }
+        .keyboardShortcut(.return)
+        .disabled(session != nil || model.nowTask == nil)
+        if case .paused = session?.phase {
+            Button("Resume") { Task { await model.resume() } }
+                .keyboardShortcut("p", modifiers: [.command, .option])
+        } else {
+            Button("Pause") { Task { await model.pause() } }
+                .keyboardShortcut("p", modifiers: [.command, .option])
+                .disabled(session?.phase != .running)
+        }
+        Button("Complete") { Task { await model.complete() } }
+            .keyboardShortcut(.return, modifiers: [.command, .shift])
+            .disabled(session == nil)
     }
 
     private func item(_ title: String, _ move: TaskActions.Move, _ shortcut: KeyboardShortcut) -> some View {

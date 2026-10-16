@@ -44,6 +44,10 @@ struct PlanningView: View {
         .sheet(isPresented: $isCapturing) {
             QuickCaptureSheet(model: model)
         }
+        .sheet(isPresented: Bindable(model).isStartingFocus) {
+            StartFocusSheet(model: model)
+        }
+        .environment(model)
         .task { await model.refresh() }
         // LSUIElement keeps the app out of the Dock, but while the planning
         // window is open the owner should be able to find it there and with

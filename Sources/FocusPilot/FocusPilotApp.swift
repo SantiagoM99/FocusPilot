@@ -13,6 +13,7 @@ struct FocusPilotApp: App {
         } label: {
             MenuBarIcon(model: model)
         }
+        .menuBarExtraStyle(.window)
 
         Window("Planning", id: PlanningView.windowID) {
             PlanningView(model: model)
@@ -20,10 +21,10 @@ struct FocusPilotApp: App {
         // Login launches should not open a window; the menu bar item is the
         // entry point. The first launch is the exception (see MenuBarIcon).
         .defaultLaunchBehavior(.suppressed)
-        .commands { TaskCommands() }
+        .commands { TaskCommands(model: model) }
 
         Settings {
-            SettingsView(preferences: model.menuBarPreferences)
+            SettingsView(model: model)
         }
     }
 }

@@ -13,8 +13,10 @@ swift build --configuration release --product FocusPilot
 swift build --configuration release --product RenderArtwork
 bin=$(swift build --configuration release --show-bin-path)
 
-app=build/FocusPilot.app
-artwork=build/artwork
+# Absolute: actool runs through a long-lived helper that may resolve relative
+# paths against another directory.
+app="$PWD/build/FocusPilot.app"
+artwork="$PWD/build/artwork"
 rm -rf "$app" "$artwork"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$artwork"
 cp "$bin/FocusPilot" "$app/Contents/MacOS/FocusPilot"

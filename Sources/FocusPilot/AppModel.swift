@@ -17,16 +17,23 @@ final class AppModel {
     private(set) var taskError: String?
     /// What FocusPilot last saw of Herdr; nil until the first check.
     private(set) var herdr: HerdrConnection?
+    /// Set when a session command fails; shown by the session surfaces.
+    var sessionError: String?
+    /// Asks the planning window to show the Start focus sheet.
+    var isStartingFocus = false
+    /// Pending reconcile at the next session deadline.
+    @ObservationIgnored var reconcileTask: Task<Void, Never>?
+    @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
     let menuBarPreferences = MenuBarPreferences()
     private let firstLaunch = FirstLaunchWelcome()
 
-    private let coordinator: FocusCoordinator?
+    let coordinator: FocusCoordinator?
 
     init() {
         do {
             let repository = try TaskRepository(location: .applicationSupport())
-            coordinator = FocusCoordinator(repository: repository, herdr: HerdrCLI())
+            coordinator = FocusCoordinator(repository: repository, herdr: HerdrCLI(), notices: UserNotices())
         } catch {
             coordinator = nil
             startupError = "Could not open the database: \(error.localizedDescription)"
@@ -35,6 +42,7 @@ final class AppModel {
         refreshLoginItem(on: NSApplication.didBecomeActiveNotification)
         tickWhileTimeIsShown()
         watchHerdr()
+        followSessions()
     }
 
     /// Reads Herdr on `HerdrPollSchedule`, which also turns new workspaces
@@ -73,29 +81,41 @@ final class AppModel {
         return firstLaunch.claimPlanningWindowOpening(hasTasks: hasTasks)
     }
 
-    /// The instant the menu bar time label is computed for.
-    private var now = Date.now
+    /// The instant session times are computed for; see `tickWhileTimeIsShown`.
+    private(set) var now = Date.now
 
     var menuBarStatus: MenuBarStatus {
         MenuBarStatus(snapshot: snapshot, now: now, showsTime: menuBarPreferences.showsTime)
     }
 
-    // Advances `now` once a second, but only while a time label is visible,
-    // so an idle menu bar item is not redrawn every second.
+    // Advances `now` once a second while a session is active (its time is
+    // on screen in the popover and panel), so an idle app is not redrawn
+    // every second.
     private func tickWhileTimeIsShown() {
         Task { [weak self] in
             while let self {
                 try? await Task.sleep(for: .seconds(1))
-                if menuBarStatus.timeText != nil {
+                if snapshot.activeSession != nil || menuBarStatus.timeText != nil {
                     now = .now
                 }
             }
         }
     }
 
+    /// Takes a snapshot streamed by the coordinator.
+    func show(_ latest: FocusSnapshot) {
+        snapshot = latest
+        now = .now
+    }
+
+    func refreshTime() {
+        now = .now
+    }
+
     func refresh() async {
         guard let coordinator else { return }
         snapshot = await coordinator.snapshot()
+        now = .now
         do {
             today = try await coordinator.todayTasks()
             projectTitles = try await coordinator.projectTitles()
