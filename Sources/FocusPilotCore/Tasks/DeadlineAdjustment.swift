@@ -4,6 +4,24 @@ import Foundation
 /// preview. Each keeps the original text, and each keeps what the owner sees
 /// on the wall clock (day and time) rather than the underlying instant.
 extension Deadline {
+    /// The stored text of a deadline the owner picked in the sheet rather
+    /// than typed.
+    static let chosenByHandText = "chosen by hand"
+
+    /// A date-only deadline picked by hand; a time can be added afterwards.
+    public static func chosenByHand(_ date: LocalDate, timeZone: TimeZone) -> Deadline {
+        Deadline(due: .dateOnly(date), timeZone: timeZone, originalText: chosenByHandText)
+    }
+
+    public var isChosenByHand: Bool {
+        originalText == Self.chosenByHandText
+    }
+
+    /// The same deadline, no longer tied to a typed phrase.
+    public var asChosenByHand: Deadline {
+        Deadline(due: due, timeZone: timeZone, originalText: Self.chosenByHandText)
+    }
+
     public func addingTime(hour: Int, minute: Int) -> Deadline {
         var components = localDate.components
         components.hour = hour

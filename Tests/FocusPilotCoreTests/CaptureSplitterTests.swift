@@ -243,6 +243,182 @@ struct CaptureDraftTests {
         #expect(typed.newTask?.deadline?.originalText == "by Oct 20")
     }
 
+    // Owner feedback: a deadline can also be chosen by hand.
+    @Test func openingThePickerProposesTodayWithoutCommittingIt() {
+        let typed = draft("Entregar informe")
+
+        let proposal = typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+
+        #expect(proposal.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 14)))
+        #expect(proposal.timeZone == bogota)
+        #expect(proposal.isChosenByHand)
+        #expect(typed.deadline == nil)
+        #expect(typed.newTask == NewTask(title: "Entregar informe"))
+    }
+
+    @Test func thePickerProposesTheCurrentDeadlineWhenThereIsOne() {
+        let typed = draft("Entregar informe el viernes 5pm")
+
+        #expect(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota) == typed.deadline)
+    }
+
+    @Test func aPickIsCommittedOnlyWhenChosen() {
+        var typed = draft("Entregar informe")
+        let proposal = typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+
+        typed.correctDeadline(proposal.moving(to: LocalDate(year: 2026, month: 10, day: 16)).addingTime(hour: 17, minute: 0))
+
+        #expect(typed.newTask?.deadline?.due == .timed(instant("2026-10-16T17:00:00-05:00")))
+        #expect(typed.title == "Entregar informe")
+    }
+
+    @Test func aHandPickOverridesAnUnreadablePhrase() {
+        var typed = draft("Write report by Oct 32")
+        #expect(typed.newTask == nil)
+
+        typed.correctDeadline(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota))
+
+        #expect(!typed.isDeadlineUnreadable)
+        #expect(typed.newTask?.title == "Write report")
+        #expect(typed.newTask?.deadline?.isChosenByHand == true)
+    }
+
+    @Test func aHandPickAfterRemovingKeepsTheWholeTextAsTitle() {
+        var typed = draft("Meet Ana at noon")
+        typed.removeDeadline()
+
+        typed.correctDeadline(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota))
+
+        #expect(typed.title == "Meet Ana at noon")
+        #expect(typed.deadline?.isChosenByHand == true)
+    }
+
+    @Test func removeDeadlineAlsoClearsAHandPick() {
+        var typed = draft("Entregar informe")
+        typed.correctDeadline(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota))
+
+        typed.removeDeadline()
+
+        #expect(typed.newTask == NewTask(title: "Entregar informe"))
+    }
+
+    @Test func typingKeepsAHandPickWhenTheNewTextHasNoReadableDeadline() {
+        var typed = draft("Entregar")
+        let picked = Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota)
+        typed.correctDeadline(picked)
+
+        typed.setText("Entregar informe", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline == picked)
+        #expect(typed.newTask?.title == "Entregar informe")
+    }
+
+    @Test func typingAReadableDeadlineReplacesAHandPick() {
+        var typed = draft("Entregar informe")
+        typed.correctDeadline(Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota))
+
+        typed.setText("Entregar informe el viernes 5pm", now: wednesdayMorningInBogota, timeZone: bogota,
+                      isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline?.due == .timed(instant("2026-10-16T17:00:00-05:00")))
+        #expect(typed.deadline?.isChosenByHand == false)
+    }
+
+    @Test func aCorrectedPhraseKeptAfterTheTextChangesCountsAsChosenByHand() {
+        var typed = draft("Read paper by Oct 20")
+        typed.correctDeadline(typed.deadline!.addingTime(hour: 18, minute: 0))
+
+        typed.setText("Read paper", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline?.due == .timed(instant("2026-10-20T18:00:00-05:00")))
+        #expect(typed.deadline?.isChosenByHand == true)
+    }
+
+    /// Types `suffix` after the current text one keystroke at a time, as the
+    /// text field reports it.
+    private func type(_ suffix: String, into typed: inout CaptureDraft) {
+        for character in suffix {
+            typed.setText(typed.text + String(character), now: wednesdayMorningInBogota, timeZone: bogota,
+                          isKnownWord: englishOnly.contains)
+        }
+    }
+
+    // PR #33 review: a phrase that is only readable halfway through typing
+    // must not delete the hand pick for good.
+    @Test func aHandPickSurvivesAPhraseThatAppearsOnlyWhileTyping() {
+        var typed = draft("Call")
+        let picked = Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota)
+        typed.correctDeadline(picked)
+
+        type(" Ana at 10am", into: &typed)
+        #expect(typed.deadline?.isChosenByHand == false)
+        #expect(typed.deadlineText == "at 10am")
+
+        type(" about the plan", into: &typed)
+        #expect(typed.deadline == picked)
+        #expect(typed.newTask?.title == "Call Ana at 10am about the plan")
+        #expect(typed.newTask?.deadline == picked)
+    }
+
+    @Test func aHandPickReturnsWhenTheTypedPhraseIsDeletedKeystrokeByKeystroke() {
+        var typed = draft("Read paper")
+        let picked = Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota)
+        typed.correctDeadline(picked)
+        type(" by Oct 21", into: &typed)
+        #expect(typed.deadline?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 21)))
+
+        while typed.text != "Read paper" {
+            typed.setText(String(typed.text.dropLast()), now: wednesdayMorningInBogota, timeZone: bogota,
+                          isKnownWord: englishOnly.contains)
+        }
+
+        #expect(typed.deadline == picked)
+    }
+
+    @Test func removeDeadlineClearsAHandPickHiddenByATypedPhrase() {
+        var typed = draft("Read paper")
+        typed.correctDeadline(Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota))
+        type(" by Oct 21", into: &typed)
+
+        typed.removeDeadline()
+        typed.setText("Read paper", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline == nil)
+    }
+
+    // PR #33 review: Done on an untouched picker must not turn a typed
+    // deadline into a hand pick.
+    @Test func confirmingAnUntouchedPickerKeepsTheTypedDeadlineTiedToItsPhrase() {
+        var typed = draft("Read paper by Friday")
+        let shown = typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+
+        typed.confirmPicker(shown)
+        typed.setText("Read paper", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline == nil)
+        #expect(typed.newTask == NewTask(title: "Read paper"))
+    }
+
+    @Test func confirmingThePickerCommitsTodayWhenThereIsNoDeadline() {
+        var typed = draft("Entregar informe")
+        let shown = typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+
+        typed.confirmPicker(shown)
+
+        #expect(typed.deadline == shown)
+    }
+
+    @Test func confirmingAChangedPickerCommitsTheChange() {
+        var typed = draft("Read paper by Friday")
+        let changed = typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota).addingTime(hour: 9, minute: 0)
+
+        typed.confirmPicker(changed)
+        typed.setText("Read paper", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline?.due == .timed(instant("2026-10-16T09:00:00-05:00")))
+        #expect(typed.deadline?.isChosenByHand == true)
+    }
+
     @Test func typingAgainDiscardsCorrections() {
         var typed = draft("Read paper by Oct 20")
         typed.title = "Edited"

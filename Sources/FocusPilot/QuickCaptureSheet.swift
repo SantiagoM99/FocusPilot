@@ -12,18 +12,22 @@ struct QuickCaptureSheet: View {
     /// Split and parsed once per text change; Save stores exactly this.
     @State private var draft = CaptureDraft()
     @State private var isEditingDeadline = false
+    /// What the open picker shows before the owner picks: the deadline, or
+    /// today. Only a change in the picker, or Done on today's proposal,
+    /// commits it.
+    @State private var proposal: Deadline?
     @State private var isSaving = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("New task")
                 .font(.title3.weight(.semibold))
-            Text("Type the task and when it's due. Nothing is saved until you confirm the interpretation below.")
+            Text("Type the task, and its deadline if it has one, in the same field. Check the reading below before saving.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 4) {
-                TextField("Task", text: $text)
+                TextField("Task", text: $text, prompt: Text("Write NLP report by Friday 5pm"))
                     .font(.title3)
                 if let hint = draft.unrecognizedDateHint {
                     Label(hint, systemImage: "questionmark.circle")
@@ -40,16 +44,31 @@ struct QuickCaptureSheet: View {
                 GridRow {
                     fieldLabel("Deadline")
                     VStack(alignment: .leading, spacing: 8) {
-                        DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
-                        if draft.deadlineText != nil {
+                        // The row itself opens the editor, so a deadline can
+                        // be set or changed by hand, not only typed.
+                        Button {
+                            proposal = draft.proposedDeadline(now: .now, timeZone: .current)
+                            isEditingDeadline.toggle()
+                        } label: {
+                            DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Choose the deadline by hand")
+                        .accessibilityHint("Opens a date picker")
+                        if draft.deadline != nil || draft.deadlineText != nil {
                             Button("Remove deadline") {
                                 draft.removeDeadline()
                                 isEditingDeadline = false
                             }
                             .buttonStyle(.link)
                         }
-                        if isEditingDeadline, let deadline = draft.deadline {
-                            DeadlineEditor(deadline: Binding(get: { deadline }, set: { draft.correctDeadline($0) }))
+                        if isEditingDeadline, let shown = draft.deadline ?? proposal {
+                            DeadlineEditor(deadline: Binding(get: { shown }, set: { draft.correctDeadline($0) }))
+                            Button("Done") {
+                                draft.confirmPicker(shown)
+                                isEditingDeadline = false
+                            }
                         }
                     }
                 }

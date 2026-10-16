@@ -76,6 +76,13 @@ struct DeadlineTextTests {
         #expect(text("today").relative(at: instant("2026-10-15T00:00:00-05:00")) == "Overdue · Wed 14 Oct · Bogotá")
     }
 
+    @Test func handPickedDeadlineSaysSoInsteadOfQuotingText() {
+        let picked = Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota)
+
+        #expect(DeadlineText(picked).source == "chosen by hand · no time chosen")
+        #expect(DeadlineText(picked.addingTime(hour: 17, minute: 0)).source == "chosen by hand")
+    }
+
     @Test func inspectionShowsExactDateTimeAndZone() {
         #expect(text("fri 23:59").inspection == "Fri 16 Oct 2026, 23:59 · America/Bogota (GMT−5)")
         #expect(text("Oct 20").inspection == "Tue 20 Oct 2026 · date only · America/Bogota")
