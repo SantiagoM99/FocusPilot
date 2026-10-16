@@ -26,7 +26,7 @@ struct QuickCaptureSheet: View {
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 4) {
-                TextField("Task", text: $text, prompt: Text("Entregar informe el viernes 5pm"))
+                TextField("Task", text: $text, prompt: Text("Write NLP report by Friday 5pm"))
                     .font(.title3)
                 if let hint = draft.unrecognizedDateHint {
                     Label(hint, systemImage: "questionmark.circle")
