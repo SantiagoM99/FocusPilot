@@ -27,10 +27,11 @@ extension TaskRepository {
         }
     }
 
-    /// The most recently started session, which may have ended.
+    /// The most recently started session, which may have ended. Ordered by
+    /// insertion, not `startedAt`, so a clock set back cannot hide it.
     public func latestSession() async throws -> FocusSession? {
         try await ownerDatabase.read { db in
-            try SessionRow.order(Column("startedAt").desc).fetchOne(db)?.session()
+            try SessionRow.order(Column.rowID.desc).fetchOne(db)?.session()
         }
     }
 }

@@ -15,13 +15,16 @@ public struct FocusSnapshot: Equatable, Sendable {
     /// When a strict session the owner asked to end early may be completed;
     /// `nil` when no early end is waiting.
     public var earlyEndAvailableAt: Date?
+    /// Higher for later coordinator states; the app keeps the newest.
+    public var revision: Int
 
     public init(currentTaskTitle: String? = nil, session: FocusSession? = nil, isObserveOnly: Bool = false,
-                earlyEndAvailableAt: Date? = nil) {
+                earlyEndAvailableAt: Date? = nil, revision: Int = 0) {
         self.currentTaskTitle = currentTaskTitle
         self.session = session
         self.isObserveOnly = isObserveOnly
         self.earlyEndAvailableAt = earlyEndAvailableAt
+        self.revision = revision
     }
 
     /// The session that is still running, paused or on a break.

@@ -32,20 +32,28 @@ extension FocusCoordinator {
     }
 
     /// Completes the session. A strict session ending before its planned end
-    /// waits `StrictEarlyEnd.wait` from the owner's first request (the owner
-    /// confirms in the UI before asking); until then it keeps running.
-    public func complete() async throws -> SessionCompletion {
-        let at = now()
-        if let active = session, !active.hasEnded, active.mode == .strict, at < active.plannedEnd {
+    /// first needs the owner's confirmation, then waits `StrictEarlyEnd.wait`
+    /// from that confirmation on the monotonic clock; until then it keeps
+    /// running.
+    public func complete(confirmed: Bool = false) async throws -> SessionCompletion {
+        if let active = session, !active.hasEnded, active.mode == .strict, now() < active.plannedEnd {
             if earlyEndRequestedAt == nil {
-                earlyEndRequestedAt = at
+                guard confirmed else { return .needsConfirmation }
+                earlyEndRequestedAt = uptime()
                 await broadcast()
             }
-            let availableAt = earlyEndRequestedAt!.addingTimeInterval(StrictEarlyEnd.wait)
-            if at < availableAt { return .waitUntil(availableAt) }
+            if let availableAt = earlyEndAvailableAt(), now() < availableAt { return .waitUntil(availableAt) }
         }
         try await handle(.complete)
         return .completed
+    }
+
+    /// When the confirmed early end may complete, measured on `uptime` and
+    /// shown on the wall clock; `nil` when the owner has not confirmed.
+    func earlyEndAvailableAt() -> Date? {
+        guard let requested = earlyEndRequestedAt else { return nil }
+        let remaining = requested + .seconds(StrictEarlyEnd.wait) - uptime()
+        return now().addingTimeInterval(max(0, remaining / .seconds(1)))
     }
 
     /// The owner changed their mind about ending a strict session early.

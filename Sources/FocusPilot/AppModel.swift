@@ -21,6 +21,9 @@ final class AppModel {
     var sessionError: String?
     /// Asks the planning window to show the Start focus sheet.
     var isStartingFocus = false
+    /// A strict session is ending early and every session surface shows the
+    /// confirmation, wherever Complete was chosen.
+    var isConfirmingEarlyEnd = false
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
@@ -102,10 +105,15 @@ final class AppModel {
         }
     }
 
-    /// Takes a snapshot streamed by the coordinator.
+    /// Takes a snapshot from the coordinator unless a newer one is shown,
+    /// since a fetched snapshot can arrive after a streamed one.
     func show(_ latest: FocusSnapshot) {
-        snapshot = latest
         now = .now
+        guard latest.revision >= snapshot.revision else { return }
+        snapshot = latest
+        if latest.activeSession == nil || latest.earlyEndAvailableAt != nil {
+            isConfirmingEarlyEnd = false
+        }
     }
 
     func refreshTime() {
@@ -114,8 +122,7 @@ final class AppModel {
 
     func refresh() async {
         guard let coordinator else { return }
-        snapshot = await coordinator.snapshot()
-        now = .now
+        show(await coordinator.snapshot())
         do {
             today = try await coordinator.todayTasks()
             projectTitles = try await coordinator.projectTitles()

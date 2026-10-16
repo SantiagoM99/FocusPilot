@@ -5,24 +5,22 @@ import SwiftUI
 /// bar popover, the focus panel and the Now card, so they behave the same.
 ///
 /// Completing a strict session before its planned end first asks for
-/// confirmation, then waits `StrictEarlyEnd.wait` (pending owner sign-off)
-/// with a countdown; the session keeps running until the owner completes.
+/// confirmation, then waits `StrictEarlyEnd.wait` with a countdown; the
+/// session keeps running until the owner completes. The coordinator decides
+/// when confirmation is needed, so the Task menu asks too.
 struct SessionControls: View {
     let model: AppModel
-    @State private var isConfirmingEarlyEnd = false
 
     var body: some View {
         if let session = model.snapshot.activeSession {
             if let availableAt = model.snapshot.earlyEndAvailableAt {
                 waiting(until: availableAt)
-            } else if isConfirmingEarlyEnd {
+            } else if model.isConfirmingEarlyEnd {
                 confirming
             } else {
                 HStack(spacing: 8) {
                     pauseButton(session)
-                    Button {
-                        if isEarlyStrictEnd(session) { isConfirmingEarlyEnd = true } else { Task { await model.complete() } }
-                    } label: {
+                    Button { Task { await model.complete() } } label: {
                         Label("Complete", systemImage: "checkmark.circle").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -54,11 +52,8 @@ struct SessionControls: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {
-                Button { isConfirmingEarlyEnd = false } label: { wide("Keep focusing") }
-                Button {
-                    isConfirmingEarlyEnd = false
-                    Task { await model.complete() }
-                } label: { wide("End early") }
+                Button { model.isConfirmingEarlyEnd = false } label: { wide("Keep focusing") }
+                Button { Task { await model.complete(confirmed: true) } } label: { wide("End early") }
             }
         }
     }
@@ -80,10 +75,6 @@ struct SessionControls: View {
 
     private func wide(_ title: String) -> some View {
         Text(title).frame(maxWidth: .infinity)
-    }
-
-    private func isEarlyStrictEnd(_ session: FocusSession) -> Bool {
-        session.mode == .strict && model.now < session.plannedEnd
     }
 
     private var waitText: String {

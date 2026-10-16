@@ -55,6 +55,20 @@ struct SessionStorageTests {
         #expect(try await repository.latestSession() == newer)
     }
 
+    // Review of PR #37: a clock set back must not hide the newest session.
+    @Test func theLastStartedSessionIsLatestEvenIfItsClockReadsEarlier() async throws {
+        var first = FocusSession.sample(phase: .ended(at: FocusSession.sampleStart.addingTimeInterval(60), reason: .completed))
+        first.startedAt = FocusSession.sampleStart.addingTimeInterval(3600)
+        var second = FocusSession.sample(phase: .running)
+        second.id = UUID()
+        _ = try await repository.record(transition(first, publishes: 0))
+        _ = try await repository.record(transition(second, publishes: 0))
+
+        _ = try await repository.record(transition(first, publishes: 0))
+
+        #expect(try await repository.latestSession() == second)
+    }
+
     @Test func noSessionBeforeTheFirstOne() async throws {
         #expect(try await repository.latestSession() == nil)
     }

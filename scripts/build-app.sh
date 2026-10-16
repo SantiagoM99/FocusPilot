@@ -32,7 +32,7 @@ xcrun actool "$artwork/AppIcon.icon" \
     --app-icon AppIcon \
     --output-partial-info-plist "$artwork/icon-info.plist" \
     --errors --warnings --output-format human-readable-text
-/usr/libexec/PlistBuddy -c "Merge $artwork/icon-info.plist" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Merge \"$artwork/icon-info.plist\"" "$app/Contents/Info.plist"
 codesign --force --sign - "$app"
 
 echo "Built $app"

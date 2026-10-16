@@ -113,18 +113,30 @@ struct FocusSessionCoordinatorTests {
 
 @Suite("Ending a strict session early")
 struct StrictEarlyEndTests {
-    // Proposed value awaiting owner sign-off (decision 0003, 2026-10-14).
+    // Confirmed by the owner on PR #37 (decision 0003).
     @Test func theWaitIsSixtySeconds() {
         #expect(StrictEarlyEnd.wait == 60)
     }
 
-    @Test func completingEarlyAsksToWaitAndKeepsTheSessionRunning() async throws {
+    // Review of PR #37: every way of completing, the Task menu included,
+    // goes through the owner's confirmation first.
+    @Test func completingEarlyFirstAsksForConfirmationAndChangesNothing() async throws {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
+        fixture.advance(minutes: 5)
+
+        #expect(try await fixture.coordinator.complete() == .needsConfirmation)
+        #expect(await fixture.coordinator.snapshot().activeSession != nil)
+        #expect(await fixture.coordinator.snapshot().earlyEndAvailableAt == nil)
+    }
+
+    @Test func confirmingStartsTheWaitAndKeepsTheSessionRunning() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
         fixture.advance(minutes: 5)
         let requestedAt = fixture.clock.now
 
-        let first = try await fixture.coordinator.complete()
+        let first = try await fixture.coordinator.complete(confirmed: true)
 
         #expect(first == .waitUntil(requestedAt.addingTimeInterval(StrictEarlyEnd.wait)))
         #expect(await fixture.coordinator.snapshot().activeSession != nil)
@@ -136,7 +148,7 @@ struct StrictEarlyEndTests {
     @Test func completingAfterTheWaitEndsTheSession() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
-        _ = try await fixture.coordinator.complete()
+        _ = try await fixture.coordinator.complete(confirmed: true)
         fixture.advance(minutes: 1)
 
         #expect(try await fixture.coordinator.complete() == .completed)
@@ -144,16 +156,29 @@ struct StrictEarlyEndTests {
         #expect(await fixture.coordinator.snapshot().earlyEndAvailableAt == nil)
     }
 
-    @Test func cancellingTheEarlyEndStartsTheWaitOver() async throws {
+    // Review of PR #37: the wait is measured on a monotonic clock.
+    @Test func movingTheWallClockForwardDoesNotSkipTheWait() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
-        _ = try await fixture.coordinator.complete()
+        _ = try await fixture.coordinator.complete(confirmed: true)
+        fixture.advance(seconds: 10)
+        fixture.clock.set(fixture.clock.now.addingTimeInterval(5 * 60))
+
+        #expect(try await fixture.coordinator.complete() == .waitUntil(fixture.clock.now.addingTimeInterval(50)))
+        #expect(await fixture.coordinator.snapshot().earlyEndAvailableAt == fixture.clock.now.addingTimeInterval(50))
+    }
+
+    @Test func cancellingTheEarlyEndStartsOverWithConfirmation() async throws {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
+        _ = try await fixture.coordinator.complete(confirmed: true)
         fixture.advance(minutes: 1)
 
         await fixture.coordinator.cancelEarlyEnd()
 
         #expect(await fixture.coordinator.snapshot().earlyEndAvailableAt == nil)
-        #expect(try await fixture.coordinator.complete() == .waitUntil(fixture.clock.now.addingTimeInterval(StrictEarlyEnd.wait)))
+        #expect(try await fixture.coordinator.complete() == .needsConfirmation)
+        #expect(try await fixture.coordinator.complete(confirmed: true) == .waitUntil(fixture.clock.now.addingTimeInterval(StrictEarlyEnd.wait)))
     }
 
     @Test func aStrictSessionPastItsPlannedEndCompletesWithoutWaiting() async throws {
@@ -181,5 +206,19 @@ struct SnapshotStreamTests {
         var latest = await iterator.next()
         while latest?.currentTaskTitle != "Reply to co-advisor" { latest = await iterator.next() }
         #expect(latest?.activeSession != nil)
+    }
+
+    // Review of PR #37: the app keeps the newest of streamed and fetched
+    // snapshots by comparing revisions.
+    @Test func everyChangeGetsAHigherSnapshotRevision() async throws {
+        let fixture = try await SessionFixture()
+        let before = await fixture.coordinator.snapshot().revision
+
+        #expect(await fixture.coordinator.snapshot().revision == before)
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+        let started = await fixture.coordinator.snapshot().revision
+        #expect(started > before)
+        try await fixture.coordinator.pause()
+        #expect(await fixture.coordinator.snapshot().revision > started)
     }
 }

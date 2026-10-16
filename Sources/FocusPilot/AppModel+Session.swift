@@ -50,13 +50,19 @@ extension AppModel {
         await run { try await $0.resume() }
     }
 
-    /// Completes the session; a strict session ending early starts its wait
-    /// instead, which the snapshot shows.
-    func complete() async {
-        await run { _ = try await $0.complete() }
+    /// Completes the session. A strict session ending early shows the
+    /// confirmation instead; once `confirmed`, it starts the wait, which the
+    /// snapshot shows. Returns true when the confirmation is now showing.
+    @discardableResult
+    func complete(confirmed: Bool = false) async -> Bool {
+        var completion: SessionCompletion?
+        await run { completion = try await $0.complete(confirmed: confirmed) }
+        isConfirmingEarlyEnd = completion == .needsConfirmation
+        return isConfirmingEarlyEnd
     }
 
     func cancelEarlyEnd() async {
+        isConfirmingEarlyEnd = false
         await coordinator?.cancelEarlyEnd()
     }
 

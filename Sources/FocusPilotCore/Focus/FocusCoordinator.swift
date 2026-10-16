@@ -20,27 +20,39 @@ public actor FocusCoordinator {
     let publisher: PolicyPublisher
     let notices: FocusNoticeSink
     let now: @Sendable () -> Date
+    /// A monotonic clock for waits, so changing the Mac's clock cannot skip them.
+    let uptime: @Sendable () -> Duration
 
     /// The latest session, active or ended.
     var session: FocusSession?
-    /// When the owner first asked to end the current strict session early.
-    var earlyEndRequestedAt: Date?
+    /// When, on `uptime`, the owner confirmed ending the current strict session early.
+    var earlyEndRequestedAt: Duration?
+    /// Grows with every change, so the app can drop a snapshot older than one it has.
+    private var revision = 0
     private var subscribers: [UUID: AsyncStream<FocusSnapshot>.Continuation] = [:]
 
     /// Without `herdr`, Herdr reads as not installed.
     public init(repository: TaskRepository, herdr: (any HerdrWorkspaceSource)? = nil,
                 publisher: PolicyPublisher = PolicyNotDelivered(),
-                notices: FocusNoticeSink = NoticesIgnored(), now: @escaping @Sendable () -> Date = Date.init) {
+                notices: FocusNoticeSink = NoticesIgnored(), now: @escaping @Sendable () -> Date = Date.init,
+                uptime: @escaping @Sendable () -> Duration = FocusCoordinator.continuousUptime()) {
         self.repository = repository
         self.herdr = herdr
         self.publisher = publisher
         self.notices = notices
         self.now = now
+        self.uptime = uptime
+    }
+
+    /// Time on `ContinuousClock`, which keeps counting while the Mac sleeps.
+    public static func continuousUptime() -> @Sendable () -> Duration {
+        let origin = ContinuousClock.now
+        return { ContinuousClock.now - origin }
     }
 
     public func snapshot() async -> FocusSnapshot {
         FocusSnapshot(currentTaskTitle: try? await repository.nowTask()?.title, session: session,
-                      earlyEndAvailableAt: earlyEndRequestedAt.map { $0.addingTimeInterval(StrictEarlyEnd.wait) })
+                      earlyEndAvailableAt: earlyEndAvailableAt(), revision: revision)
     }
 
     /// Every snapshot from now on, starting with the current one.
@@ -58,6 +70,7 @@ public actor FocusCoordinator {
     }
 
     func broadcast() async {
+        revision += 1
         guard !subscribers.isEmpty else { return }
         let latest = await snapshot()
         for continuation in subscribers.values {

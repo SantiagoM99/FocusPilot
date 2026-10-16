@@ -45,8 +45,9 @@ struct TaskCommands: Commands {
     }
 
     /// Start Focus ⌘⏎, Pause ⌥⌘P (Resume while paused), Complete ⇧⌘⏎.
-    /// Complete on a strict session ending early starts its wait; the
-    /// countdown and confirmation live in the popover, panel and Now card.
+    /// Complete on a strict session ending early asks for confirmation like
+    /// every other Complete; it shows in the planning window's Now card (and
+    /// the popover and panel), so that window is brought forward.
     @ViewBuilder private var sessionItems: some View {
         let session = model.snapshot.activeSession
         Button("Start Focus…") {
@@ -63,7 +64,11 @@ struct TaskCommands: Commands {
                 .keyboardShortcut("p", modifiers: [.command, .option])
                 .disabled(session?.phase != .running)
         }
-        Button("Complete") { Task { await model.complete() } }
+        Button("Complete") {
+            Task {
+                if await model.complete() { openWindow(id: PlanningView.windowID) }
+            }
+        }
             .keyboardShortcut(.return, modifiers: [.command, .shift])
             .disabled(session == nil)
     }
