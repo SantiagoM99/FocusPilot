@@ -13,8 +13,10 @@ swift build --configuration release --product FocusPilot
 swift build --configuration release --product RenderArtwork
 bin=$(swift build --configuration release --show-bin-path)
 
-app=build/FocusPilot.app
-artwork=build/artwork
+# Absolute: actool runs through a long-lived helper that may resolve relative
+# paths against another directory.
+app="$PWD/build/FocusPilot.app"
+artwork="$PWD/build/artwork"
 rm -rf "$app" "$artwork"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$artwork"
 cp "$bin/FocusPilot" "$app/Contents/MacOS/FocusPilot"
@@ -30,7 +32,7 @@ xcrun actool "$artwork/AppIcon.icon" \
     --app-icon AppIcon \
     --output-partial-info-plist "$artwork/icon-info.plist" \
     --errors --warnings --output-format human-readable-text
-/usr/libexec/PlistBuddy -c "Merge $artwork/icon-info.plist" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Merge \"$artwork/icon-info.plist\"" "$app/Contents/Info.plist"
 codesign --force --sign - "$app"
 
 echo "Built $app"

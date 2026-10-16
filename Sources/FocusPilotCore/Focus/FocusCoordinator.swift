@@ -1,26 +1,81 @@
+import Foundation
+
+
 /// Owns FocusPilot's state transitions and is the UI's single entry point.
 ///
 /// The UI reads snapshots from here and sends requests here; the coordinator
 /// talks to the repository. The current task is the one the owner pinned as
-/// Now; nothing else changes it.
+/// Now; nothing else changes it. Focus sessions are driven by `FocusEngine`
+/// (see `FocusCoordinator+Sessions.swift`); every change is pushed to
+/// `snapshots()` subscribers, so the menu bar stays current without the
+/// planning window.
 public actor FocusCoordinator {
-    // Held so that later state transitions persist through the sole writer
-    // rather than each feature opening its own path to the database.
-    private let repository: TaskRepository
+    public enum SessionError: Error, Equatable {
+        case noCurrentTask
+    }
+
     private let herdr: (any HerdrWorkspaceSource)?
 
-    private var current = FocusSnapshot()
+    let repository: TaskRepository
+    let publisher: PolicyPublisher
+    let notices: FocusNoticeSink
+    let now: @Sendable () -> Date
+    /// A monotonic clock for waits, so changing the Mac's clock cannot skip them.
+    let uptime: @Sendable () -> Duration
+
+    /// The latest session, active or ended.
+    var session: FocusSession?
+    /// When, on `uptime`, the owner confirmed ending the current strict session early.
+    var earlyEndRequestedAt: Duration?
+    /// Grows with every change, so the app can drop a snapshot older than one it has.
+    private var revision = 0
+    private var subscribers: [UUID: AsyncStream<FocusSnapshot>.Continuation] = [:]
 
     /// Without `herdr`, Herdr reads as not installed.
-    public init(repository: TaskRepository, herdr: (any HerdrWorkspaceSource)? = nil) {
+    public init(repository: TaskRepository, herdr: (any HerdrWorkspaceSource)? = nil,
+                publisher: PolicyPublisher = PolicyNotDelivered(),
+                notices: FocusNoticeSink = NoticesIgnored(), now: @escaping @Sendable () -> Date = Date.init,
+                uptime: @escaping @Sendable () -> Duration = FocusCoordinator.continuousUptime()) {
         self.repository = repository
         self.herdr = herdr
+        self.publisher = publisher
+        self.notices = notices
+        self.now = now
+        self.uptime = uptime
+    }
+
+    /// Time on `ContinuousClock`, which keeps counting while the Mac sleeps.
+    public static func continuousUptime() -> @Sendable () -> Duration {
+        let origin = ContinuousClock.now
+        return { ContinuousClock.now - origin }
     }
 
     public func snapshot() async -> FocusSnapshot {
-        var snapshot = current
-        snapshot.currentTaskTitle = try? await repository.nowTask()?.title
-        return snapshot
+        FocusSnapshot(currentTaskTitle: try? await repository.nowTask()?.title, session: session,
+                      earlyEndAvailableAt: earlyEndAvailableAt(), revision: revision)
+    }
+
+    /// Every snapshot from now on, starting with the current one.
+    public func snapshots() async -> AsyncStream<FocusSnapshot> {
+        let (stream, continuation) = AsyncStream.makeStream(of: FocusSnapshot.self, bufferingPolicy: .bufferingNewest(1))
+        let id = UUID()
+        subscribers[id] = continuation
+        continuation.onTermination = { _ in Task { await self.unsubscribe(id) } }
+        continuation.yield(await snapshot())
+        return stream
+    }
+
+    private func unsubscribe(_ id: UUID) {
+        subscribers[id] = nil
+    }
+
+    func broadcast() async {
+        revision += 1
+        guard !subscribers.isEmpty else { return }
+        let latest = await snapshot()
+        for continuation in subscribers.values {
+            continuation.yield(latest)
+        }
     }
 
     public func hasTasks() async throws -> Bool {
@@ -31,6 +86,7 @@ public actor FocusCoordinator {
 
     public func capture(_ newTask: NewTask) async throws {
         _ = try await repository.addTask(newTask)
+        await broadcast()
     }
 
     public func todayTasks() async throws -> [TodayItem] {
@@ -45,6 +101,7 @@ public actor FocusCoordinator {
     /// Only called for the owner's own actions.
     public func moveTask(_ id: Int64, to status: TaskStatus, _ placement: TaskPlacement) async throws {
         try await repository.moveTask(id, to: status, placement)
+        await broadcast()
     }
 
     public func projects() async throws -> [ProjectSummary] {

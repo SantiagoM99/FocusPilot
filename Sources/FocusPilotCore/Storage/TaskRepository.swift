@@ -12,7 +12,8 @@ import GRDB
 /// each logical change must happen inside a single `write` closure, never
 /// split across two writes or a read followed by a write.
 public actor TaskRepository {
-    private let ownerDatabase: DatabasePool
+    // Internal only so this actor's extensions in other files can write.
+    let ownerDatabase: DatabasePool
     private let cacheDatabase: DatabasePool
     private let now: @Sendable () -> Date
 
