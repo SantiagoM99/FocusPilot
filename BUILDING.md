@@ -46,7 +46,7 @@ This writes the four menu bar glyphs in light and dark (with and without the tim
 
 | Path | Contents |
 |---|---|
-| `Sources/FocusPilotCore` | Testable logic: storage, coordinator, login item, menu bar state, artwork geometry |
+| `Sources/FocusPilotCore` | Testable logic: storage, coordinator, tasks and deadlines, login item, menu bar state, artwork geometry |
 | `Sources/FocusPilot` | The SwiftUI app: menu bar item, planning window, settings |
 | `Sources/RenderArtwork` | Build-time tool that writes `AppIcon.icon` and review images |
 | `Tests/FocusPilotCoreTests` | Swift Testing suites for `FocusPilotCore` |

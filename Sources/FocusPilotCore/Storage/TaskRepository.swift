@@ -14,14 +14,17 @@ import GRDB
 public actor TaskRepository {
     private let ownerDatabase: DatabasePool
     private let cacheDatabase: DatabasePool
+    private let now: @Sendable () -> Date
 
     /// Opens (creating if needed) both databases in `location` and brings each
-    /// up to date with its own migrations.
+    /// up to date with its own migrations. `now` stamps created and updated
+    /// times; tests pass a fixed clock.
     ///
     /// Only a failure of the owner database is thrown. A cache that cannot be
     /// opened or migrated is deleted and recreated empty, because losing
     /// derived values is cheap and must never keep the owner from their data.
-    public init(location: StorageLocation) throws {
+    public init(location: StorageLocation, now: @escaping @Sendable () -> Date = Date.init) throws {
+        self.now = now
         try FileManager.default.createDirectory(at: location.directory, withIntermediateDirectories: true)
         ownerDatabase = try DatabasePool(path: location.ownerDatabaseURL.path)
         try OwnerSchema.migrator.migrate(ownerDatabase)
@@ -48,17 +51,64 @@ public actor TaskRepository {
     // MARK: Owner data
 
     public func addTask(title: String) async throws -> TaskRecord {
-        try await ownerDatabase.write { db in
-            var task = TaskRecord(id: nil, title: title)
-            try task.insert(db)
-            return task
-        }
+        try await addTask(NewTask(title: title))
     }
 
     public func tasks() async throws -> [TaskRecord] {
         try await ownerDatabase.read { db in
             try TaskRecord.order(Column("id")).fetchAll(db)
         }
+    }
+
+    /// Saves a captured task, filing it under an existing project with the
+    /// same name (ignoring case and accents) or a new one.
+    public func addTask(_ newTask: NewTask) async throws -> TaskRecord {
+        guard newTask.isValid else { throw NewTask.Invalid.missingTitle }
+        let createdAt = now()
+        // One write closure: the project and the task commit together or not at all.
+        return try await ownerDatabase.write { db in
+            var task = TaskRecord(id: nil, title: newTask.title, nextAction: newTask.nextAction,
+                                  createdAt: createdAt, updatedAt: createdAt)
+            task.deadline = newTask.deadline
+            task.projectId = try newTask.projectName.map { try Self.projectID(named: $0, in: db) }
+            try task.insert(db)
+            return task
+        }
+    }
+
+    /// Every task in capture order. Ordering by priority is not decided yet.
+    public func todayTasks() async throws -> [TodayItem] {
+        try await ownerDatabase.read { db in
+            try TaskRecord
+                .including(optional: TaskRecord.project)
+                .order(Column("id"))
+                .asRequest(of: TaskWithProject.self)
+                .fetchAll(db)
+                .map(\.todayItem)
+        }
+    }
+
+    /// Project titles for the capture sheet's popup, in alphabetical order.
+    public func projectTitles() async throws -> [String] {
+        try await ownerDatabase.read { db in
+            try ProjectRecord.fetchAll(db).map(\.title).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        }
+    }
+
+    /// Runs inside the caller's write, so the lookup and the insert cannot
+    /// be interleaved with another capture. Matching ignores case and accents
+    /// in Swift because SQLite's NOCASE only folds ASCII: "INVESTIGACIÓN"
+    /// files under "Investigación".
+    private static func projectID(named name: String, in db: Database) throws -> Int64 {
+        let existing = try ProjectRecord.fetchAll(db).first {
+            $0.title.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
+        if let existing {
+            return existing.id!
+        }
+        var project = ProjectRecord(id: nil, title: name)
+        try project.insert(db)
+        return project.id!
     }
 
     // MARK: Cache

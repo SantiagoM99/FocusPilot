@@ -21,4 +21,18 @@ public actor FocusCoordinator {
     public func hasTasks() async throws -> Bool {
         try await !repository.tasks().isEmpty
     }
+
+    // MARK: Tasks
+
+    public func capture(_ newTask: NewTask) async throws {
+        _ = try await repository.addTask(newTask)
+    }
+
+    public func todayTasks() async throws -> [TodayItem] {
+        try await repository.todayTasks()
+    }
+
+    public func projectTitles() async throws -> [String] {
+        try await repository.projectTitles()
+    }
 }
