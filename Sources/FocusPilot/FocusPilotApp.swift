@@ -21,10 +21,9 @@ struct FocusPilotApp: App {
         // Login launches should not open a window; the menu bar item is the
         // entry point. The first launch is the exception (see MenuBarIcon).
         .defaultLaunchBehavior(.suppressed)
-        .commands { TaskCommands(model: model) }
-
-        Settings {
-            SettingsView(model: model)
+        .commands {
+            TaskCommands(model: model)
+            SettingsCommand(model: model)
         }
     }
 }

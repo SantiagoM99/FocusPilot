@@ -25,6 +25,13 @@ final class AppModel {
     /// A strict session is ending early and every session surface shows the
     /// confirmation, wherever Complete was chosen.
     var isConfirmingEarlyEnd = false
+    /// Block rule sets and allowed entries, as Settings shows them.
+    var ruleSets: [BlockRuleSet] = []
+    var allowed: [AllowedActivity] = []
+    /// Set when a rule or allowed-list edit was refused or failed.
+    var rulesError: String?
+    /// Asks the planning window to show a page, e.g. Settings from ⌘,.
+    var requestedPage: PlanningView.Page?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
