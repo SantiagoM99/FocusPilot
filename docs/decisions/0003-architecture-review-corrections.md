@@ -79,6 +79,7 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-14: Logo direction "Scope" (ring plus one dot), specified in [docs/design/focuspilot-logo.html](../design/focuspilot-logo.html): flat system blue app icon built with Icon Composer, and custom monochrome menu bar template images for idle (ring), focusing (ring and dot), paused (hollow dot) and observe-only (dashed ring). Proposed by Claude: the time next to the menu bar icon is a Settings option, off by default, so the item stays narrow on crowded menu bars.
 - 2026-10-15: When the owner moves the pinned Now task out of Now, the first Next task becomes Now in the same write; if Next is empty, Now stays empty. Nothing else changes Now.
 - 2026-10-15: Safari spike S1: an ad hoc signed app with a `group.` App Group triggers the macOS 15+ consent prompt on every container access. Shipping the App Group needs a Team ID prefix (paid developer account) or an authorizing profile; the spike's fallback is a shared folder through the extension's home-relative temporary exception (see #1).
+- 2026-10-15: A project links to at most one Herdr workspace (or none). Projects can be imported from Herdr workspaces, and while FocusPilot runs, a new Herdr workspace with no project automatically becomes a linked project (once per workspace; unlinked or deleted projects are not recreated). FocusPilot only reads Herdr for this.
 
 ## Sources
 
