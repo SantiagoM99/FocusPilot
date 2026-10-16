@@ -9,6 +9,10 @@ final class AppModel {
     private(set) var snapshot = FocusSnapshot()
     private(set) var today: [TodayItem] = []
     private(set) var projectTitles: [String] = []
+    private(set) var projects: [ProjectSummary] = []
+    /// The project shown in Projects (nil inside: tasks with no project).
+    private(set) var shownProject: ProjectSummary.ID?
+    private(set) var projectItems: [TodayItem] = []
     private(set) var startupError: String?
     private(set) var taskError: String?
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
@@ -73,10 +77,31 @@ final class AppModel {
         do {
             today = try await coordinator.todayTasks()
             projectTitles = try await coordinator.projectTitles()
+            projects = try await coordinator.projects()
+            if let shownProject {
+                projectItems = try await coordinator.projectTasks(shownProject)
+            }
             taskError = nil
         } catch {
             taskError = "Could not load tasks: \(error.localizedDescription)"
         }
+    }
+
+    func showProject(_ id: ProjectSummary.ID) async {
+        shownProject = id
+        await refresh()
+    }
+
+    /// Applies the owner's reorder or pin and reloads every list.
+    func move(_ id: Int64, to status: TaskStatus, _ placement: TaskPlacement) async {
+        guard let coordinator else { return }
+        do {
+            try await coordinator.moveTask(id, to: status, placement)
+        } catch {
+            taskError = "Could not move the task: \(error.localizedDescription)"
+            return
+        }
+        await refresh()
     }
 
     /// Saves the task and reloads Today. Returns false, with `taskError`

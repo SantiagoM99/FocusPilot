@@ -2,38 +2,60 @@ import AppKit
 import FocusPilotCore
 import SwiftUI
 
-/// The planning window: Today's tasks and the quick capture sheet. The full
-/// three-column layout arrives with the planning window ticket.
+/// The planning window (design 01 and 15): a sidebar with Today and
+/// Projects, and the quick capture sheet. The task detail pane, Review
+/// queue and protection status arrive with their tickets.
 struct PlanningView: View {
     static let windowID = "planning"
 
+    enum Page: Hashable {
+        case today, projects
+    }
+
     let model: AppModel
+    @State private var page: Page?
     @State private var isCapturing = false
+    @State private var todaySelection: Int64?
+
+    init(model: AppModel, page: Page = .today) {
+        self.model = model
+        _page = State(initialValue: page)
+    }
 
     var body: some View {
-        content
-            .frame(minWidth: 480, minHeight: 320)
-            .navigationTitle("Today")
-            .navigationSubtitle(Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
-            .toolbar {
-                Button("New Task", systemImage: "plus") { isCapturing = true }
-                    .keyboardShortcut("n")
-                    .help("New task (⌘N)")
+        NavigationSplitView {
+            List(selection: $page) {
+                Label("Today", systemImage: "sun.max").tag(Page.today)
+                Label("Projects", systemImage: "folder").tag(Page.projects)
             }
-            .sheet(isPresented: $isCapturing) {
-                QuickCaptureSheet(model: model)
-            }
-            .task { await model.refresh() }
-            // LSUIElement keeps the app out of the Dock, but while the planning
-            // window is open the owner should be able to find it there and with
-            // Command-Tab like any other window.
-            .onAppear { NSApplication.shared.setActivationPolicy(.regular) }
-            .onDisappear { NSApplication.shared.setActivationPolicy(.accessory) }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+        } detail: {
+            content
+                .navigationTitle(page == .projects ? "Projects" : "Today")
+                .navigationSubtitle(page == .projects ? ""
+                    : Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+                .toolbar {
+                    Button("New Task", systemImage: "plus") { isCapturing = true }
+                        .help("New task (⌘N)")
+                }
+        }
+        .frame(minWidth: 760, minHeight: 420)
+        .sheet(isPresented: $isCapturing) {
+            QuickCaptureSheet(model: model)
+        }
+        .task { await model.refresh() }
+        // LSUIElement keeps the app out of the Dock, but while the planning
+        // window is open the owner should be able to find it there and with
+        // Command-Tab like any other window.
+        .onAppear { NSApplication.shared.setActivationPolicy(.regular) }
+        .onDisappear { NSApplication.shared.setActivationPolicy(.accessory) }
     }
 
     @ViewBuilder private var content: some View {
         if let startupError = model.startupError {
             ContentUnavailableView("Database unavailable", systemImage: "exclamationmark.triangle", description: Text(startupError))
+        } else if page == .projects {
+            ProjectsView(model: model, capture: { isCapturing = true })
         } else if model.today.isEmpty {
             ContentUnavailableView(
                 "No tasks yet",
@@ -41,7 +63,9 @@ struct PlanningView: View {
                 description: Text("Press ⌘N to capture one. Closing this window keeps FocusPilot running in the menu bar.")
             )
         } else {
-            TodayList(items: model.today)
+            TaskList(items: model.today, showsProject: true,
+                     move: { id, status, placement in Task { await model.move(id, to: status, placement) } },
+                     capture: { isCapturing = true }, selection: $todaySelection)
         }
     }
 }
