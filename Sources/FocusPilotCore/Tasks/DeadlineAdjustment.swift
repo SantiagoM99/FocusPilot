@@ -17,6 +17,11 @@ extension Deadline {
         originalText == Self.chosenByHandText
     }
 
+    /// The same deadline, no longer tied to a typed phrase.
+    public var asChosenByHand: Deadline {
+        Deadline(due: due, timeZone: timeZone, originalText: Self.chosenByHandText)
+    }
+
     public func addingTime(hour: Int, minute: Int) -> Deadline {
         var components = localDate.components
         components.hour = hour

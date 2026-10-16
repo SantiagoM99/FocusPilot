@@ -20,15 +20,19 @@ public struct CaptureDraft: Equatable, Sendable {
 
     public init() {}
 
-    /// Re-splits the text and discards earlier corrections to the title and
-    /// deadline, since they belonged to the old text. `isKnownWord` says
+    /// Re-splits the text and discards the title correction, which belonged
+    /// to the old text. A deadline picked or corrected by hand is kept unless
+    /// the new text has a readable deadline. `isKnownWord` says
     /// whether a word is in the spelling dictionary, so "match" is not taken
     /// for a misspelled "March".
     public mutating func setText(_ text: String, now: Date, timeZone: TimeZone, isKnownWord: (String) -> Bool) {
         self.text = text
         split = CaptureSplitter(parser: DeadlineParser(now: now, timeZone: timeZone)).split(text, isKnownWord: isKnownWord)
         editedTitle = nil
-        chosenDeadline = nil
+        // A deadline picked by hand survives typing unless the new text has
+        // a readable deadline of its own. Kept apart from the phrase it may
+        // have corrected, it now counts as chosen by hand.
+        chosenDeadline = split.deadline == nil ? chosenDeadline.map(\.asChosenByHand) : nil
         deadlineRemoved = false
     }
 
@@ -63,11 +67,11 @@ public struct CaptureDraft: Equatable, Sendable {
         chosenDeadline = deadline
     }
 
-    /// Opens a deadline to edit by hand: the current one, or if there is
-    /// none (or it could not be read) today, date-only, in `timeZone`.
-    public mutating func startChoosingDeadline(now: Date, timeZone: TimeZone) {
-        guard deadline == nil else { return }
-        chosenDeadline = .chosenByHand(LocalDate(containing: now, in: timeZone), timeZone: timeZone)
+    /// What the picker shows when opened: the current deadline, or if there
+    /// is none (or it could not be read) today, date-only, in `timeZone`.
+    /// Nothing is committed until the owner picks (`correctDeadline`).
+    public func proposedDeadline(now: Date, timeZone: TimeZone) -> Deadline {
+        deadline ?? .chosenByHand(LocalDate(containing: now, in: timeZone), timeZone: timeZone)
     }
 
     /// Treats the whole text as the title, with no deadline.

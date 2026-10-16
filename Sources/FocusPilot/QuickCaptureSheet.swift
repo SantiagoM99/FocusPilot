@@ -12,6 +12,9 @@ struct QuickCaptureSheet: View {
     /// Split and parsed once per text change; Save stores exactly this.
     @State private var draft = CaptureDraft()
     @State private var isEditingDeadline = false
+    /// What the open picker shows before the owner picks: the deadline, or
+    /// today. Only a change in the picker or Done commits it.
+    @State private var proposal: Deadline?
     @State private var isSaving = false
 
     var body: some View {
@@ -43,7 +46,7 @@ struct QuickCaptureSheet: View {
                         // The row itself opens the editor, so a deadline can
                         // be set or changed by hand, not only typed.
                         Button {
-                            draft.startChoosingDeadline(now: .now, timeZone: .current)
+                            proposal = draft.proposedDeadline(now: .now, timeZone: .current)
                             isEditingDeadline.toggle()
                         } label: {
                             DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
@@ -59,8 +62,12 @@ struct QuickCaptureSheet: View {
                             }
                             .buttonStyle(.link)
                         }
-                        if isEditingDeadline, let deadline = draft.deadline {
-                            DeadlineEditor(deadline: Binding(get: { deadline }, set: { draft.correctDeadline($0) }))
+                        if isEditingDeadline, let shown = draft.deadline ?? proposal {
+                            DeadlineEditor(deadline: Binding(get: { shown }, set: { draft.correctDeadline($0) }))
+                            Button("Done") {
+                                draft.correctDeadline(shown)
+                                isEditingDeadline = false
+                            }
                         }
                     }
                 }

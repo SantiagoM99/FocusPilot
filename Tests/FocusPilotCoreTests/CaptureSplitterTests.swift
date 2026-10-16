@@ -244,41 +244,39 @@ struct CaptureDraftTests {
     }
 
     // Owner feedback: a deadline can also be chosen by hand.
-    @Test func choosingADeadlineByHandStartsDateOnlyTodayInTheMacZone() {
-        var typed = draft("Entregar informe")
+    @Test func openingThePickerProposesTodayWithoutCommittingIt() {
+        let typed = draft("Entregar informe")
 
-        typed.startChoosingDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+        let proposal = typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
 
-        #expect(typed.deadline?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 14)))
-        #expect(typed.deadline?.timeZone == bogota)
-        #expect(typed.deadline?.isChosenByHand == true)
-        #expect(typed.title == "Entregar informe")
-        #expect(typed.newTask?.deadline == typed.deadline)
+        #expect(proposal.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 14)))
+        #expect(proposal.timeZone == bogota)
+        #expect(proposal.isChosenByHand)
+        #expect(typed.deadline == nil)
+        #expect(typed.newTask == NewTask(title: "Entregar informe"))
     }
 
-    @Test func aHandPickedTimeMakesItTimed() {
-        var typed = draft("Entregar informe")
-        typed.startChoosingDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+    @Test func thePickerProposesTheCurrentDeadlineWhenThereIsOne() {
+        let typed = draft("Entregar informe el viernes 5pm")
 
-        typed.correctDeadline(typed.deadline!.moving(to: LocalDate(year: 2026, month: 10, day: 16)).addingTime(hour: 17, minute: 0))
+        #expect(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota) == typed.deadline)
+    }
+
+    @Test func aPickIsCommittedOnlyWhenChosen() {
+        var typed = draft("Entregar informe")
+        let proposal = typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+
+        typed.correctDeadline(proposal.moving(to: LocalDate(year: 2026, month: 10, day: 16)).addingTime(hour: 17, minute: 0))
 
         #expect(typed.newTask?.deadline?.due == .timed(instant("2026-10-16T17:00:00-05:00")))
-    }
-
-    @Test func startingToChooseKeepsAnExistingDeadline() {
-        var typed = draft("Entregar informe el viernes 5pm")
-        let parsed = typed.deadline
-
-        typed.startChoosingDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
-
-        #expect(typed.deadline == parsed)
+        #expect(typed.title == "Entregar informe")
     }
 
     @Test func aHandPickOverridesAnUnreadablePhrase() {
         var typed = draft("Write report by Oct 32")
         #expect(typed.newTask == nil)
 
-        typed.startChoosingDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+        typed.correctDeadline(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota))
 
         #expect(!typed.isDeadlineUnreadable)
         #expect(typed.newTask?.title == "Write report")
@@ -289,7 +287,7 @@ struct CaptureDraftTests {
         var typed = draft("Meet Ana at noon")
         typed.removeDeadline()
 
-        typed.startChoosingDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+        typed.correctDeadline(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota))
 
         #expect(typed.title == "Meet Ana at noon")
         #expect(typed.deadline?.isChosenByHand == true)
@@ -297,11 +295,43 @@ struct CaptureDraftTests {
 
     @Test func removeDeadlineAlsoClearsAHandPick() {
         var typed = draft("Entregar informe")
-        typed.startChoosingDeadline(now: wednesdayMorningInBogota, timeZone: bogota)
+        typed.correctDeadline(typed.proposedDeadline(now: wednesdayMorningInBogota, timeZone: bogota))
 
         typed.removeDeadline()
 
         #expect(typed.newTask == NewTask(title: "Entregar informe"))
+    }
+
+    @Test func typingKeepsAHandPickWhenTheNewTextHasNoReadableDeadline() {
+        var typed = draft("Entregar")
+        let picked = Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota)
+        typed.correctDeadline(picked)
+
+        typed.setText("Entregar informe", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline == picked)
+        #expect(typed.newTask?.title == "Entregar informe")
+    }
+
+    @Test func typingAReadableDeadlineReplacesAHandPick() {
+        var typed = draft("Entregar informe")
+        typed.correctDeadline(Deadline.chosenByHand(LocalDate(year: 2026, month: 10, day: 20), timeZone: bogota))
+
+        typed.setText("Entregar informe el viernes 5pm", now: wednesdayMorningInBogota, timeZone: bogota,
+                      isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline?.due == .timed(instant("2026-10-16T17:00:00-05:00")))
+        #expect(typed.deadline?.isChosenByHand == false)
+    }
+
+    @Test func aCorrectedPhraseKeptAfterTheTextChangesCountsAsChosenByHand() {
+        var typed = draft("Read paper by Oct 20")
+        typed.correctDeadline(typed.deadline!.addingTime(hour: 18, minute: 0))
+
+        typed.setText("Read paper", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: englishOnly.contains)
+
+        #expect(typed.deadline?.due == .timed(instant("2026-10-20T18:00:00-05:00")))
+        #expect(typed.deadline?.isChosenByHand == true)
     }
 
     @Test func typingAgainDiscardsCorrections() {
