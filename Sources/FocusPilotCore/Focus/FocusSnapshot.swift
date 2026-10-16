@@ -15,15 +15,18 @@ public struct FocusSnapshot: Equatable, Sendable {
     /// When a strict session the owner asked to end early may be completed;
     /// `nil` when no early end is waiting.
     public var earlyEndAvailableAt: Date?
+    /// The last policy published to the extensions.
+    public var policy: CompiledPolicy?
     /// Higher for later coordinator states; the app keeps the newest.
     public var revision: Int
 
     public init(currentTaskTitle: String? = nil, session: FocusSession? = nil, isObserveOnly: Bool = false,
-                earlyEndAvailableAt: Date? = nil, revision: Int = 0) {
+                earlyEndAvailableAt: Date? = nil, policy: CompiledPolicy? = nil, revision: Int = 0) {
         self.currentTaskTitle = currentTaskTitle
         self.session = session
         self.isObserveOnly = isObserveOnly
         self.earlyEndAvailableAt = earlyEndAvailableAt
+        self.policy = policy
         self.revision = revision
     }
 
@@ -31,6 +34,13 @@ public struct FocusSnapshot: Equatable, Sendable {
     public var activeSession: FocusSession? {
         guard let session, !session.hasEnded else { return nil }
         return session
+    }
+
+    /// Whether session-only rules block now: while running, and through
+    /// pauses and breaks of a strict session.
+    public var sessionRulesApply: Bool {
+        guard let active = activeSession, let policy = FocusEngine.policy(for: active) else { return false }
+        return policy.resumesAt == nil
     }
 
     /// When the coordinator must next be asked to reconcile, such as the

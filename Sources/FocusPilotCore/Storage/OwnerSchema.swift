@@ -122,6 +122,25 @@ enum OwnerSchema {
             }
             try db.create(index: "task_on_clientId", on: TaskRecord.databaseTableName, columns: ["clientId"], unique: true)
         }
+        migrator.registerMigration("owner-v7-rules") { db in
+            try db.create(table: RuleSetRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("targets", .text).notNull()
+                table.column("activation", .text).notNull()
+                table.column("revision", .integer).notNull().defaults(to: 1)
+            }
+            try db.create(table: AllowedRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+                table.column("target", .text).notNull()
+                table.column("targetKey", .text).notNull().unique()
+                table.column("source", .text).notNull().check(sql: "source IN ('seeded', 'owner')")
+            }
+            for entry in SeededAllowedList.entries {
+                var row = try AllowedRow(entry)
+                try row.insert(db)
+            }
+        }
         return migrator
     }
 

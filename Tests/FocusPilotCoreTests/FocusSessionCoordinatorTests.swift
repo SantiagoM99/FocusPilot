@@ -21,7 +21,7 @@ struct FocusSessionCoordinatorTests {
         #expect(session.action == "Explain baseline results")
         #expect(session.plannedEnd == wednesdayMorningInBogota.addingTimeInterval(50 * 60))
         let policy = try #require(await fixture.publisher.published.last)
-        #expect(policy.schemaVersion == PublishedPolicy.currentSchemaVersion)
+        #expect(policy.schemaVersion == CompiledPolicy.currentSchemaVersion)
         #expect(policy.revision == 1)
         #expect(policy.effectiveAt == wednesdayMorningInBogota)
         #expect(policy.session?.end == session.plannedEnd)

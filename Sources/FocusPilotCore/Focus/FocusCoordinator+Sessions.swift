@@ -9,6 +9,9 @@ extension FocusCoordinator {
     public func launch() async throws {
         session = try await repository.latestSession()
         try await handle(.reconcile)
+        if policy == nil {
+            try await publish(repository.republish())
+        }
     }
 
     /// Starts a session on the pinned Now task.
@@ -67,7 +70,8 @@ extension FocusCoordinator {
     private func handle(_ event: FocusEvent) async throws {
         let at = now()
         let transition = try FocusEngine.handle(event, session: session, at: at)
-        var revisions = try await repository.record(transition).makeIterator()
+        let recorded = try await repository.record(transition)
+        var revisions = recorded.revisions.makeIterator()
         session = transition.session
         if session?.hasEnded != false {
             earlyEndRequestedAt = nil
@@ -76,8 +80,8 @@ extension FocusCoordinator {
             switch effect {
             case .persist:
                 break
-            case .publishPolicy(let policy):
-                await publisher.publish(PublishedPolicy(revision: revisions.next()!, effectiveAt: at, session: policy))
+            case .publishPolicy(let sessionPolicy):
+                await publish(revision: revisions.next()!, inputs: recorded.inputs, session: sessionPolicy, at: at)
             case .notify(let notice):
                 await notices.deliver(notice)
             }

@@ -25,6 +25,8 @@ public actor FocusCoordinator {
 
     /// The latest session, active or ended.
     var session: FocusSession?
+    /// The last policy published, shown in Settings.
+    var policy: CompiledPolicy?
     /// When, on `uptime`, the owner confirmed ending the current strict session early.
     var earlyEndRequestedAt: Duration?
     /// Grows with every change, so the app can drop a snapshot older than one it has.
@@ -52,7 +54,7 @@ public actor FocusCoordinator {
 
     public func snapshot() async -> FocusSnapshot {
         FocusSnapshot(currentTaskTitle: try? await repository.nowTask()?.title, session: session,
-                      earlyEndAvailableAt: earlyEndAvailableAt(), revision: revision)
+                      earlyEndAvailableAt: earlyEndAvailableAt(), policy: policy, revision: revision)
     }
 
     /// Every snapshot from now on, starting with the current one.
