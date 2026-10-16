@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import FocusPilotCore
 
-/// Stands in for the herdr binary: records every launch and answers with a
-/// canned reply.
+/// Stands in for the herdr binary: records every launch and answers each
+/// command with a canned reply.
 final class RecordingRunner: HerdrProcessRunning, @unchecked Sendable {
     struct Launch: Equatable {
         var executable: String
@@ -13,17 +13,25 @@ final class RecordingRunner: HerdrProcessRunning, @unchecked Sendable {
 
     private let lock = NSLock()
     private var recorded: [Launch] = []
-    var reply: Result<HerdrProcessOutput, Error>
+    var replies: [[String]: Result<HerdrProcessOutput, Error>]
 
-    init(reply: Result<HerdrProcessOutput, Error>) {
-        self.reply = reply
+    init(replies: [[String]: Result<HerdrProcessOutput, Error>]) {
+        self.replies = replies
+    }
+
+    /// A compatible running server whose `workspace list` prints `json`.
+    convenience init(listing json: String = workspaceListJSON, status: String = statusJSON()) {
+        self.init(replies: [
+            ["status", "--json"]: .success(HerdrProcessOutput(status: 0, standardOutput: Data(status.utf8))),
+            ["workspace", "list"]: .success(HerdrProcessOutput(status: 0, standardOutput: Data(json.utf8))),
+        ])
     }
 
     var launches: [Launch] { lock.withLock { recorded } }
 
     func run(executable: URL, arguments: [String], environment: [String: String]) async throws -> HerdrProcessOutput {
         lock.withLock { recorded.append(Launch(executable: executable.path, arguments: arguments, environment: environment)) }
-        return try reply.get()
+        return try (replies[arguments] ?? .success(HerdrProcessOutput(status: 2, standardOutput: Data()))).get()
     }
 }
 
@@ -46,6 +54,15 @@ let workspaceListJSON = """
     ]}}
     """
 
+/// `herdr status --json` as Herdr 0.9.0 printed it, trimmed to what is read.
+func statusJSON(running: Bool = true, compatible: Bool = true, protocol: Int = 22) -> String {
+    """
+    {"client":{"version":"0.9.0","protocol":22},
+     "server":{"status":"\(running ? "running" : "stopped")","running":\(running),"version":"0.9.0",
+               "protocol":\(`protocol`),"compatible":\(compatible)}}
+    """
+}
+
 @Suite("Herdr CLI")
 struct HerdrCLITests {
     private let home = URL(fileURLWithPath: "/Users/owner")
@@ -60,7 +77,7 @@ struct HerdrCLITests {
     }
 
     private func listing(_ json: String = workspaceListJSON) -> RecordingRunner {
-        RecordingRunner(reply: .success(HerdrProcessOutput(status: 0, standardOutput: Data(json.utf8))))
+        RecordingRunner(listing: json)
     }
 
     @Test func readsWorkspacesWithTheirLabelAndCheckout() async {
@@ -86,12 +103,13 @@ struct HerdrCLITests {
         _ = await herdr.connection()
         _ = await herdr.connection()
 
+        let readOnly = [["status", "--json"], ["workspace", "list"], ["workspace", "get"]]
         #expect(!runner.launches.isEmpty)
         for launch in runner.launches {
-            #expect([["workspace", "list"], ["workspace", "get"]].contains(Array(launch.arguments.prefix(2))))
+            #expect(readOnly.contains(Array(launch.arguments.prefix(2))), "\(launch.arguments) is not read-only")
         }
         for command in HerdrCommand.allCases {
-            #expect(["list", "get"].contains(command.arguments[1]), "\(command) is not read-only")
+            #expect(readOnly.contains(command.arguments), "\(command) is not read-only")
         }
     }
 
@@ -99,16 +117,16 @@ struct HerdrCLITests {
         let runner = listing()
         _ = await cli(runner: runner).connection()
 
-        #expect(runner.launches.first?.environment == [
+        #expect(Set(runner.launches.map(\.environment)) == [[
             "HOME": "/Users/owner", "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8",
-        ])
+        ]])
     }
 
     @Test func findsTheBinaryAtAFixedPathNotThroughPATH() async {
         let runner = listing()
         _ = await cli(runner: runner, executables: ["/opt/homebrew/bin/herdr"]).connection()
 
-        #expect(runner.launches.map(\.executable) == ["/opt/homebrew/bin/herdr"])
+        #expect(Set(runner.launches.map(\.executable)) == ["/opt/homebrew/bin/herdr"])
     }
 
     @Test func missingBinaryIsReportedWithoutRunningAnything() async {
@@ -125,12 +143,13 @@ struct HerdrCLITests {
     }
 
     @Test func failedListMeansNotRunning() async {
-        let runner = RecordingRunner(reply: .success(HerdrProcessOutput(status: 1, standardOutput: Data())))
+        let runner = RecordingRunner(listing: workspaceListJSON)
+        runner.replies[["workspace", "list"]] = .success(HerdrProcessOutput(status: 1, standardOutput: Data()))
         #expect(await cli(runner: runner).connection() == .disconnected(.notRunning))
     }
 
     @Test func launchFailureMeansNotRunning() async {
-        let runner = RecordingRunner(reply: .failure(CocoaError(.executableLoad)))
+        let runner = RecordingRunner(replies: [["status", "--json"]: .failure(CocoaError(.executableLoad))])
         #expect(await cli(runner: runner).connection() == .disconnected(.notRunning))
     }
 
@@ -142,5 +161,31 @@ struct HerdrCLITests {
     ])
     func unexpectedOutputIsReportedAsUnreadable(json: String) async {
         #expect(await cli(runner: listing(json)).connection() == .disconnected(.unreadableReply))
+    }
+
+    // MARK: Version gate
+
+    @Test func versionIsCheckedBeforeListing() async {
+        let runner = listing()
+        _ = await cli(runner: runner).connection()
+        #expect(runner.launches.map(\.arguments) == [["status", "--json"], ["workspace", "list"]])
+    }
+
+    @Test(arguments: [statusJSON(protocol: 23), statusJSON(compatible: false), "{}", "not json"])
+    func anUnsupportedServerIsDisconnectedAndNotListed(status: String) async {
+        let runner = RecordingRunner(listing: workspaceListJSON, status: status)
+        #expect(await cli(runner: runner).connection() == .disconnected(.unsupportedVersion))
+        #expect(!runner.launches.contains { $0.arguments == ["workspace", "list"] })
+    }
+
+    @Test func aStoppedServerIsNotRunning() async {
+        let runner = RecordingRunner(listing: workspaceListJSON, status: statusJSON(running: false))
+        #expect(await cli(runner: runner).connection() == .disconnected(.notRunning))
+    }
+
+    @Test func failedStatusMeansNotRunning() async {
+        let runner = RecordingRunner(listing: workspaceListJSON)
+        runner.replies[["status", "--json"]] = .success(HerdrProcessOutput(status: 1, standardOutput: Data()))
+        #expect(await cli(runner: runner).connection() == .disconnected(.notRunning))
     }
 }

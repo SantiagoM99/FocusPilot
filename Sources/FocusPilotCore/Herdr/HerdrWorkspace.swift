@@ -56,6 +56,9 @@ public enum HerdrUnavailable: Equatable, Sendable {
     case binaryNotFound
     /// No server socket, or the CLI could not reach the server.
     case notRunning
+    /// The server speaks a protocol FocusPilot was not built for, or does
+    /// not say which.
+    case unsupportedVersion
     /// Herdr answered with something FocusPilot does not understand, such as
     /// a newer output format.
     case unreadableReply

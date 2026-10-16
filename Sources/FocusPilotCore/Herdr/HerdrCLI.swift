@@ -6,6 +6,9 @@ public struct HerdrCLI: Sendable {
     /// A GUI app's PATH does not include where Herdr installs itself, and a
     /// login shell does not reliably add it either, so only fixed paths are
     /// tried, in this order.
+    /// The socket protocol this client was validated against (Herdr 0.9.0).
+    static let supportedProtocol = 22
+
     static let binaryCandidates = [".local/bin/herdr", "/opt/homebrew/bin/herdr", "/usr/local/bin/herdr", ".cargo/bin/herdr"]
 
     private let home: URL
@@ -33,18 +36,25 @@ public struct HerdrCLI: Sendable {
         guard let startedAt = socketCreationDate(socket) else { return .disconnected(.notRunning) }
         let server = HerdrServer(sessionName: "default", socketPath: socket.path, startedAt: startedAt)
 
-        let output: HerdrProcessOutput
-        do {
-            output = try await runner.run(executable: binary, arguments: HerdrCommand.workspaceList.arguments,
-                                          environment: environment)
-        } catch {
-            return .disconnected(.notRunning)
+        guard let status = await run(.status, with: binary) else { return .disconnected(.notRunning) }
+        switch HerdrStatus.parse(status) {
+        case .stopped: return .disconnected(.notRunning)
+        case .unsupported: return .disconnected(.unsupportedVersion)
+        case .compatible: break
         }
-        guard output.status == 0 else { return .disconnected(.notRunning) }
-        guard let workspaces = HerdrWorkspaceList.parse(output.standardOutput) else {
+        guard let output = await run(.workspaceList, with: binary) else { return .disconnected(.notRunning) }
+        guard let workspaces = HerdrWorkspaceList.parse(output) else {
             return .disconnected(.unreadableReply)
         }
         return .connected(server, workspaces)
+    }
+
+    /// The command's output, or nil if it could not run or failed.
+    private func run(_ command: HerdrCommand, with binary: URL) async -> Data? {
+        guard let output = try? await runner.run(executable: binary, arguments: command.arguments, environment: environment),
+              output.status == 0
+        else { return nil }
+        return output.standardOutput
     }
 
     private func binary() -> URL? {
@@ -58,6 +68,24 @@ public struct HerdrCLI: Sendable {
     /// session, so the child gets only these variables.
     private var environment: [String: String] {
         ["HOME": home.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8"]
+    }
+}
+
+/// Reads `herdr status --json`. Anything other than a running, compatible
+/// server on the supported protocol is unsupported, including output that
+/// cannot be read.
+enum HerdrStatus {
+    case compatible, stopped, unsupported
+
+    static func parse(_ data: Data) -> HerdrStatus {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let server = root["server"] as? [String: Any],
+              let running = server["running"] as? Bool
+        else { return .unsupported }
+        guard running else { return .stopped }
+        guard server["compatible"] as? Bool == true, server["protocol"] as? Int == HerdrCLI.supportedProtocol
+        else { return .unsupported }
+        return .compatible
     }
 }
 

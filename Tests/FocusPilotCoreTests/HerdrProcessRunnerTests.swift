@@ -25,6 +25,19 @@ struct HerdrProcessRunnerTests {
         }
     }
 
+    @Test func aChildThatIgnoresTerminationIsKilled() async {
+        var runner = HerdrProcessRunner()
+        runner.timeout = .milliseconds(200)
+        runner.killGrace = .milliseconds(200)
+        let start = ContinuousClock.now
+        await #expect(throws: HerdrProcessRunner.TimedOut.self) {
+            // exec keeps one process, so the ignored SIGTERM applies to sleep itself.
+            try await runner.run(executable: URL(fileURLWithPath: "/bin/sh"),
+                                 arguments: ["-c", "trap '' TERM; exec /bin/sleep 10"], environment: [:])
+        }
+        #expect(ContinuousClock.now - start < .seconds(3))
+    }
+
     @Test func oversizedOutputIsRejected() async {
         var runner = HerdrProcessRunner()
         runner.outputLimit = 1000

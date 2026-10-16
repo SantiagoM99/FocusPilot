@@ -19,6 +19,8 @@ public protocol HerdrProcessRunning: Sendable {
 public struct HerdrProcessRunner: HerdrProcessRunning {
     public var timeout: Duration = .seconds(3)
     public var outputLimit = 1 << 20
+    /// How long a child gets to exit after SIGTERM before SIGKILL.
+    public var killGrace: Duration = .seconds(1)
 
     public init() {}
 
@@ -40,10 +42,12 @@ public struct HerdrProcessRunner: HerdrProcessRunning {
             process.terminationHandler = { _ in continuation.finish() }
         }
         try process.run()
-        let timeout = timeout
+        let (timeout, killGrace) = (timeout, killGrace)
         let watchdog = Task {
             try await Task.sleep(for: timeout)
             process.terminate()
+            try await Task.sleep(for: killGrace)
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
         }
         defer { watchdog.cancel() }
 

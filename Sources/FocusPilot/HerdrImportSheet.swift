@@ -126,6 +126,7 @@ extension HerdrUnavailable {
         switch self {
         case .binaryNotFound: "Herdr not found"
         case .notRunning: "Herdr isn’t running"
+        case .unsupportedVersion: "Herdr version not supported"
         case .unreadableReply: "Herdr’s reply wasn’t understood"
         }
     }
@@ -136,6 +137,8 @@ extension HerdrUnavailable {
             "FocusPilot looks for herdr in ~/.local/bin, /opt/homebrew/bin, /usr/local/bin and ~/.cargo/bin."
         case .notRunning:
             "Start Herdr and its workspaces appear here. FocusPilot checks again every few seconds."
+        case .unsupportedVersion:
+            "FocusPilot works with Herdr’s protocol 22 (Herdr 0.9). FocusPilot checks again every few seconds."
         case .unreadableReply:
             "This Herdr version may be newer than FocusPilot supports. FocusPilot checks again every few seconds."
         }
