@@ -2,10 +2,15 @@ import Foundation
 import Testing
 @testable import FocusPilotCore
 
+/// Stands in for the system spelling dictionary: real words that happen to
+/// be close to a date name.
+let knownWords: Set<String> = ["match", "money", "monkey", "fridge", "banana", "total", "lunch", "marco", "sundae", "domino"]
+
 @Suite("CaptureSplitter")
 struct CaptureSplitterTests {
     private func split(_ text: String) -> CaptureSplit {
-        CaptureSplitter(parser: DeadlineParser(now: wednesdayMorningInBogota, timeZone: bogota)).split(text)
+        CaptureSplitter(parser: DeadlineParser(now: wednesdayMorningInBogota, timeZone: bogota))
+            .split(text, isKnownWord: knownWords.contains)
     }
 
     @Test func trailingDeadlinePhraseIsSplitOffTheTitle() {
@@ -36,8 +41,15 @@ struct CaptureSplitterTests {
         ("Clean the fridge by Friday", "Clean the fridge", "by Friday"),
         ("Pay money by Friday", "Pay money", "by Friday"),
         ("Update total by 5pm", "Update total", "by 5pm"),
-        // A misspelling never overrides a readable phrase.
-        ("Present fryday by 10:00", "Present fryday", "by 10:00"),
+        // A time written as one token counts without a marker.
+        ("Meet Ana 10:00", "Meet Ana", "10:00"),
+        ("Watch the match 10:00", "Watch the match", "10:00"),
+        ("Buy banana 3pm", "Buy banana", "3pm"),
+        ("Pay money 5pm", "Pay money", "5pm"),
+        ("Feed the monkey 8am", "Feed the monkey", "8am"),
+        ("Clean the fridge 9am", "Clean the fridge", "9am"),
+        ("Comprar el marco 10:00", "Comprar el marco", "10:00"),
+        ("Meet at lunch 12pm", "Meet at lunch", "12pm"),
         // A bare time opens the phrase when a date word follows it.
         ("Submit 12 pm Friday", "Submit", "12 pm Friday"),
         // Spanish weekdays and months after el, para or antes del.
@@ -65,7 +77,7 @@ struct CaptureSplitterTests {
         "Email Ana", "Read paper by Smith", "Work on parser", "Work on 3 chapters", "tomorrow", "Plan 2027",
         // Abbreviations and "N pm" count only after a marker word.
         "Read The Sun", "Ir al mar 3", "Call Jan 3", "Read page 3 pm", "Read chapter 12 pm",
-        "Submit PhD shortlist Oct 20", "Meet Ana 10:00", "Pin 2-3-4",
+        "Submit PhD shortlist Oct 20", "Pin 2-3-4",
         // A marker followed by ordinary words is part of the title.
         "Go running on Sundays", "Write report on today's meeting", "Read article on May Day", "Comment on 3rd draft",
         // Ordinary words close to a date name are not misspellings.
@@ -82,14 +94,21 @@ struct CaptureSplitterTests {
         #expect(result.deadline == nil)
     }
 
+    @Test func bareTimeIsTodayAtThatTime() {
+        let result = split("Watch the match 10:00")
+
+        #expect(result.deadline?.due == .timed(instant("2026-10-14T10:00:00-05:00")))
+        #expect(result.unrecognizedWord == nil)
+    }
+
+    // Only a clear date with impossible values after a marker blocks saving.
     @Test(arguments: [
         ("Write report by Oct 32", "Write report", "by Oct 32"),
+        ("Pay rent by Feb 30", "Pay rent", "by Feb 30"),
+        ("Entregar informe para el 31 de febrero", "Entregar informe", "para el 31 de febrero"),
+        ("Call Ana at 25:00", "Call Ana", "at 25:00"),
+        ("Call Ana at 13pm", "Call Ana", "at 13pm"),
         ("Finish draft due 12am", "Finish draft", "due 12am"),
-        ("Send slides by next tuesdy", "Send slides", "by next tuesdy"),
-        ("Present on fryday 10:00", "Present", "on fryday 10:00"),
-        ("Llamar a Ana mañnana 10:00", "Llamar a Ana", "mañnana 10:00"),
-        ("Present fryday 10:00", "Present", "fryday 10:00"),
-        ("Llamar a Ana el vierns 10:00", "Llamar a Ana", "el vierns 10:00"),
     ])
     func phraseThatLooksLikeADeadlineButCannotBeReadIsKeptAsUnreadable(text: String, title: String, deadlineText: String) {
         let result = split(text)
@@ -98,13 +117,38 @@ struct CaptureSplitterTests {
         #expect(result.deadlineText == deadlineText)
         #expect(result.deadline == nil)
     }
+
+    // A guessed misspelling never blocks saving and never takes words out
+    // of the title; it only names the word for a quiet hint.
+    @Test(arguments: [
+        ("Present fryday", "fryday"),
+        ("Present fryday 10:00", "fryday"),
+        ("Present on fryday 10:00", "fryday"),
+        ("Present fryday by 10:00", "fryday"),
+        ("Send slides by next tuesdy", "tuesdy"),
+        ("Llamar a Ana mañnana 10:00", "mañnana"),
+        ("Llamar a Ana el vierns 10:00", "vierns"),
+    ])
+    func nearMissDateWordKeepsTheWholeTitleAndIsNamed(text: String, word: String) {
+        let result = split(text)
+
+        #expect(result.title == text)
+        #expect(result.deadlineText == nil)
+        #expect(result.deadline == nil)
+        #expect(result.unrecognizedWord == word)
+    }
+
+    @Test(arguments: ["Watch the match", "Buy Sundae", "Feed the monkey 8am", "Comprar el marco 10:00", "Jugar el domino", "Call Ana"])
+    func realWordsAreNotNamedAsMisspellings(_ text: String) {
+        #expect(split(text).unrecognizedWord == nil)
+    }
 }
 
 @Suite("CaptureDraft")
 struct CaptureDraftTests {
     private func draft(_ text: String, now: Date = wednesdayMorningInBogota) -> CaptureDraft {
         var draft = CaptureDraft()
-        draft.setText(text, now: now, timeZone: bogota)
+        draft.setText(text, now: now, timeZone: bogota, isKnownWord: knownWords.contains)
         return draft
     }
 
@@ -124,6 +168,14 @@ struct CaptureDraftTests {
 
     @Test func blankTextCannotBeSaved() {
         #expect(draft("   ").newTask == nil)
+    }
+
+    @Test func nearMissDateWordShowsAHintButSaves() {
+        let typed = draft("Present fryday 10:00")
+
+        #expect(typed.unrecognizedDateHint == "Did you mean a date? “fryday” wasn’t recognized.")
+        #expect(typed.newTask == NewTask(title: "Present fryday 10:00"))
+        #expect(draft("Present Friday 10:00").unrecognizedDateHint == nil)
     }
 
     @Test func unreadableDeadlineBlocksSavingUntilRemoved() {
@@ -162,7 +214,7 @@ struct CaptureDraftTests {
         typed.title = "Edited"
         typed.removeDeadline()
 
-        typed.setText("Read paper by Oct 21", now: wednesdayMorningInBogota, timeZone: bogota)
+        typed.setText("Read paper by Oct 21", now: wednesdayMorningInBogota, timeZone: bogota, isKnownWord: knownWords.contains)
 
         #expect(typed.title == "Read paper")
         #expect(typed.deadline?.due == .dateOnly(LocalDate(year: 2026, month: 10, day: 21)))

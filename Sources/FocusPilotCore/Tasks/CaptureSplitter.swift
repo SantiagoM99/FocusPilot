@@ -7,23 +7,33 @@ public struct CaptureSplit: Equatable, Sendable {
     public var deadlineText: String?
     /// The parsed deadline; nil when there is no phrase or it is unreadable.
     public var deadline: Deadline?
+    /// A word that looks like a misspelled date ("fryday"), for a hint that
+    /// never blocks saving.
+    public var unrecognizedWord: String?
 }
 
 /// Splits "Write NLP report by Friday 11pm" into the title "Write NLP
 /// report" and the deadline "by Friday 11pm".
 ///
-/// The deadline is the longest trailing phrase the parser fully reads, if
-/// it starts with a marker word (by, due, on, at, before, el, para, antes)
-/// or, without one, with an unambiguous date word: a full English weekday or
-/// month name, today/tomorrow/hoy/mañana/pasado, or an ISO date, optionally
-/// preceded by a time ("12pm Friday"). Abbreviations, Spanish names and bare
-/// times are too common in titles ("Read The Sun", "Call Jan 3", "Llamar a
-/// Domingo", "Read page 3 pm") to count without a marker.
+/// The deadline is the longest trailing phrase the parser fully reads that
+/// starts with:
+/// - a marker word (by, due, on, at, before, el, para, antes);
+/// - an unambiguous date word: a full English weekday or month name,
+///   today/tomorrow/hoy/mañana/pasado, or an ISO date;
+/// - a time written as one token ("10:00", "3pm"), or any time followed by
+///   an unambiguous date word ("12 pm Friday").
+/// Abbreviations, Spanish names and "N pm" with a space need a marker: they
+/// are too common in titles ("Read The Sun", "Llamar a Domingo", "Read page
+/// 3 pm").
 ///
-/// When nothing is readable but the end looks like an attempt at a deadline
-/// ("by Oct 32", "on fryday 10:00", "mañnana 10:00"), that phrase is returned
-/// without a deadline so the sheet can warn and block saving. Otherwise the
-/// whole text is the title.
+/// A guessed misspelling never blocks saving or takes words out of the
+/// title. When a near-miss date word that `isKnownWord` does not know
+/// ("fryday", but not "match") sits right before the phrase, the whole text
+/// stays the title and the word is named for a hint.
+///
+/// Saving is blocked only for a clear date attempt after a marker that has
+/// impossible values ("by Feb 30", "para el 31 de febrero", "at 25:00"):
+/// that phrase is returned without a deadline so the sheet can warn.
 public struct CaptureSplitter: Sendable {
     public var parser: DeadlineParser
 
@@ -31,35 +41,46 @@ public struct CaptureSplitter: Sendable {
         self.parser = parser
     }
 
-    public func split(_ text: String) -> CaptureSplit {
+    public func split(_ text: String, isKnownWord: (String) -> Bool) -> CaptureSplit {
         let words = text.ranges(of: /\S+/).map { text[$0] }
-        // A readable phrase always wins: in "Present fryday by 10:00" the
-        // misspelling stays in the title, where the preview shows it.
-        return readablePhrase(text, words)
-            ?? unreadablePhrase(text, words)
-            ?? CaptureSplit(title: Self.title(text[...]), deadlineText: nil, deadline: nil)
+        func isTypo(_ word: Substring) -> Bool {
+            DateVocabulary.isMisspelledName(word) && !isKnownWord(DateVocabulary.normalized(word))
+        }
+        let start = readablePhrase(text, words, isTypo: isTypo) ?? unreadablePhrase(text, words)
+        var result = CaptureSplit(title: Self.title(text[...]), deadlineText: nil, deadline: nil)
+        if let start {
+            let phrase = String(text[words[start].startIndex...])
+            result = CaptureSplit(title: Self.title(text[..<words[start].startIndex]), deadlineText: phrase,
+                                  deadline: parser.parse(phrase))
+        }
+        result.unrecognizedWord = (0..<(start ?? words.count))
+            .first { isTypo(words[$0]) && DateVocabulary.isInDatePosition(words, $0) }
+            .map { words[$0].trimmingCharacters(in: .punctuationCharacters) }
+        return result
     }
 
-    private func readablePhrase(_ text: String, _ words: [Substring]) -> CaptureSplit? {
+    /// Where the readable phrase starts, if any.
+    private func readablePhrase(_ text: String, _ words: [Substring], isTypo: (Substring) -> Bool) -> Int? {
         // Start at 1: the title keeps at least one word.
-        for index in words.indices.dropFirst() {
-            let title = Self.title(text[..<words[index].startIndex])
-            guard !title.isEmpty, Self.mayStartDeadline(words[index...]) else { continue }
-            let phrase = String(text[words[index].startIndex...])
-            if let deadline = parser.parse(phrase) {
-                return CaptureSplit(title: title, deadlineText: phrase, deadline: deadline)
-            }
+        for index in words.indices.dropFirst() where Self.mayStartDeadline(words[index...]) {
+            guard parser.parse(String(text[words[index].startIndex...])) != nil else { continue }
+            // "Present fryday by 10:00": the misspelled word probably belongs
+            // to the deadline, so reading only "by 10:00" would be a guess.
+            return isTypo(words[index - 1]) ? nil : index
         }
         return nil
     }
 
     private static func mayStartDeadline(_ words: ArraySlice<Substring>) -> Bool {
         guard let first = words.first else { return false }
-        if DeadlineParser.fillerWords.contains(Substring(DateVocabulary.normalized(first))) { return true }
-        if isUnambiguousStart(first) { return true }
-        // "Submit 12pm Friday": a time opens the phrase when such a word follows.
+        if DateVocabulary.isMarker(first) || isUnambiguousStart(first) { return true }
         guard let length = DateVocabulary.timeLength(words) else { return false }
-        return words.dropFirst(length).first.map(isUnambiguousStart) == true
+        // "Meet Ana 10:00", "Submit 12 pm Friday". "Read page 3 pm" stays a
+        // title: with a space, the number may belong to the title.
+        guard let next = words.dropFirst(length).first else {
+            return length == 1 && DateVocabulary.normalized(first) != "noon"
+        }
+        return isUnambiguousStart(next)
     }
 
     private static func isUnambiguousStart(_ word: Substring) -> Bool {
@@ -67,26 +88,18 @@ public struct CaptureSplitter: Sendable {
         return DateVocabulary.unambiguousStarts.contains(word) || LocalDate(isoString: word) != nil
     }
 
-    /// The longest trailing phrase that opens a date, with or without a marker
-    /// before it ("by Oct 32", "mañnana 10:00", "by next tuesdy"), and whose
-    /// remaining words could all belong to a date. "on May Day" and "on 3rd
-    /// draft" fail the last test and stay in the title; in "Watch the match"
-    /// or "Meet at lunch" no date or time follows the near-miss word.
-    private func unreadablePhrase(_ text: String, _ words: [Substring]) -> CaptureSplit? {
-        for index in words.indices.dropFirst() {
+    /// Where a blocking phrase starts: a marker followed by a clear date,
+    /// made only of exact date words, that the parser cannot read ("by Oct
+    /// 32", "at 13pm"). "on May Day" and "on 3rd draft" contain other words
+    /// and stay in the title.
+    private func unreadablePhrase(_ text: String, _ words: [Substring]) -> Int? {
+        words.indices.dropFirst().first { index in
             let rest = words[(index + 1)...]
-            let startsAttempt: Bool
-            if DeadlineParser.fillerWords.contains(Substring(DateVocabulary.normalized(words[index]))) {
-                startsAttempt = DateVocabulary.beginsDate(rest)
-            } else {
-                startsAttempt = DateVocabulary.opensMisspelledDate(words[index...])
-            }
-            guard startsAttempt, rest.allSatisfy(DateVocabulary.couldBelongToDate) else { continue }
-            let title = Self.title(text[..<words[index].startIndex])
-            guard !title.isEmpty else { continue }
-            return CaptureSplit(title: title, deadlineText: String(text[words[index].startIndex...]), deadline: nil)
+            return DateVocabulary.isMarker(words[index])
+                && DateVocabulary.beginsDate(rest)
+                && rest.allSatisfy(DateVocabulary.couldBelongToDate)
+                && parser.parse(String(text[words[index].startIndex...])) == nil
         }
-        return nil
     }
 
     /// The title without trailing separators: "Call bank," becomes "Call bank".

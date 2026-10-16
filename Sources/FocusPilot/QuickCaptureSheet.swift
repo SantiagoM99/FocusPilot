@@ -22,8 +22,15 @@ struct QuickCaptureSheet: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            TextField("Task", text: $text)
-                .font(.title3)
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Task", text: $text)
+                    .font(.title3)
+                if let hint = draft.unrecognizedDateHint {
+                    Label(hint, systemImage: "questionmark.circle")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 12) {
                 GridRow {
@@ -90,7 +97,7 @@ struct QuickCaptureSheet: View {
         .padding(16)
         .frame(width: 520)
         .onChange(of: text) {
-            draft.setText(text, now: .now, timeZone: .current)
+            draft.setText(text, now: .now, timeZone: .current, isKnownWord: SpellingDictionary.isKnown)
             isEditingDeadline = false
         }
     }

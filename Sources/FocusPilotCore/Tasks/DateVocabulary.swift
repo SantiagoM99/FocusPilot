@@ -13,41 +13,41 @@ enum DateVocabulary {
     static let unambiguousStarts: Set<String> = Set(fullNames).subtracting(["may"])
         .union(["today", "tomorrow", "hoy", "mañana", "pasado"])
 
-    /// True when the words after a marker open a date: a date or time word,
-    /// a misspelled date name that `opensMisspelledDate` accepts, or
-    /// "next"/"this"/"pasado"/a day number followed by a date-like word.
+    static func isMarker(_ word: Substring) -> Bool {
+        DeadlineParser.fillerWords.contains(Substring(normalized(word)))
+    }
+
+    /// True when the words after a marker open a clear date: an exact date
+    /// or time word, or "next"/"this"/"pasado"/a day number followed by one.
+    /// Further markers and connectors are skipped ("para el 31 de febrero").
     static func beginsDate(_ words: ArraySlice<Substring>) -> Bool {
+        let words = words.filter { !isMarker($0) && !DeadlineParser.connectorWords.contains(Substring(normalized($0))) }
         guard let first = words.first else { return false }
-        if isDateOrTime(first) || opensMisspelledDate(words) { return true }
+        if isDateOrTime(first) { return true }
         let word = normalized(first)
         let opensWithModifier = ["next", "this", "pasado"].contains(word) || Int(word) != nil
-        return opensWithModifier && words.dropFirst().first.map(isDateLike) == true
+        return opensWithModifier && words.dropFirst().first.map(isDateOrTime) == true
     }
 
-    /// A misspelled date name followed directly by a date or time
-    /// ("fryday 10:00", "mañnana 10:00"). Alone, it is too often an ordinary
-    /// word ("match", "lunch", "marco") to count.
-    static func opensMisspelledDate(_ words: ArraySlice<Substring>) -> Bool {
-        guard let first = words.first, isMisspelledName(first) else { return false }
-        let rest = words.dropFirst()
-        return timeLength(rest) != nil || rest.first.map(isDateOrTime) == true
-    }
-
-    /// Could this word be part of a typed date? Date-like words, numbers,
-    /// am/pm and the modifiers, markers and connectors that appear inside dates.
+    /// Could this word be part of a typed date? Exact date words, numbers,
+    /// am/pm and the modifiers, markers and connectors that appear inside
+    /// dates. A misspelling is not: it never makes a phrase block saving.
     static func couldBelongToDate(_ word: Substring) -> Bool {
         let normalized = Substring(normalized(word))
-        return isDateLike(word)
+        return isDateOrTime(word)
             || Int(normalized) != nil
             || ["am", "pm", "next", "this", "pasado"].contains(normalized)
             || DeadlineParser.fillerWords.contains(normalized)
             || DeadlineParser.connectorWords.contains(normalized)
     }
 
-    /// A date or time word, or a misspelling of a date name. Used inside a
-    /// phrase that has already opened a date.
-    static func isDateLike(_ word: Substring) -> Bool {
-        isDateOrTime(word) || isMisspelledName(word)
+    /// Is the word at `index` where a date would go? After a marker or
+    /// "next"/"this", or at the end, or before a marker, date or time.
+    static func isInDatePosition(_ words: [Substring], _ index: Int) -> Bool {
+        if index > 0, isMarker(words[index - 1]) || ["next", "this"].contains(normalized(words[index - 1])) { return true }
+        let rest = words[(index + 1)...]
+        guard let next = rest.first else { return true }
+        return isMarker(next) || isDateOrTime(next) || timeLength(rest) != nil
     }
 
     /// An exact date name, a relative day, or a time or date pattern.

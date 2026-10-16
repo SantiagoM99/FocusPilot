@@ -19,10 +19,12 @@ public struct CaptureDraft: Equatable, Sendable {
     public init() {}
 
     /// Re-splits the text and discards earlier corrections to the title and
-    /// deadline, since they belonged to the old text.
-    public mutating func setText(_ text: String, now: Date, timeZone: TimeZone) {
+    /// deadline, since they belonged to the old text. `isKnownWord` says
+    /// whether a word is in the spelling dictionary, so "match" is not taken
+    /// for a misspelled "March".
+    public mutating func setText(_ text: String, now: Date, timeZone: TimeZone, isKnownWord: (String) -> Bool) {
         self.text = text
-        split = CaptureSplitter(parser: DeadlineParser(now: now, timeZone: timeZone)).split(text)
+        split = CaptureSplitter(parser: DeadlineParser(now: now, timeZone: timeZone)).split(text, isKnownWord: isKnownWord)
         editedTitle = nil
         correctedDeadline = nil
         deadlineRemoved = false
@@ -47,6 +49,12 @@ public struct CaptureDraft: Equatable, Sendable {
     /// A deadline phrase was found but could not be read: saving is blocked.
     public var isDeadlineUnreadable: Bool {
         deadlineText != nil && deadline == nil
+    }
+
+    /// A quiet note when a word looks like a misspelled date. It never
+    /// blocks saving.
+    public var unrecognizedDateHint: String? {
+        split.unrecognizedWord.map { "Did you mean a date? “\($0)” wasn’t recognized." }
     }
 
     public mutating func correctDeadline(_ deadline: Deadline) {
