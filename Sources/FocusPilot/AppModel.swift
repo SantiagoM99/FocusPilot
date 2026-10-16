@@ -37,11 +37,13 @@ final class AppModel {
         watchHerdr()
     }
 
-    /// Reads Herdr every few seconds, which also turns new workspaces into
-    /// projects. While Herdr is unreachable it keeps retrying without
-    /// reporting errors. Lists reload only when Herdr's answer changes.
+    /// Reads Herdr on `HerdrPollSchedule`, which also turns new workspaces
+    /// into projects. While Herdr is unreachable it keeps retrying, less
+    /// often, without reporting errors. Lists reload only when Herdr's answer
+    /// changes.
     private func watchHerdr() {
         Task { [weak self] in
+            var schedule = HerdrPollSchedule()
             while let coordinator = self?.coordinator {
                 let connection = await coordinator.refreshHerdr()
                 guard let self else { return }
@@ -49,7 +51,7 @@ final class AppModel {
                     herdr = connection
                     await refresh()
                 }
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: schedule.delay(after: connection))
             }
         }
     }

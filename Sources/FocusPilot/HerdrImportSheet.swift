@@ -136,11 +136,11 @@ extension HerdrUnavailable {
         case .binaryNotFound:
             "FocusPilot looks for herdr in ~/.local/bin, /opt/homebrew/bin, /usr/local/bin and ~/.cargo/bin."
         case .notRunning:
-            "Start Herdr and its workspaces appear here. FocusPilot checks again every few seconds."
+            "Start Herdr and its workspaces appear here. FocusPilot keeps checking."
         case .unsupportedVersion:
-            "FocusPilot works with Herdr’s protocol 22 (Herdr 0.9). FocusPilot checks again every few seconds."
+            "FocusPilot works with Herdr’s protocol 22 (Herdr 0.9). FocusPilot keeps checking."
         case .unreadableReply:
-            "This Herdr version may be newer than FocusPilot supports. FocusPilot checks again every few seconds."
+            "This Herdr version may be newer than FocusPilot supports. FocusPilot keeps checking."
         }
     }
 }
