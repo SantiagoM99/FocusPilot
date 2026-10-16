@@ -15,6 +15,8 @@ final class AppModel {
     private(set) var projectItems: [TodayItem] = []
     private(set) var startupError: String?
     private(set) var taskError: String?
+    /// What FocusPilot last saw of Herdr; nil until the first check.
+    private(set) var herdr: HerdrConnection?
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
     let menuBarPreferences = MenuBarPreferences()
     private let firstLaunch = FirstLaunchWelcome()
@@ -24,7 +26,7 @@ final class AppModel {
     init() {
         do {
             let repository = try TaskRepository(location: .applicationSupport())
-            coordinator = FocusCoordinator(repository: repository)
+            coordinator = FocusCoordinator(repository: repository, herdr: HerdrCLI())
         } catch {
             coordinator = nil
             startupError = "Could not open the database: \(error.localizedDescription)"
@@ -32,6 +34,24 @@ final class AppModel {
         refreshLoginItem(on: NSMenu.didBeginTrackingNotification)
         refreshLoginItem(on: NSApplication.didBecomeActiveNotification)
         tickWhileTimeIsShown()
+        watchHerdr()
+    }
+
+    /// Reads Herdr every few seconds, which also turns new workspaces into
+    /// projects. While Herdr is unreachable it keeps retrying without
+    /// reporting errors. Lists reload only when Herdr's answer changes.
+    private func watchHerdr() {
+        Task { [weak self] in
+            while let coordinator = self?.coordinator {
+                let connection = await coordinator.refreshHerdr()
+                guard let self else { return }
+                if connection != herdr {
+                    herdr = connection
+                    await refresh()
+                }
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
     }
 
     // The owner can change the login item in System Settings while the app
@@ -99,6 +119,31 @@ final class AppModel {
             try await coordinator.moveTask(id, to: status, placement)
         } catch {
             taskError = "Could not move the task: \(error.localizedDescription)"
+            return
+        }
+        await refresh()
+    }
+
+    func importHerdrWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer) async {
+        await perform("Could not import the workspaces") {
+            try await $0.importHerdrWorkspaces(workspaces, on: server)
+        }
+    }
+
+    func linkProject(_ projectID: Int64, to workspace: HerdrWorkspace, on server: HerdrServer) async {
+        await perform("Could not link the workspace") { try await $0.linkProject(projectID, to: workspace, on: server) }
+    }
+
+    func unlinkProject(_ projectID: Int64) async {
+        await perform("Could not unlink the workspace") { try await $0.unlinkProject(projectID) }
+    }
+
+    private func perform(_ failure: String, _ change: (FocusCoordinator) async throws -> Void) async {
+        guard let coordinator else { return }
+        do {
+            try await change(coordinator)
+        } catch {
+            taskError = "\(failure): \(error.localizedDescription)"
             return
         }
         await refresh()
