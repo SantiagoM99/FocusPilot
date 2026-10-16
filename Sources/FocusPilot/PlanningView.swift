@@ -40,6 +40,7 @@ struct PlanningView: View {
                 }
         }
         .frame(minWidth: 760, minHeight: 420)
+        .focusedSceneValue(\.quickCapture, { isCapturing = true })
         .sheet(isPresented: $isCapturing) {
             QuickCaptureSheet(model: model)
         }
@@ -55,7 +56,7 @@ struct PlanningView: View {
         if let startupError = model.startupError {
             ContentUnavailableView("Database unavailable", systemImage: "exclamationmark.triangle", description: Text(startupError))
         } else if page == .projects {
-            ProjectsView(model: model, capture: { isCapturing = true })
+            ProjectsView(model: model)
         } else if model.today.isEmpty {
             ContentUnavailableView(
                 "No tasks yet",
@@ -65,7 +66,7 @@ struct PlanningView: View {
         } else {
             TaskList(items: model.today, showsProject: true,
                      move: { id, status, placement in Task { await model.move(id, to: status, placement) } },
-                     capture: { isCapturing = true }, selection: $todaySelection)
+                     selection: $todaySelection)
         }
     }
 }

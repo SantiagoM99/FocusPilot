@@ -13,7 +13,6 @@ struct TaskList: View {
     var showsEmptyNow = true
     var nextCaption = "Manual order · drag to reorder"
     let move: (Int64, TaskStatus, TaskPlacement) -> Void
-    let capture: () -> Void
     @Binding var selection: Int64?
 
     var body: some View {
@@ -41,7 +40,6 @@ struct TaskList: View {
             }
         }
         .focusedSceneValue(\.taskActions, TaskActions(
-            capture: capture,
             placement: { action in selection.flatMap { placement(for: action, of: $0) } },
             perform: { move in selection.map { perform(move, on: $0) } }
         ))
@@ -84,16 +82,21 @@ struct TaskList: View {
         }
     }
 
-    /// Moving into a section puts the task at its top, where it is seen;
-    /// Move Up and Down stay within the section, among the visible rows.
+    /// Moving into a section puts the task at its top, where it is seen, and
+    /// is unavailable when the task is already there. Move Up and Down stay
+    /// within the section, among the visible rows.
     private func placement(for action: TaskActions.Move, of id: Int64)
         -> (id: Int64, status: TaskStatus, placement: TaskPlacement)? {
         guard let item = items.first(where: { $0.id == id }) else { return nil }
-        let visible = TaskSections(items).items(in: item.status).map(\.id)
+        let sections = TaskSections(items)
+        let visible = sections.items(in: item.status).map(\.id)
+        func toTop(_ status: TaskStatus) -> (id: Int64, status: TaskStatus, placement: TaskPlacement)? {
+            TaskPlacement.toTop(of: status, moving: id, from: item.status, visible: visible).map { (id, status, $0) }
+        }
         switch action {
-        case .now: return item.status == .now ? nil : (id, .now, .top)
-        case .next: return (id, .next, .top)
-        case .later: return (id, .later, .top)
+        case .now: return toTop(.now)
+        case .next: return toTop(.next)
+        case .later: return toTop(.later)
         case .up: return TaskPlacement.up(id, in: visible).map { (id, item.status, $0) }
         case .down: return TaskPlacement.down(id, in: visible).map { (id, item.status, $0) }
         }

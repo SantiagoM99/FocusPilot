@@ -59,10 +59,36 @@ struct TaskOrderTests {
         #expect(sections(after: changes) == [.now: [1], .next: [2, 4], .later: [3, 5, 6]])
     }
 
-    @Test func movingTheNowTaskAwayLeavesNoNow() {
+    // Owner decision on PR #32: the first task in Next takes the place of a
+    // Now task the owner moves away.
+    @Test func movingTheNowTaskAwayPromotesTheFirstNextTask() {
         let changes = TaskOrder.move(1, to: .later, .bottom, in: board)
 
-        #expect(sections(after: changes) == [.next: [2, 3, 4], .later: [5, 6, 1]])
+        #expect(sections(after: changes) == [.now: [2], .next: [3, 4], .later: [5, 6, 1]])
+        #expect(changes.last == TaskPosition(id: 2, status: .now, rank: 0))
+    }
+
+    @Test func theMovedNowTaskIsNotPromotedBackIntoNow() {
+        let changes = TaskOrder.move(1, to: .next, .top, in: board)
+
+        #expect(sections(after: changes) == [.now: [2], .next: [1, 3, 4], .later: [5, 6]])
+    }
+
+    @Test func movingTheNowTaskAwayWithNothingInNextLeavesNoNow() {
+        let onlyLater = board.filter { $0.status != .next }
+
+        let changes = TaskOrder.move(1, to: .later, .top, in: onlyLater)
+
+        #expect(changes.allSatisfy { $0.status != .now })
+        #expect(changes.contains(TaskPosition(id: 1, status: .later, rank: 0)))
+    }
+
+    @Test func movingTheNowTaskToNextWhenNextIsEmptyLeavesNoNow() {
+        let onlyLater = board.filter { $0.status != .next }
+
+        let changes = TaskOrder.move(1, to: .next, .top, in: onlyLater)
+
+        #expect(changes == [TaskPosition(id: 1, status: .next, rank: 0)])
     }
 
     @Test func onlyChangedTasksAreReturned() {
@@ -123,6 +149,13 @@ struct VisiblePlacementTests {
     ])
     func dropOffsetsBecomePlacements(source: Int, offset: Int, expected: TaskPlacement) {
         #expect(TaskPlacement.drop(visible[source], at: offset, in: visible) == expected)
+    }
+
+    @Test func movingToTheTopOfASectionIsNilWhenAlreadyThere() {
+        #expect(TaskPlacement.toTop(of: .next, moving: 10, from: .next, visible: visible) == nil)
+        #expect(TaskPlacement.toTop(of: .next, moving: 20, from: .next, visible: visible) == .top)
+        #expect(TaskPlacement.toTop(of: .later, moving: 10, from: .next, visible: []) == .top)
+        #expect(TaskPlacement.toTop(of: .now, moving: 10, from: .now, visible: [10]) == nil)
     }
 
     @Test func droppingARowWhereItWasChangesNothing() {

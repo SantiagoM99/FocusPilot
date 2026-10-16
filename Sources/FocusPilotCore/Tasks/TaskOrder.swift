@@ -24,6 +24,8 @@ public enum TaskOrder {
     /// `placement`.
     ///
     /// Pinning a task as Now returns the previous Now to the top of Next.
+    /// Moving the Now task to Next or Later promotes the first other task in
+    /// Next to Now (owner decision, PR #32); with none, Now stays empty.
     /// The target section is renumbered from 0, and only tasks whose status
     /// or rank changed are returned, demotions first, so applying them in
     /// order never leaves two tasks in Now. Moving to or from `done` is not
@@ -41,6 +43,9 @@ public enum TaskOrder {
             updated[id] = TaskPosition(id: id, status: .now, rank: 0)
         } else {
             place(id, in: status, placement, &updated)
+            if moving.status == .now, let first = section(.next, in: updated, excluding: id).first {
+                updated[first] = TaskPosition(id: first, status: .now, rank: 0)
+            }
         }
         return positions
             .compactMap { old in updated[old.id].flatMap { $0 == old ? nil : $0 } }
@@ -49,10 +54,7 @@ public enum TaskOrder {
 
     private static func place(_ id: Int64, in status: TaskStatus, _ placement: TaskPlacement,
                               _ positions: inout [Int64: TaskPosition]) {
-        var section = positions.values
-            .filter { $0.status == status && $0.id != id }
-            .sorted { ($0.rank, $0.id) < ($1.rank, $1.id) }
-            .map(\.id)
+        var section = section(status, in: positions, excluding: id)
         let index = switch placement {
         case .top: 0
         case .bottom: section.count
@@ -64,11 +66,26 @@ public enum TaskOrder {
             positions[member] = TaskPosition(id: member, status: status, rank: rank)
         }
     }
+
+    private static func section(_ status: TaskStatus, in positions: [Int64: TaskPosition], excluding id: Int64) -> [Int64] {
+        positions.values
+            .filter { $0.status == status && $0.id != id }
+            .sorted { ($0.rank, $0.id) < ($1.rank, $1.id) }
+            .map(\.id)
+    }
 }
 
 /// Placements for moves made in a visible list, which in a project view
 /// hides other projects' tasks: moves are relative to visible neighbors.
 extension TaskPlacement {
+    /// To the top of `status`, or nil when the task is already there:
+    /// already Now, or already first among the visible rows of that section.
+    public static func toTop(of status: TaskStatus, moving id: Int64, from current: TaskStatus,
+                             visible: [Int64]) -> TaskPlacement? {
+        guard status == current else { return .top }
+        return status == .now || visible.first == id ? nil : .top
+    }
+
     /// One row up, or nil at the top.
     public static func up(_ id: Int64, in visible: [Int64]) -> TaskPlacement? {
         guard let index = visible.firstIndex(of: id), index > 0 else { return nil }

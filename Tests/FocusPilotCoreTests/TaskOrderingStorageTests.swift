@@ -85,6 +85,19 @@ struct TaskOrderingStorageTests {
         #expect(tasks[ids[2]]?.updatedAt == wednesdayMorningInBogota)
     }
 
+    @Test func movingNowAwayPromotesTheFirstNextTaskInTheSameChange() async throws {
+        let ids = try await capture("A", "B", "C")
+        try await repository.moveTask(ids[0], to: .now, .top)
+        clock.set(wednesdayMorningInBogota.addingTimeInterval(60))
+
+        try await repository.moveTask(ids[0], to: .later, .top)
+
+        #expect(try await todayTitles() == ["now:B", "next:C", "later:A"])
+        let promoted = try #require(try await repository.tasks().first { $0.id == ids[1] })
+        #expect(promoted.revision == 2)
+        #expect(promoted.updatedAt == wednesdayMorningInBogota.addingTimeInterval(60))
+    }
+
     @Test func databaseHoldsAtMostOneNow() async throws {
         let ids = try await capture("A", "B")
         try await repository.moveTask(ids[0], to: .now, .top)

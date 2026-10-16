@@ -5,7 +5,6 @@ import SwiftUI
 /// (design 15). Pinning a task here changes the one global Now.
 struct ProjectsView: View {
     let model: AppModel
-    let capture: () -> Void
     @State private var projectSelection: ProjectSummary.ID?
     @State private var taskSelection: Int64?
 
@@ -46,11 +45,13 @@ struct ProjectsView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 Divider()
-                TaskList(items: model.projectItems, showsProject: false,
+                // Until the newly selected project has loaded, show nothing
+                // rather than the previous project's tasks.
+                TaskList(items: model.shownProject == projectSelection ? model.projectItems : [], showsProject: false,
                          nowCaption: "the one current action, shared with Today", showsEmptyNow: false,
                          nextCaption: "Manual order within the project",
                          move: { id, status, placement in Task { await model.move(id, to: status, placement) } },
-                         capture: capture, selection: $taskSelection)
+                         selection: $taskSelection)
             }
         } else if model.projects.isEmpty {
             ContentUnavailableView("No projects yet", systemImage: "folder",
