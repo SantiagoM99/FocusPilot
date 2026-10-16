@@ -10,13 +10,14 @@ enum HerdrLinkStore {
         for workspace in workspaces {
             try markSeen(workspace, on: server, in: db)
             if try linkedProjectID(workspace, on: server, in: db) == nil {
-                try linkNewOrMatchingProject(to: workspace, on: server, in: db)
+                try linkProject(to: workspace, on: server, adoptingUnlinkedNamesake: true, in: db)
             }
         }
     }
 
-    /// Turns the workspaces that appeared since the last sync into linked
-    /// projects, and returns their titles.
+    /// Turns the workspaces that appeared since the last sync into new
+    /// linked projects, and returns their titles. It never links an existing
+    /// project: one the owner unlinked stays unlinked.
     static func syncWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer, in db: Database) throws -> [String] {
         guard try isSeen(server, in: db) else {
             // The first sight of a server instance: what is open now was
@@ -33,7 +34,10 @@ enum HerdrLinkStore {
             try markSeen(workspace, on: server, in: db)
             let isLinked = try linkedProjectID(workspace, on: server, in: db) != nil
             if workspace.isLinkedWorktree || isLinked { continue }
-            created.append(try linkNewOrMatchingProject(to: workspace, on: server, in: db))
+            // Most likely the same work reopened: the project keeps showing
+            // "not found" so the owner can relink it rather than get a copy.
+            if try hasStaleLink(like: workspace, on: server, among: workspaces, in: db) { continue }
+            created.append(try linkProject(to: workspace, on: server, adoptingUnlinkedNamesake: false, in: db))
         }
         return created
     }
@@ -48,12 +52,13 @@ enum HerdrLinkStore {
         try markSeen(workspace, on: server, in: db)
     }
 
-    /// A project named after the workspace: an unlinked project with that
-    /// name if there is one, else a new project, numbered if the name is
-    /// taken. Returns the project's title.
+    /// A project named after the workspace: when `adoptingUnlinkedNamesake`
+    /// (only for the owner's own import), an unlinked project with that name;
+    /// otherwise a new project, numbered if the name is taken. Returns the
+    /// project's title.
     @discardableResult
-    private static func linkNewOrMatchingProject(to workspace: HerdrWorkspace, on server: HerdrServer,
-                                                 in db: Database) throws -> String {
+    private static func linkProject(to workspace: HerdrWorkspace, on server: HerdrServer, adoptingUnlinkedNamesake: Bool,
+                                    in db: Database) throws -> String {
         let name = workspace.label.trimmingCharacters(in: .whitespacesAndNewlines)
         let baseTitle = name.isEmpty ? "Workspace \(workspace.id)" : name
         let projects = try ProjectRecord.fetchAll(db)
@@ -63,7 +68,7 @@ enum HerdrLinkStore {
         }
 
         var project: ProjectRecord
-        if let match = existing(baseTitle), !linked.contains(match.id!) {
+        if adoptingUnlinkedNamesake, let match = existing(baseTitle), !linked.contains(match.id!) {
             project = match
         } else {
             let title = (2...).lazy.map { "\(baseTitle) \($0)" }.first { existing($0) == nil }!
@@ -72,6 +77,18 @@ enum HerdrLinkStore {
         }
         try HerdrLinkRecord(projectId: project.id!, workspace: workspace, server: server).insert(db)
         return project.title
+    }
+
+    /// Whether some project's link has the workspace's label and checkout
+    /// but no longer points at an open workspace.
+    private static func hasStaleLink(like workspace: HerdrWorkspace, on server: HerdrServer, among open: [HerdrWorkspace],
+                                     in db: Database) throws -> Bool {
+        let openIDs = Set(open.map(\.id))
+        return try HerdrLinkRecord.fetchAll(db).contains { record in
+            let link = record.link
+            let isLive = link.server == server && openIDs.contains(link.workspaceID)
+            return !isLive && link.label == workspace.label && link.cwd == workspace.cwd
+        }
     }
 
     private static func linkedProjectID(_ workspace: HerdrWorkspace, on server: HerdrServer, in db: Database) throws -> Int64? {

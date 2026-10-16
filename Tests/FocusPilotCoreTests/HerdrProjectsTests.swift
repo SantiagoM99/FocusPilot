@@ -118,6 +118,52 @@ struct HerdrProjectsTests {
         #expect(try await project("Thesis").herdrLink == nil)
     }
 
+    @Test func syncNeverRelinksAProjectTheOwnerUnlinked() async throws {
+        let foo = HerdrWorkspace(id: "w3", label: "Foo", cwd: nil, isLinkedWorktree: false)
+        try await repository.syncHerdrWorkspaces([], on: herdrServer)
+        try await repository.syncHerdrWorkspaces([foo], on: herdrServer)
+        try await repository.unlinkProject(try #require(try await project("Foo").id))
+        try await repository.syncHerdrWorkspaces([], on: herdrServer)
+        let reopened = HerdrWorkspace(id: "w7", label: "Foo", cwd: nil, isLinkedWorktree: false)
+
+        let created = try await repository.syncHerdrWorkspaces([reopened], on: herdrServer)
+
+        #expect(try await project("Foo").herdrLink == nil)
+        #expect(created == ["Foo 2"])
+        #expect(try await project("Foo 2").herdrLink?.workspaceID == "w7")
+    }
+
+    @Test func syncNeverAdoptsAProjectMadeByHand() async throws {
+        _ = try await repository.addTask(NewTask(title: "Draft chapter", projectName: "Thesis"))
+        try await repository.syncHerdrWorkspaces([], on: herdrServer)
+
+        try await repository.syncHerdrWorkspaces([thesisWorkspace], on: herdrServer)
+
+        #expect(try await project("Thesis").herdrLink == nil)
+        #expect(try await project("Thesis 2").herdrLink?.workspaceID == "w5")
+    }
+
+    @Test func aReopenedWorkspaceIsLeftForRelinkInsteadOfDuplicated() async throws {
+        try await repository.syncHerdrWorkspaces([], on: herdrServer)
+        try await repository.syncHerdrWorkspaces([nlpWorkspace], on: herdrServer)
+        try await repository.syncHerdrWorkspaces([], on: herdrServer)
+        let reopened = HerdrWorkspace(id: "w9", label: "NLP report", cwd: nlpWorkspace.cwd, isLinkedWorktree: false)
+
+        let created = try await repository.syncHerdrWorkspaces([reopened], on: herdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report"])
+        #expect(try await project("NLP report").herdrLink?.workspaceID == "w4")
+    }
+
+    @Test func aDifferentFolderWithTheSameLabelIsStillCreated() async throws {
+        try await repository.syncHerdrWorkspaces([], on: herdrServer)
+        try await repository.syncHerdrWorkspaces([nlpWorkspace], on: herdrServer)
+        let elsewhere = HerdrWorkspace(id: "w9", label: "NLP report", cwd: "/tmp/other", isLinkedWorktree: false)
+
+        #expect(try await repository.syncHerdrWorkspaces([elsewhere], on: herdrServer) == ["NLP report 2"])
+    }
+
     @Test func aWorkspaceSeenBeforeARestartIsNotRecreatedAfterIt() async throws {
         try await repository.importHerdrWorkspaces([nlpWorkspace], on: herdrServer)
         try await repository.syncHerdrWorkspaces([nlpWorkspace], on: herdrServer)
