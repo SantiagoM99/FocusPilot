@@ -8,6 +8,7 @@ Read README.md and the relevant design documents before editing. Phase 1 impleme
 - AI proposes changes; deterministic code validates authority and executes authorized actions.
 - No autonomous prompts to other Herdr agents, approvals, pane closure, or focus changes by default.
 - Native macOS interface: SwiftUI/AppKit. Safari first, with Chrome supported.
+- All user-facing text is Spanish only, placeholders included (decision 0003, 2026-10-15).
 - Cache derived values only; clearing caches must not remove tasks, preferences, deadlines, or focus rules.
 - Preserve usage provenance and uncertainty; external Herdr agents are not automatically instrumented. Do not double-count request events, cumulative counters, or trace rollups.
 - Native Swift orchestration; LangSmith is optional diagnostics, not the authoritative budget ledger. No LangGraph runtime is selected.
