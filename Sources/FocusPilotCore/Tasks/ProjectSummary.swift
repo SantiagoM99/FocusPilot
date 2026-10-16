@@ -7,12 +7,14 @@ public struct ProjectSummary: Equatable, Sendable, Identifiable {
     public var title: String
     public var openTaskCount: Int
     public var nearestDeadline: Deadline?
+    public var herdrLink: HerdrLink?
 
-    public init(id: Int64?, title: String, openTaskCount: Int, nearestDeadline: Deadline?) {
+    public init(id: Int64?, title: String, openTaskCount: Int, nearestDeadline: Deadline?, herdrLink: HerdrLink? = nil) {
         self.id = id
         self.title = title
         self.openTaskCount = openTaskCount
         self.nearestDeadline = nearestDeadline
+        self.herdrLink = herdrLink
     }
 
     /// "3 tasks · Due Sat 17 Oct", "1 task · Overdue Tue 13 Oct".

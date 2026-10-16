@@ -7,12 +7,18 @@ struct ProjectsView: View {
     let model: AppModel
     @State private var projectSelection: ProjectSummary.ID?
     @State private var taskSelection: Int64?
+    @State private var isImporting = false
 
     var body: some View {
         TimelineView(.everyMinute) { context in
             HStack(spacing: 0) {
-                List(model.projects, selection: $projectSelection) { project in
-                    ProjectRow(project: project, now: context.date)
+                VStack(spacing: 0) {
+                    projectsHeader
+                    List(model.projects, selection: $projectSelection) { project in
+                        ProjectRow(project: project, now: context.date)
+                    }
+                    Divider()
+                    HerdrStatusLine(connection: model.herdr)
                 }
                 .frame(width: 280)
                 Divider()
@@ -20,6 +26,7 @@ struct ProjectsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .sheet(isPresented: $isImporting) { HerdrImportSheet(model: model) }
         .onChange(of: projectSelection) {
             taskSelection = nil
             if let projectSelection { Task { await model.showProject(projectSelection) } }
@@ -32,15 +39,40 @@ struct ProjectsView: View {
         }
     }
 
+    private var projectsHeader: some View {
+        HStack {
+            Text("Projects")
+                .font(.headline)
+            Spacer()
+            Menu {
+                Button("From Herdr…") { isImporting = true }
+            } label: {
+                Image(systemName: "plus")
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("New project")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
     @ViewBuilder
     private func detail(now: Date) -> some View {
         if let projectSelection, let project = model.projects.first(where: { $0.id == projectSelection }) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(project.title)
-                        .font(.title3.weight(.semibold))
-                    Text(project.headline(at: now))
-                        .foregroundStyle(project.isOverdue(at: now) ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(project.title)
+                            .font(.title3.weight(.semibold))
+                        Text(project.headline(at: now))
+                            .foregroundStyle(project.isOverdue(at: now) ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    }
+                    if project.id != nil {
+                        HerdrLinkLine(model: model, project: project)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
@@ -55,7 +87,7 @@ struct ProjectsView: View {
             }
         } else if model.projects.isEmpty {
             ContentUnavailableView("No projects yet", systemImage: "folder",
-                                   description: Text("Choose a project when you capture a task."))
+                                   description: Text("Choose a project when you capture a task, or import Herdr workspaces with +."))
         } else {
             ContentUnavailableView("Select a project", systemImage: "folder")
         }

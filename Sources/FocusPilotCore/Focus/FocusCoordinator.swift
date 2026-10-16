@@ -7,11 +7,14 @@ public actor FocusCoordinator {
     // Held so that later state transitions persist through the sole writer
     // rather than each feature opening its own path to the database.
     private let repository: TaskRepository
+    private let herdr: (any HerdrWorkspaceSource)?
 
     private var current = FocusSnapshot()
 
-    public init(repository: TaskRepository) {
+    /// Without `herdr`, Herdr reads as not installed.
+    public init(repository: TaskRepository, herdr: (any HerdrWorkspaceSource)? = nil) {
         self.repository = repository
+        self.herdr = herdr
     }
 
     public func snapshot() async -> FocusSnapshot {
@@ -50,5 +53,31 @@ public actor FocusCoordinator {
 
     public func projectTasks(_ projectID: Int64?) async throws -> [TodayItem] {
         try await repository.projectTasks(projectID)
+    }
+
+    // MARK: Herdr workspaces
+
+    /// Reads Herdr's workspaces and links the new ones to projects. Nothing
+    /// is written while Herdr is unreachable, and a failed write is retried
+    /// on the next refresh, since unseen workspaces stay unseen.
+    public func refreshHerdr() async -> HerdrConnection {
+        guard let herdr else { return .disconnected(.binaryNotFound) }
+        let connection = await herdr.connection()
+        if case .connected(let server, let workspaces) = connection {
+            _ = try? await repository.syncHerdrWorkspaces(workspaces, on: server)
+        }
+        return connection
+    }
+
+    public func importHerdrWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer) async throws {
+        try await repository.importHerdrWorkspaces(workspaces, on: server)
+    }
+
+    public func linkProject(_ projectID: Int64, to workspace: HerdrWorkspace, on server: HerdrServer) async throws {
+        try await repository.linkProject(projectID, to: workspace, on: server)
+    }
+
+    public func unlinkProject(_ projectID: Int64) async throws {
+        try await repository.unlinkProject(projectID)
     }
 }
