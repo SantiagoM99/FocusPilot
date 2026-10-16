@@ -13,7 +13,8 @@ struct QuickCaptureSheet: View {
     @State private var draft = CaptureDraft()
     @State private var isEditingDeadline = false
     /// What the open picker shows before the owner picks: the deadline, or
-    /// today. Only a change in the picker or Done commits it.
+    /// today. Only a change in the picker, or Done on today's proposal,
+    /// commits it.
     @State private var proposal: Deadline?
     @State private var isSaving = false
 
@@ -65,7 +66,7 @@ struct QuickCaptureSheet: View {
                         if isEditingDeadline, let shown = draft.deadline ?? proposal {
                             DeadlineEditor(deadline: Binding(get: { shown }, set: { draft.correctDeadline($0) }))
                             Button("Done") {
-                                draft.correctDeadline(shown)
+                                draft.confirmPicker(shown)
                                 isEditingDeadline = false
                             }
                         }
