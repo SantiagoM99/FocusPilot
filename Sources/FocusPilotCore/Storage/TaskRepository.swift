@@ -97,10 +97,12 @@ public actor TaskRepository {
         try await ownerDatabase.read { db in
             let tasks = try Self.openTasks(db).fetchAll(db)
             let byProject = Dictionary(grouping: tasks, by: \.task.projectId)
+            let links = Dictionary(uniqueKeysWithValues: try HerdrLinkRecord.fetchAll(db).map { ($0.projectId, $0.link) })
             func summary(_ id: Int64?, _ title: String) -> ProjectSummary {
                 let open = byProject[id] ?? []
                 let nearest = open.compactMap(\.task.deadline).min { $0.endInstant < $1.endInstant }
-                return ProjectSummary(id: id, title: title, openTaskCount: open.count, nearestDeadline: nearest)
+                return ProjectSummary(id: id, title: title, openTaskCount: open.count, nearestDeadline: nearest,
+                                      herdrLink: id.flatMap { links[$0] })
             }
             var projects = try ProjectRecord.fetchAll(db)
                 .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -164,6 +166,30 @@ public actor TaskRepository {
         var project = ProjectRecord(id: nil, title: name)
         try project.insert(db)
         return project.id!
+    }
+
+    // MARK: Herdr links
+
+    /// Imports the owner's chosen workspaces as linked projects, in one write.
+    public func importHerdrWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer) async throws {
+        try await ownerDatabase.write { db in try HerdrLinkStore.importWorkspaces(workspaces, on: server, in: db) }
+    }
+
+    /// Records Herdr's current workspaces and turns the new ones into linked
+    /// projects. Returns the titles of the projects it created or linked.
+    @discardableResult
+    public func syncHerdrWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer) async throws -> [String] {
+        try await ownerDatabase.write { db in try HerdrLinkStore.syncWorkspaces(workspaces, on: server, in: db) }
+    }
+
+    /// Links a project to a workspace, replacing its current link.
+    public func linkProject(_ projectID: Int64, to workspace: HerdrWorkspace, on server: HerdrServer) async throws {
+        try await ownerDatabase.write { db in try HerdrLinkStore.link(project: projectID, to: workspace, on: server, in: db) }
+    }
+
+    /// Removes the project's link. The project and its tasks stay.
+    public func unlinkProject(_ projectID: Int64) async throws {
+        _ = try await ownerDatabase.write { db in try HerdrLinkRecord.deleteOne(db, key: projectID) }
     }
 
     // MARK: Cache

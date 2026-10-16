@@ -63,6 +63,36 @@ enum OwnerSchema {
                           unique: true, condition: Column("status") == TaskStatus.now.rawValue)
             try db.create(index: "task_on_projectId", on: TaskRecord.databaseTableName, columns: ["projectId"])
         }
+        migrator.registerMigration("owner-v4-herdr") { db in
+            // At most one workspace per project, and one project per workspace.
+            try db.create(table: HerdrLinkRecord.databaseTableName) { table in
+                table.primaryKey("projectId", .integer)
+                    .references(ProjectRecord.databaseTableName, onDelete: .cascade)
+                table.column("sessionName", .text).notNull()
+                table.column("socketPath", .text).notNull()
+                table.column("serverStartedAt", .integer).notNull()
+                table.column("workspaceId", .text).notNull()
+                table.column("label", .text).notNull()
+                table.column("cwd", .text)
+                table.uniqueKey(["socketPath", "serverStartedAt", "workspaceId"])
+            }
+            // Every workspace FocusPilot has already imported, created or
+            // passed over, so none becomes a project automatically twice,
+            // even after its project is unlinked or deleted.
+            try db.create(table: "herdrSeenWorkspace") { table in
+                table.column("socketPath", .text).notNull()
+                table.column("serverStartedAt", .integer).notNull()
+                table.column("workspaceId", .text).notNull()
+                table.primaryKey(["socketPath", "serverStartedAt", "workspaceId"])
+            }
+            // Server instances seen at least once. The workspaces already
+            // open the first time an instance is seen are not new.
+            try db.create(table: "herdrSeenServer") { table in
+                table.column("socketPath", .text).notNull()
+                table.column("serverStartedAt", .integer).notNull()
+                table.primaryKey(["socketPath", "serverStartedAt"])
+            }
+        }
         return migrator
     }
 
