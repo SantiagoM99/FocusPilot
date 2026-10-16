@@ -37,7 +37,7 @@ public struct TaskInbox: Sendable {
     /// Hands each queued request to `add` in order, then empties the inbox.
     /// If an add throws, the inbox is kept whole for the next attempt.
     /// Returns how many requests were handed over.
-    public func drain(_ add: (HerdrAddRequest) async throws -> Void) async throws -> Int {
+    public func drain(_ add: @Sendable (HerdrAddRequest) async throws -> Void) async throws -> Int {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return 0 }
         return try await withLockedFile { handle in
             let requests = Self.requests(in: try handle.readToEnd() ?? Data())

@@ -15,6 +15,7 @@ final class AppModel {
     private(set) var projectItems: [TodayItem] = []
     private(set) var startupError: String?
     private(set) var taskError: String?
+    private(set) var commandLineError: String?
     /// What FocusPilot last saw of Herdr; nil until the first check.
     private(set) var herdr: HerdrConnection?
     /// Set when a session command fails; shown by the session surfaces.
@@ -32,11 +33,14 @@ final class AppModel {
     private let firstLaunch = FirstLaunchWelcome()
 
     let coordinator: FocusCoordinator?
+    private var commandServer: CommandSocketServer?
 
     init() {
         do {
-            let repository = try TaskRepository(location: .applicationSupport())
+            let location = StorageLocation.applicationSupport()
+            let repository = try TaskRepository(location: location)
             coordinator = FocusCoordinator(repository: repository, herdr: HerdrCLI(), notices: UserNotices())
+            listenForCommands(location: location, service: CommandService(repository: repository))
         } catch {
             coordinator = nil
             startupError = "Could not open the database: \(error.localizedDescription)"
@@ -46,6 +50,30 @@ final class AppModel {
         tickWhileTimeIsShown()
         watchHerdr()
         followSessions()
+    }
+
+    /// Answers the focuspilot CLI, and imports what it queued while the app
+    /// was closed: at launch, then every few seconds in case an add was
+    /// queued while the app was starting.
+    private func listenForCommands(location: StorageLocation, service: CommandService) {
+        let server = CommandSocketServer(path: location.commandSocketPath) { [weak self] request in
+            let response = await service.handle(request)
+            if case .added = response { await self?.refresh() }
+            return response
+        }
+        do {
+            try server.start()
+            commandServer = server
+        } catch {
+            // The CLI then queues to the inbox, which is still imported.
+            commandLineError = "The focuspilot command can’t reach FocusPilot: \(error)"
+        }
+        Task { [weak self] in
+            while let self, let coordinator {
+                if (try? await coordinator.importInbox(location.inbox)) ?? 0 > 0 { await refresh() }
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
     }
 
     /// Reads Herdr on `HerdrPollSchedule`, which also turns new workspaces
@@ -161,6 +189,10 @@ final class AppModel {
 
     func linkProject(_ projectID: Int64, to workspace: HerdrWorkspace, on server: HerdrServer) async {
         await perform("Could not link the workspace") { try await $0.linkProject(projectID, to: workspace, on: server) }
+    }
+
+    func undoHerdrAdd(_ taskID: Int64) async {
+        await perform("Could not undo the task") { try await $0.undoHerdrAdd(taskID) }
     }
 
     func unlinkProject(_ projectID: Int64) async {

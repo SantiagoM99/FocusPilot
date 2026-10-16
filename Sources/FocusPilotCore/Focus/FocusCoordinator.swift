@@ -137,4 +137,17 @@ public actor FocusCoordinator {
     public func unlinkProject(_ projectID: Int64) async throws {
         try await repository.unlinkProject(projectID)
     }
+
+    // MARK: Tasks from the focuspilot CLI
+
+    /// The owner's undo of a task added from Herdr.
+    public func undoHerdrAdd(_ taskID: Int64) async throws {
+        try await repository.undoHerdrAdd(taskID)
+    }
+
+    /// Imports the adds queued while FocusPilot was closed. Returns how many
+    /// were handed to the repository; already stored ones are not repeated.
+    public func importInbox(_ inbox: TaskInbox) async throws -> Int {
+        try await inbox.drain { _ = try await repository.addFromHerdr($0) }
+    }
 }

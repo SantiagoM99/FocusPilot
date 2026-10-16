@@ -153,6 +153,7 @@ final class FocusPilotCommandTests {
             """)
         #expect(try await repository.tasks().isEmpty)
 
+        let repository = repository
         #expect(try await location.inbox.drain { _ = try await repository.addFromHerdr($0) } == 1)
         #expect(try await repository.tasks().map(\.title) == ["Reply to co-advisor"])
     }

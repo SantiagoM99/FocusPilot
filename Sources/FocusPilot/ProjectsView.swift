@@ -83,6 +83,7 @@ struct ProjectsView: View {
                          nowCaption: "the one current action, shared with Today", showsEmptyNow: false,
                          nextCaption: "Manual order within the project",
                          move: { id, status, placement in Task { await model.move(id, to: status, placement) } },
+                         undoHerdrAdd: { id in Task { await model.undoHerdrAdd(id) } },
                          selection: $taskSelection)
             }
         } else if model.projects.isEmpty {
