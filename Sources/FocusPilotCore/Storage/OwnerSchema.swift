@@ -93,6 +93,25 @@ enum OwnerSchema {
                 table.primaryKey(["socketPath", "serverStartedAt"])
             }
         }
+        migrator.registerMigration("owner-v5-session") { db in
+            // One row per session; the phase is the engine's own JSON, which
+            // golden tests keep stable.
+            try db.create(table: SessionRow.databaseTableName) { table in
+                table.primaryKey("id", .text)
+                table.column("taskID", .integer).notNull()
+                table.column("action", .text).notNull()
+                table.column("mode", .text).notNull().check(sql: "mode IN ('normal', 'strict')")
+                table.column("startedAt", .datetime).notNull()
+                table.column("plannedEnd", .datetime).notNull()
+                table.column("phase", .text).notNull()
+            }
+            try db.create(index: "focusSession_on_startedAt", on: SessionRow.databaseTableName, columns: ["startedAt"])
+            // The last policy revision handed out; a single row.
+            try db.create(table: "policyPublication") { table in
+                table.primaryKey("id", .integer).check(sql: "id = 1")
+                table.column("revision", .integer).notNull()
+            }
+        }
         return migrator
     }
 

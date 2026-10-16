@@ -7,6 +7,7 @@ import Observation
 @Observable
 public final class MenuBarPreferences {
     private static let showsTimeKey = "menuBarShowsTime"
+    private static let hidesFocusPanelKey = "hidesFocusPanel"
 
     private let defaults: UserDefaults
 
@@ -17,8 +18,15 @@ public final class MenuBarPreferences {
         didSet { defaults.set(showsTime, forKey: Self.showsTimeKey) }
     }
 
+    /// Show the floating focus panel during sessions. On by default; it is
+    /// optional (#11), so the owner can rely on the menu bar alone.
+    public var showsFocusPanel: Bool {
+        didSet { defaults.set(!showsFocusPanel, forKey: Self.hidesFocusPanelKey) }
+    }
+
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         showsTime = defaults.bool(forKey: Self.showsTimeKey)
+        showsFocusPanel = !defaults.bool(forKey: Self.hidesFocusPanelKey)
     }
 }

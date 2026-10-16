@@ -16,4 +16,12 @@ struct MenuBarPreferencesTests {
 
         #expect(MenuBarPreferences(defaults: defaults).showsTime)
     }
+
+    @Test func focusPanelIsShownByDefaultAndCanBeTurnedOff() {
+        #expect(MenuBarPreferences(defaults: defaults).showsFocusPanel)
+
+        MenuBarPreferences(defaults: defaults).showsFocusPanel = false
+
+        #expect(!MenuBarPreferences(defaults: defaults).showsFocusPanel)
+    }
 }
