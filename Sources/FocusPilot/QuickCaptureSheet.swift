@@ -18,12 +18,12 @@ struct QuickCaptureSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("New task")
                 .font(.title3.weight(.semibold))
-            Text("Type the task and when it's due. Nothing is saved until you confirm the interpretation below.")
+            Text("Type the task, and its deadline if it has one, in the same field. Check the reading below before saving.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 4) {
-                TextField("Task", text: $text)
+                TextField("Task", text: $text, prompt: Text("Entregar informe el viernes 5pm"))
                     .font(.title3)
                 if let hint = draft.unrecognizedDateHint {
                     Label(hint, systemImage: "questionmark.circle")
@@ -40,8 +40,19 @@ struct QuickCaptureSheet: View {
                 GridRow {
                     fieldLabel("Deadline")
                     VStack(alignment: .leading, spacing: 8) {
-                        DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
-                        if draft.deadlineText != nil {
+                        // The row itself opens the editor, so a deadline can
+                        // be set or changed by hand, not only typed.
+                        Button {
+                            draft.startChoosingDeadline(now: .now, timeZone: .current)
+                            isEditingDeadline.toggle()
+                        } label: {
+                            DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Choose the deadline by hand")
+                        .accessibilityHint("Opens a date picker")
+                        if draft.deadline != nil || draft.deadlineText != nil {
                             Button("Remove deadline") {
                                 draft.removeDeadline()
                                 isEditingDeadline = false

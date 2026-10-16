@@ -11,7 +11,9 @@ public struct CaptureDraft: Equatable, Sendable {
     public private(set) var split = CaptureSplit(title: "", deadlineText: nil, deadline: nil)
     public private(set) var deadlineRemoved = false
     private var editedTitle: String?
-    private var correctedDeadline: Deadline?
+    /// A correction of the parsed deadline or one picked by hand; it
+    /// overrides the parsed phrase until the text changes or it is removed.
+    private var chosenDeadline: Deadline?
 
     public var projectName: String?
     public var nextAction: String?
@@ -26,7 +28,7 @@ public struct CaptureDraft: Equatable, Sendable {
         self.text = text
         split = CaptureSplitter(parser: DeadlineParser(now: now, timeZone: timeZone)).split(text, isKnownWord: isKnownWord)
         editedTitle = nil
-        correctedDeadline = nil
+        chosenDeadline = nil
         deadlineRemoved = false
     }
 
@@ -43,7 +45,7 @@ public struct CaptureDraft: Equatable, Sendable {
     }
 
     public var deadline: Deadline? {
-        deadlineRemoved ? nil : correctedDeadline ?? split.deadline
+        chosenDeadline ?? (deadlineRemoved ? nil : split.deadline)
     }
 
     /// A deadline phrase was found but could not be read: saving is blocked.
@@ -58,13 +60,20 @@ public struct CaptureDraft: Equatable, Sendable {
     }
 
     public mutating func correctDeadline(_ deadline: Deadline) {
-        correctedDeadline = deadline
+        chosenDeadline = deadline
+    }
+
+    /// Opens a deadline to edit by hand: the current one, or if there is
+    /// none (or it could not be read) today, date-only, in `timeZone`.
+    public mutating func startChoosingDeadline(now: Date, timeZone: TimeZone) {
+        guard deadline == nil else { return }
+        chosenDeadline = .chosenByHand(LocalDate(containing: now, in: timeZone), timeZone: timeZone)
     }
 
     /// Treats the whole text as the title, with no deadline.
     public mutating func removeDeadline() {
         deadlineRemoved = true
-        correctedDeadline = nil
+        chosenDeadline = nil
     }
 
     /// The task to save, or nil while the title is blank or the deadline

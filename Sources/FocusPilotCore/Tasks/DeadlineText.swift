@@ -30,8 +30,12 @@ public struct DeadlineText: Sendable {
         }
     }
 
-    /// "from “by Oct 20” · no time given, none assumed".
+    /// "from “by Oct 20” · no time given, none assumed", or "chosen by hand".
     public var source: String {
+        if deadline.isChosenByHand {
+            if case .dateOnly = deadline.due { return Deadline.chosenByHandText + " · no time chosen" }
+            return Deadline.chosenByHandText
+        }
         let quoted = "from “\(deadline.originalText)”"
         switch deadline.due {
         case .dateOnly: return quoted + " · no time given, none assumed"
