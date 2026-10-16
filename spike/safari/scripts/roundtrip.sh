@@ -1,9 +1,8 @@
 #!/bin/zsh
 # For each policy revision the app published: when the extension first acknowledged it, through
 # which transport, how late, and whether an app push or the periodic alarm carried it.
-dir_g="$HOME/Library/Group Containers/group.com.focuspilot.spike.s1/FocusPilotSpikeS1"
 dir_h="$HOME/Library/Application Support/FocusPilotSpikeS1"
-python3 - "$dir_g" "$dir_h" <<'PY'
+python3 - "$dir_h" <<'PY'
 import json, sys, os
 from datetime import datetime
 def load(name):

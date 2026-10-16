@@ -1,8 +1,7 @@
 #!/bin/zsh
 # Every measured overrun: how late a session end or exception expiry was applied by the
 # background (DNR rules) or the content script (in-page blank).
-for f in "$HOME/Library/Group Containers/group.com.focuspilot.spike.s1/FocusPilotSpikeS1/inbox.jsonl" \
-         "$HOME/Library/Application Support/FocusPilotSpikeS1/inbox.jsonl"; do
+for f in "$HOME/Library/Application Support/FocusPilotSpikeS1/inbox.jsonl"; do
   [[ -f "$f" ]] || continue
   jq -r 'select(.kind=="observation") | .payload as $p
     | ( ($p.overruns // [])[] | [$p.observedAt, "background", .kind, .scheduledAt, (.overrunMs|tostring) + " ms", $p.reason] ),

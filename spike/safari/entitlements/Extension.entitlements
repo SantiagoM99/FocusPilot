@@ -4,12 +4,8 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.focuspilot.spike.s1</string>
-	</array>
-	<!-- Fallback transport if the App Group is not usable without a team. Must match
-	     Spike.fallbackRelativePath in src/Shared/SharedStore.swift. -->
+	<!-- The shared store. Must match Spike.fallbackRelativePath in src/Shared/SharedStore.swift.
+	     No App Group by default (see App.entitlements); build.sh with the app-group flag adds it back. -->
 	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
 	<array>
 		<string>/Library/Application Support/FocusPilotSpikeS1/</string>

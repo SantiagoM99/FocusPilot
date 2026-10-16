@@ -106,24 +106,55 @@ enum CLI {
             let report = SharedStore.probeAll().map { $0.1.dictionary }
             print(String(data: try! JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]), encoding: .utf8)!)
         case "--normal", "--strict":
-            print(PolicyWriter.publish(session: PolicyWriter.session(mode: args[1] == "--strict" ? "strict" : "normal", minutes: minutes(2))))
+            push(PolicyWriter.publish(session: PolicyWriter.session(mode: args[1] == "--strict" ? "strict" : "normal", minutes: minutes(2))))
         case "--exception":
             guard let p = PolicyWriter.withException(minutes: minutes(2)) else { print("no session"); exit(2) }
-            print(PolicyWriter.publish(session: p["session"], base: p))
+            push(PolicyWriter.publish(session: p["session"], base: p))
         case "--end":
             guard let p = PolicyWriter.ended() else { print("no session"); exit(2) }
-            print(PolicyWriter.publish(session: p["session"], base: p))
+            push(PolicyWriter.publish(session: p["session"], base: p))
         case "--clear":
-            print(PolicyWriter.publish(session: nil))
+            push(PolicyWriter.publish(session: nil))
+        case "--extension-state":
+            var text = "pending"
+            SFSafariExtensionManager.getStateOfSafariExtension(withIdentifier: Spike.extensionBundleID) { state, error in
+                text = state.map { $0.isEnabled ? "enabled" : "installed, disabled" } ?? "not found: \(error.map { "\($0)" } ?? "nil")"
+            }
+            wait { text != "pending" }
+            print(text)
         case "--login-status":
             print(SpikeModel.describe(SMAppService.mainApp.status))
         case "--unregister-login-item":
             do { try SMAppService.mainApp.unregister(); print("unregistered") } catch { print("unregister: \(error)") }
         default:
-            print("usage: --probe | --normal MIN | --strict MIN | --exception MIN | --end | --clear | --login-status | --unregister-login-item")
+            print("usage: --probe | --normal MIN | --strict MIN | --exception MIN | --end | --clear | --extension-state | --login-status | --unregister-login-item")
             exit(2)
         }
         return true
+    }
+
+    // The same nudge the menu sends, from this short-lived process, so tests need no menu clicks.
+    // Logged as "push" in app-events like the menu's; skipped when Safari is not running.
+    private static func push(_ r: (revision: Int, written: [String], failed: [String])) {
+        print(r)
+        guard !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Safari").isEmpty else {
+            AppEvents.log("push-skipped", ["revision": r.revision, "why": "Safari not running", "from": "cli"])
+            return
+        }
+        var done = false
+        let sentAt = Date()
+        SFSafariApplication.dispatchMessage(withName: "policy-changed", toExtensionWithIdentifier: Spike.extensionBundleID, userInfo: ["revision": r.revision]) { error in
+            AppEvents.log("push", ["revision": r.revision, "from": "cli", "callbackMs": Int(Date().timeIntervalSince(sentAt) * 1000), "error": error.map { "\($0)" } ?? NSNull()])
+            print("push: \(error.map { "\($0)" } ?? "ok")")
+            done = true
+        }
+        wait { done }
+    }
+
+    private static func wait(timeout: TimeInterval = 10, until condition: () -> Bool) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        if !condition() { print("timed out after \(timeout)s") }
     }
 }
 
@@ -272,7 +303,18 @@ final class SpikeModel: ObservableObject {
 // MARK: - App and lifecycle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var sigterm: DispatchSourceSignal?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Lets scripts quit the app with `kill -TERM` and still get a normal terminate (and its
+        // app-terminate event) without Apple Events, which would need Automation consent.
+        signal(SIGTERM, SIG_IGN)
+        sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        sigterm?.setEventHandler {
+            AppEvents.log("sigterm")
+            NSApp.terminate(nil)
+        }
+        sigterm?.resume()
         let event = NSAppleEventManager.shared().currentAppleEvent
         let loginLaunch = event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
         AppEvents.log("app-launch", [

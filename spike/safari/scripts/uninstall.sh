@@ -4,7 +4,8 @@
 set -euo pipefail
 here=${0:A:h:h}
 app="$HOME/Applications/FocusPilotSpikeS1.app"
-osascript -e 'tell application id "com.focuspilot.spike.s1" to quit' 2>/dev/null || true
+# SIGTERM, not an AppleScript quit: Apple Events to another app need Automation consent.
+pkill -TERM -f "FocusPilotSpikeS1.app/Contents/MacOS/FocusPilotSpikeS1$" 2>/dev/null && perl -e "select(undef,undef,undef,1.5)" || true
 pkill -f "FocusPilotSpikeS1.app/Contents/MacOS/FocusPilotSpikeS1" 2>/dev/null || true
 # Unregister the login item through the app itself while its binary still exists.
 lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister

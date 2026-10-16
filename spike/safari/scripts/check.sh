@@ -4,8 +4,9 @@
 #  2. Signatures and entitlements of the built app and appex.
 #  3. Shared-store access from the unsandboxed app (--probe).
 #  4. Shared-store access from a sandboxed command-line stand-in for the appex, signed ad hoc
-#     with the appex's exact entitlements, plus a control without the App Group claim. Both run
-#     under launchd so the terminal's privacy permissions are not inherited.
+#     with the appex's exact entitlements, run under launchd so the terminal's privacy
+#     permissions are not inherited. Nothing here touches the App Group container, which would
+#     raise a consent prompt (SPIKE_NOTES.md, Permission prompts).
 set -euo pipefail
 here=${0:A:h:h}
 app="$here/build/DerivedData/Build/Products/Release/FocusPilotSpikeS1.app"
@@ -32,14 +33,9 @@ echo "== 3. unsandboxed app probe"
 echo "== 4. sandboxed stand-in probes (launchd)"
 swiftc -O -o "$out/focuspilot-s1-probe" "$here/src/Shared/SharedStore.swift" "$here/src/Probe/main.swift" \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$here/src/Probe/Info.plist"
-cp "$out/focuspilot-s1-probe" "$out/focuspilot-s1-probe-nogroup"
-python3 -c "import plistlib,sys; d=plistlib.load(open(sys.argv[1],'rb')); d.pop('com.apple.security.application-groups'); plistlib.dump(d, open(sys.argv[2],'wb'))" \
-  "$here/entitlements/Extension.entitlements" "$out/nogroup.entitlements"
 codesign --force --sign - --options runtime --identifier com.focuspilot.spike.s1.probe \
   --entitlements "$here/entitlements/Extension.entitlements" "$out/focuspilot-s1-probe" 2>/dev/null
-codesign --force --sign - --options runtime --identifier com.focuspilot.spike.s1.probe-nogroup \
-  --entitlements "$out/nogroup.entitlements" "$out/focuspilot-s1-probe-nogroup" 2>/dev/null
-for n in focuspilot-s1-probe focuspilot-s1-probe-nogroup; do
+for n in focuspilot-s1-probe; do
   rm -f "$out/$n.launchd.out"
   launchctl submit -l "com.focuspilot.s1.$n" -o "$out/$n.launchd.out" -e "$out/$n.launchd.err" -- "$out/$n"
   for i in {1..60}; do [[ -s "$out/$n.launchd.out" ]] && break; perl -e 'select(undef,undef,undef,0.25)'; done

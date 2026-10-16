@@ -101,9 +101,15 @@ async function applyRules(domains) {
 }
 
 async function scheduleTransition(at) {
-  await browser.alarms.clear("transition");
   // A small margin so the alarm never fires a hair before the instant it is meant to apply.
-  if (at != null) browser.alarms.create("transition", { when: at + 250 });
+  const when = at == null ? null : at + 250;
+  // Safari fires an alarm no sooner than ~30 s after it is created, so recreating it on every
+  // reconcile (at least once a minute) kept pushing transitions up to 30 s late. Keep it if it
+  // already targets the same instant.
+  const existing = await browser.alarms.get("transition");
+  if (existing && when != null && Math.abs(existing.scheduledTime - when) < 1000) return;
+  await browser.alarms.clear("transition");
+  if (when != null) browser.alarms.create("transition", { when });
 }
 
 function reconcile(reason) {
@@ -124,6 +130,7 @@ async function reconcileNow(reason) {
   const result = P.evaluate(policy, now);
   const ruleIds = await applyRules(result.blockedDomains);
   const appliedAt = Date.now();
+  const { known: knownTabs, reloaded } = await reloadBlockedTabs(result.blockedDomains);
   await scheduleTransition(result.nextTransitionAt);
 
   const samePolicy = lastEval && policy && lastEval.revision === policy.revision;
@@ -156,6 +163,9 @@ async function reconcileNow(reason) {
     nativeError: nativeResult.error,
     nativeTransport: nativeResult.transport ?? null,
     portOpen: !!port,
+    reloaded,
+    knownTabs,
+    tabs: await testTabs(),
   });
   // Second round trip so the ack lands in the inbox now rather than on the next wake.
   await exchange(reason + ":ack");
@@ -191,6 +201,77 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return false;
   }
   return false;
+});
+
+// What each test-domain tab shows right now: Safari's error page after a DNR block, the content
+// script's blank page, or the site. Host-permitted tabs only, so no "tabs" permission is needed.
+async function testTabs() {
+  try {
+    // Safari's url filter matched nothing here, so list every tab Safari reveals: without the
+    // "tabs" permission it hides url and title for hosts outside host_permissions.
+    const all = await browser.tabs.query({});
+    // Only tabs on hosts the extension may access come with a url (the test domain).
+    const test = all.filter((t) => t.url);
+    return {
+      hostAccess: await browser.permissions.contains({ origins: ["*://*.instagram.com/*"] }),
+      total: all.length,
+      withoutUrl: all.filter((t) => !t.url).length,
+      test: test.map((t) => ({ id: t.id, status: t.status, title: t.title ?? null, url: t.url, active: t.active })),
+    };
+  } catch (e) {
+    return String(e?.message ?? e);
+  }
+}
+
+// DNR cannot touch a page that is already loaded, and WebKit stops a page's timers while Safari is
+// in the background, so the content script cannot be relied on to blank in time. The background
+// keeps running, though: reload every known tab on a newly blocked domain so DNR blocks the load.
+// Tabs are known from tabs.onUpdated; Safari hides their url from tabs.query.
+async function reloadBlockedTabs(blockedDomains) {
+  const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+  const out = [];
+  for (const [id, info] of Object.entries(tabHosts)) {
+    if (info.blockedPage || !blockedDomains.some((d) => P.hostMatches(info.host, d))) continue;
+    try {
+      await browser.tabs.reload(Number(id));
+      out.push({ tabId: Number(id), host: info.host, ok: true });
+    } catch (e) {
+      out.push({ tabId: Number(id), host: info.host, ok: false, error: String(e?.message ?? e) });
+      delete tabHosts[id];
+    }
+  }
+  await browser.storage.local.set({ tabHosts });
+  return { known: tabHosts, reloaded: out };
+}
+
+browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  queue(async () => {
+    const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+    if (!(tabId in tabHosts)) return;
+    delete tabHosts[tabId];
+    await browser.storage.local.set({ tabHosts });
+    await observe("tab-removed", { tabId, ...removeInfo });
+  });
+});
+
+// Tab loads on the host-permitted test domain only (no "tabs" permission, so Safari exposes url and
+// title only for hosts the extension may access). A DNR-blocked load shows here with Safari's
+// error page while content-load never arrives.
+browser.tabs.onUpdated.addListener((tabId, change, tab) => {
+  let host = null;
+  try {
+    host = new URL(tab?.url ?? change.url ?? "").hostname;
+  } catch {}
+  if (!host || !P.hostMatches(host, "instagram.com")) return;
+  if (!("status" in change) && !("title" in change) && !("url" in change)) return;
+  queue(async () => {
+    const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+    // Safari's own error page after a DNR block; reloading it again would only loop.
+    const blockedPage = (tab?.title ?? change.title) === "Failed to open page";
+    tabHosts[tabId] = { host, blockedPage, at: new Date().toISOString() };
+    await browser.storage.local.set({ tabHosts });
+    await observe("tab-updated", { tabId, ...change, tabUrl: tab?.url ?? null, tabTitle: tab?.title ?? null, tabStatus: tab?.status ?? null });
+  });
 });
 
 browser.alarms.get("sync").then((a) => {

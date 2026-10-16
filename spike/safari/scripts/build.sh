@@ -4,17 +4,21 @@
 # "group." App Group: it demands a provisioning profile, which needs a team. codesign does not
 # check that, so the claim reaches the binary and the runtime decides (see SPIKE_NOTES.md).
 #
-#   build.sh                  normal build
-#   build.sh --no-app-group   appex signed without the App Group claim, so the handler must use
-#                             the home-relative temporary exception (fallback transport test)
+#   build.sh              normal build: no App Group; app and appex share the home-relative store
+#   build.sh --app-group  adds the "group." App Group claim to both, to reproduce the consent
+#                         prompts recorded in SPIKE_NOTES.md (Permission prompts)
 set -euo pipefail
 here=${0:A:h:h}
 ext_entitlements="$here/entitlements/Extension.entitlements"
-if [[ "${1:-}" == "--no-app-group" ]]; then
+app_entitlements="$here/entitlements/App.entitlements"
+if [[ "${1:-}" == "--app-group" ]]; then
   mkdir -p "$here/build"
-  python3 -c "import plistlib,sys; d=plistlib.load(open(sys.argv[1],'rb')); d.pop('com.apple.security.application-groups'); plistlib.dump(d, open(sys.argv[2],'wb'))" \
-    "$ext_entitlements" "$here/build/Extension-no-app-group.entitlements"
-  ext_entitlements="$here/build/Extension-no-app-group.entitlements"
+  for name in Extension App; do
+    python3 -c "import plistlib,sys; d=plistlib.load(open(sys.argv[1],'rb')); d['com.apple.security.application-groups']=['group.com.focuspilot.spike.s1']; plistlib.dump(d, open(sys.argv[2],'wb'))" \
+      "$here/entitlements/$name.entitlements" "$here/build/$name-app-group.entitlements"
+  done
+  ext_entitlements="$here/build/Extension-app-group.entitlements"
+  app_entitlements="$here/build/App-app-group.entitlements"
 fi
 "$here/scripts/generate.sh"
 log="$here/build/xcodebuild.log"
@@ -28,6 +32,6 @@ appex="$app/Contents/PlugIns/FocusPilotSpikeS1 Extension.appex"
 codesign --force --sign - --options runtime --timestamp=none \
   --entitlements "$ext_entitlements" "$appex"
 codesign --force --sign - --options runtime --timestamp=none \
-  --entitlements "$here/entitlements/App.entitlements" "$app"
+  --entitlements "$app_entitlements" "$app"
 codesign --verify --deep --strict "$app"
-echo "built and signed ad hoc: $app (appex entitlements: ${ext_entitlements:t})"
+echo "built and signed ad hoc: $app (entitlements: ${ext_entitlements:t}, ${app_entitlements:t})"

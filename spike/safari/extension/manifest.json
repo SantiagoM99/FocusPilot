@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FocusPilot Spike S1",
-  "version": "0.0.1",
+  "version": "0.0.13",
   "description": "Throwaway spike: Safari enforces a focus policy without the app.",
   "background": {
     "scripts": [

@@ -1,7 +1,7 @@
 # Spike S1 notes: Safari keeps blocking without the app
 
 Issue: SantiagoM99/FocusPilot#1. Branch `spike/s1-safari`. Throwaway code; not for merge.
-Status: built, ad-hoc signed and installed in `~/Applications`; **waiting for the owner to enable the extension in Safari**. Nothing has run inside Safari yet.
+Status: T1–T5 run inside Safari on 2026-10-15/16 without owner clicks (see **Results**). The repeated permission prompts are explained and gone (see **Permission prompts**). Open: T6 sleep/wake (needs a human), T7–T9.
 
 Environment: macOS 26.6.2 (25G83), Safari 26.6.2, Xcode 27.0 (27A266a). No signing identities on the Mac, so everything is signed ad hoc (`codesign -s -`, "Sign to Run Locally").
 
@@ -11,14 +11,14 @@ All code is in `spike/safari/`. The generated Xcode project and build output liv
 
 | Piece | Path | What it does |
 |---|---|---|
-| Web extension (MV3) | `extension/` | Background `background.js` (with `policy.js`; classic non-persistent background scripts) reconciles on every wake: worker load, `onStartup`, `onInstalled`, a 1-minute `sync` alarm, a `transition` alarm set to the next session end or exception expiry, an app push and popup "Sync now". Each reconcile does one `sendNativeMessage` round trip: it hands over unsent observations and gets the current snapshot. It keeps the higher revision and evaluates the policy against its own clock. It then writes `declarativeNetRequest` dynamic `block` rules (`||instagram.com/`, main and sub frames) and queues an `ack` (first time it applies a revision) or a `reconcile` observation. A second round trip delivers that observation. Observations stay in `browser.storage.local` until the handler confirms the append. |
-| Content script | `extension/content.js` | Runs on `*.instagram.com` at `document_start`. It evaluates the stored policy with its own timer and blanks an already-loaded page, pausing media first, when the exception expires or a block starts. DNR cannot do that. It reports `content-blanked` with the timer's overrun. |
+| Web extension (MV3) | `extension/` | Background `background.js` (with `policy.js`; classic non-persistent background scripts) reconciles on every wake: worker load, `onStartup`, `onInstalled`, a 1-minute `sync` alarm, a `transition` alarm set to the next session end or exception expiry (kept, not recreated, while its target is unchanged: Safari fires an alarm no sooner than ~30 s after it is created), an app push, a content-script event and popup "Sync now". On each reconcile it also reloads every known tab on a newly blocked domain, so DNR blocks a page that was already open; tabs are learned from `tabs.onUpdated` because Safari hides their url from `tabs.query`. It records `tab-updated` (url, title, status) for the test domain only, which is how a DNR block is observed without looking at the screen: the tab title becomes Safari's "Failed to open page". Each reconcile does one `sendNativeMessage` round trip: it hands over unsent observations and gets the current snapshot. It keeps the higher revision and evaluates the policy against its own clock. It then writes `declarativeNetRequest` dynamic `block` rules (`||instagram.com/`, main and sub frames) and queues an `ack` (first time it applies a revision) or a `reconcile` observation. A second round trip delivers that observation. Observations stay in `browser.storage.local` until the handler confirms the append. |
+| Content script | `extension/content.js` | Runs on `*.instagram.com` at `document_start`. It evaluates the stored policy with its own timer and blanks an already-loaded page, pausing media first, when the exception expires or a block starts. DNR cannot do that. It builds the blank page with DOM calls (no `innerHTML`). It reports `content-load` (with `blocked` and page visibility), `timer-armed`, `timer-fired`, `content-blanked` with the timer's overrun, `visibility` changes and any `content-blank-failed`/`content-error`. |
 | Popup | toolbar icon | Shows stored policy, last evaluation, dynamic rules, last native result and unsent observation count. "Sync now" forces a reconcile. |
-| Native handler (appex) | `src/Extension/SafariWebExtensionHandler.swift` | Sandboxed. Safari starts it for each native message, with or without the app. It probes both shared stores, uses the first writable one, appends each observation plus a `handler-request` line to `inbox.jsonl` under an exclusive `flock`, and returns `policy.json`. Each response and each `handler-request` line records both store probes, so App Group access is measured on every call. |
-| Menu-bar app | `src/App/App.swift` | `LSUIElement` SwiftUI `MenuBarExtra` (shield icon) plus a window that does not open at launch. Menu: start normal session (2/5/15 min) or strict (2 min), grant a 1- or 2-minute exception, end session, clear, open window, open Safari extension settings, import inbox, quit. The window adds custom durations, store probes, the inbox tail, extension state (`SFSafariExtensionManager`) and login item register/unregister/status (`SMAppService.mainApp`). Publishing writes the snapshot atomically to every writable store. If Safari is already running it also pushes `policy-changed` with `SFSafariApplication.dispatchMessage`; it skips this otherwise, because that call launches Safari. The app logs its own lifecycle (launch, window open/close, sleep, wake, publish, push, login item, terminate) to `app-events.jsonl`. On launch and wake it imports the inbox, deduplicated by `(installId, seq)`. |
-| Shared store code | `src/Shared/SharedStore.swift` | Compiled into app, appex and probe. Candidates in order: App Group `group.com.focuspilot.spike.s1` (`~/Library/Group Containers/…/FocusPilotSpikeS1/`), then `~/Library/Application Support/FocusPilotSpikeS1/` through a home-relative temporary exception. Only a real write counts as access. |
+| Native handler (appex) | `src/Extension/SafariWebExtensionHandler.swift` | Sandboxed. Safari starts it for each native message, with or without the app. It probes both shared stores, uses the first writable one, appends each observation plus a `handler-request` line to `inbox.jsonl` under an exclusive `flock`, and returns `policy.json`. Each response and each `handler-request` line records the store probes. |
+| Menu-bar app | `src/App/App.swift` | `LSUIElement` SwiftUI `MenuBarExtra` (shield icon) plus a window that does not open at launch. Menu: start normal session (2/5/15 min) or strict (2 min), grant a 1- or 2-minute exception, end session, clear, open window, open Safari extension settings, import inbox, quit. The window adds custom durations, store probes, the inbox tail, extension state (`SFSafariExtensionManager`) and login item register/unregister/status (`SMAppService.mainApp`). Publishing writes the snapshot atomically to every writable store. If Safari is already running it also pushes `policy-changed` with `SFSafariApplication.dispatchMessage`; it skips this otherwise, because that call launches Safari. The CLI publishing commands push the same way, so tests need no menu clicks. `kill -TERM` quits it cleanly (logs `sigterm`, `app-terminate`), so scripts never need an Apple Event. The app logs its own lifecycle (launch, window open/close, sleep, wake, publish, push, login item, terminate) to `app-events.jsonl`. On launch and wake it imports the inbox, deduplicated by `(installId, seq)`. |
+| Shared store code | `src/Shared/SharedStore.swift` | Compiled into app, appex and probe. Default and only store: `~/Library/Application Support/FocusPilotSpikeS1/`, reached by the appex through a home-relative temporary exception. The App Group `group.com.focuspilot.spike.s1` is tried first only when the binary claims it (`build.sh --app-group`), because that claim causes the consent prompts below. Only a real write counts as access. |
 | Probe | `src/Probe/` | A command-line stand-in for the appex with the same sandbox entitlements (used by `check.sh`). |
-| Scripts | `scripts/` | `generate.sh` (project via `safari-web-extension-converter`, then sources/entitlements laid over it by `patch-pbxproj.py`), `build.sh [--no-app-group]`, `install.sh`, `check.sh`, `policy.sh` (app CLI: `--normal MIN`, `--strict MIN`, `--exception MIN`, `--end`, `--clear`, `--probe`, `--login-status`), `inbox.sh [-f]`, `events.sh`, `overruns.sh`, `roundtrip.sh`, `uninstall.sh [--keep-data]`. |
+| Scripts | `scripts/` | `generate.sh` (project via `safari-web-extension-converter`, then sources/entitlements laid over it by `patch-pbxproj.py`), `build.sh [--app-group]`, `install.sh`, `check.sh`, `policy.sh` (app CLI: `--normal MIN`, `--strict MIN`, `--exception MIN`, `--end`, `--clear`, `--probe`, `--extension-state`, `--login-status`; publishing also pushes), `inbox.sh [-f]`, `events.sh`, `overruns.sh`, `roundtrip.sh`, `uninstall.sh [--keep-data]`. |
 
 Policy snapshot (`policy.json`): `schemaVersion`, `revision` (epoch ms; the extension rejects lower ones), `writtenAt`, `writer`, `alwaysOn[]`, `session` {`sessionId`, `mode` normal|strict, `startsAt`, `endsAt`, `ended`, `domains` ["instagram.com"], `exceptions[]` {`id`, `domain`, `expiresAt`}}. All times are absolute UTC instants. Without the app, a normal session stops at `endsAt` and a strict one keeps blocking until the app writes `ended: true`. Exceptions expire in both modes.
 
@@ -26,7 +26,7 @@ Overrun is how late the extension applied a transition: `appliedAt − scheduled
 
 All log timestamps are **UTC** (Bogotá is UTC−5).
 
-### Findings so far (no Safari needed)
+### Findings from the build (no Safari needed)
 
 1. **Xcode refuses to sign ad hoc with the App Group claim.** With `com.apple.security.application-groups = group.com.focuspilot.spike.s1`, `xcodebuild` fails on both targets with "requires a provisioning profile. Enable development signing and select a provisioning profile". With the entitlements files removed, the same build signs and compiles. Workaround: `build.sh` builds with `CODE_SIGNING_ALLOWED=NO` and signs with `codesign --sign - --options runtime --entitlements …`, appex first, then app. codesign accepts the claim. Whether the system honours it is the runtime question below.
 2. **The ad-hoc App Group claim works for sandboxed code started outside Safari.** `check.sh` gives these results:
@@ -35,7 +35,7 @@ All log timestamps are **UTC** (Bogotá is UTC−5).
    - A control signed without the group claim is denied with `NSCocoaErrorDomain Code=513`.
    - The home-relative temporary exception works in both stand-ins.
    - No call blocked on a consent prompt. I cannot see the screen, so the owner should note any dialog (T2).
-   - Apple documents that without a Team ID prefix, a provisioning profile or App Store/TestFlight distribution "the system prompts the user to approve its access" on macOS 15+. These results do not show that prompt. **The real appex launched by Safari is still unverified**; T2 settles it.
+   - These stand-in results did not show the consent prompt. Inside Safari it did appear, repeatedly: see **Permission prompts**. The build now leaves the App Group out.
 3. **Sandbox containers cannot be deleted from a terminal without Full Disk Access** ("Operation not permitted"). `uninstall.sh` lists any it leaves behind.
 4. `safari-web-extension-converter` (Xcode 27) flags `background.type` and `background.persistent` as unsupported, although Apple's own macOS template uses `"type": "module"`. The spike uses two classic background scripts with neither key, so the converter reports no warning about them.
 
@@ -56,7 +56,71 @@ All log timestamps are **UTC** (Bogotá is UTC−5).
   - An Apple Event quit logs `app-terminate` and the process exits.
 - `inbox.sh`, `overruns.sh` and `roundtrip.sh` were checked against synthetic records. These were then deleted, and the stores were reset to empty.
 
-Not verified: everything inside Safari (handler launch, App Group access by the real appex, DNR, alarms, content script, push), the login item and sleep/wake.
+This section describes the first build (App Group claimed by both). Safari results are in **Results** below.
+
+## Permission prompts (finding, 2026-10-15)
+
+Owner complaint: "every time the app activates it asks me for lots of permissions, constantly."
+
+**What it was.** Only one kind of prompt, repeated: TCC service `kTCCServiceSystemPolicyAppData`, the macOS 15+ "“FocusPilotSpikeS1” would like to access data from other apps" dialog. `log show --last 2d` shows **21 prompts** for subject `com.focuspilot.spike.s1` and nothing else on the Mac. They ran from 15:14:33 to 15:24:30 UTC, about two a minute, alternating between two requesting processes:
+- the Safari appex `com.focuspilot.spike.s1.Extension`, at :30 each minute (the 1-minute `sync` alarm → native handler → store probe);
+- the menu-bar app `com.focuspilot.spike.s1`, at :34 each minute (its 5-second refresh timer probing the stores).
+
+**Allow did not stick.** Every prompt was answered Allow: `AUTHREQ_RESULT authValue=2, authReason=2` (user consent). The next access a minute later prompted again. The prompts stopped when the owner quit the app (15:23:47 UTC). After that the appex's next request was the last one answered.
+
+**Cause.** Both binaries claimed the iOS-style App Group `group.com.focuspilot.spike.s1` while signed ad hoc, with no Team ID and no provisioning profile. containermanagerd logs `REJECTED. Requestor's signature does not allow it to access a TCC-protected group container. Group containers identifiers should be prefixed by requestor's team ID`. sandboxd then falls back to asking TCC, which prompts. Apple documents this: on macOS 15+, accessing an app group container you are not authorised for results in a user prompt. A `group.` identifier needs the group in the app's provisioning profile; a `<TeamID>.<name>` identifier needs no profile, only a matching signing team. The first accesses on 2026-10-15 at 05:09–05:15 UTC worked without a prompt; prompting began when the owner returned to the Mac at 15:14 UTC.
+
+**Checked and not involved** (no TCC request from these, no prompt in 2 days of logs):
+- `SFSafariApplication.dispatchMessage`;
+- `SFSafariExtensionManager.getStateOfSafariExtension`;
+- `SMAppService.mainApp.status` (never registered);
+- Automation/Apple Events (`kTCCServiceAppleEvents`: none);
+- folder access (`~/Library/Application Support` is not TCC-protected);
+- `open -a Safari <url>` (LaunchServices, not Apple Events).
+
+**Fix in the spike.** Both binaries are now built without the App Group claim. The app and the appex share `~/Library/Application Support/FocusPilotSpikeS1/` through the appex's home-relative temporary exception. `SharedStore` touches the group container only when the binary claims it (`build.sh --app-group` reproduces the problem). Scripts no longer read the group container: the terminal reading it is also an access to another app's data. `install.sh`/`uninstall.sh` quit the app with SIGTERM instead of an AppleScript `quit`, so no Automation consent is ever needed. Result: **0 prompts** (`AUTHREQ_PROMPTING` count) from 23:48 UTC to 00:20 UTC across 24 policy publishes, 13 reinstalls and every test below.
+
+**For the real product.** Decide the store with signing in mind:
+- With a Developer ID team, use a macOS-style `<TeamID>.focuspilot` App Group. It needs no provisioning profile and should not prompt. Keep `group.*` only if FocusPilot ships with a provisioning profile that authorises it (Mac App Store, or Developer ID with a profile).
+- Never ship a `group.*` claim without that authorisation. The prompt repeats and "Allow" does not stop it.
+- The home-relative temporary exception works with no prompt and no team. It is acceptable outside the Mac App Store, so it is the fallback.
+
+**Remaining unavoidable one-time prompts:** none came from FocusPilot in these tests. The Safari-side setup is a setting rather than a prompt, and was already done by the owner:
+- Allow unsigned extensions (resets when Safari quits);
+- enabling the extension;
+- website access for instagram.com.
+
+## Results (2026-10-15/16, run without owner clicks)
+
+Method: the policy was changed only with `policy.sh` (the app binary in CLI mode, which now also pushes). Pages were loaded with `open -a Safari <url>`. Results were read from the inbox, `app-events.jsonl`, `roundtrip.sh` and `overruns.sh`. No UI was clicked and Safari was never quit, so the unsigned-extension setting stayed on. The extension stayed enabled through 13 rebuild+reinstall cycles with Safari open (`--extension-state` → `enabled`). Each reinstall fired `onInstalled:update`; relaunching the app once fired `onInstalled:install`. Times are UTC.
+
+| Test | Result |
+|---|---|
+| T1 roundtrip, app running | **Pass.** 22 of 24 publishes were acknowledged through the app push (`app-push:policy-changed`) 0.1–0.2 s after publishing. 2 were dropped (00:05:55 and 00:05:58): `dispatchMessage` called back with no error, but the background page had been unloaded and nothing arrived. The next one was carried by `worker-start` 2.6 s later. One more was published mid-reinstall and carried by `worker-start` after 1.5 s. This matches the owner's 17.6 s `worker-start` ack. **Push is a latency hint, not a delivery guarantee**; the 1-minute alarm and other wakes are the backstop. |
+| T2 shared store | **Pass via home-relative exception** (`transport: home-exception` on every call, no prompt). App Group: works but prompts repeatedly when unauthorised (see above). |
+| End session | **Pass.** `--end` → ack 0.2 s, `blocked=` empty. |
+| DNR on a fresh load | **Pass.** A new tab during a block got Safari's error page: `tab-updated title="Failed to open page"`, and no `content-load` ran (E1 23:58:37, C 23:52:57, Q1 00:19:21). |
+| Already-open tab when a block starts | **Content script: not observed** in tab A (23:49:20). **Background reload: pass.** L1, loaded while unblocked, was reloaded by the background 0.14 s after the session ack and showed "Failed to open page" (00:09:21). |
+| T4 exception grant and expiry | **Pass.**<br>• Grant → ack 0.2 s, and a tab opened during the exception loads (`content-load blocked=false`).<br>• DNR re-blocked at expiry with overrun 0.27 s (E, J), 0.27 s (M) and 0.22 s (N).<br>• In N2 the content script's timer fired 200 ms late while the page was hidden, blanked it (title "Blocked by FocusPilot spike"), and the background reload then showed "Failed to open page". |
+| T5 normal end, app quit | **Pass.** App quit with SIGTERM right after the ack (00:15:54); DNR rules were removed at the end with overrun 0.26 s and no app running. |
+| T5 strict past end, app quit | **Pass.**<br>• With the app quit, the 00:19:04 reconcile (59 s past the end) shows `strictPastEnd: true`, still blocking.<br>• A fresh load at 00:19:21 got "Failed to open page".<br>• `policy.sh --end`, the app binary in CLI mode with the menu-bar app still quit, unblocked it: ack after 0.17 s. |
+| T3 app quit, extension keeps policy | **Pass** (covered by both T5 runs: `alarm:sync` reconciles and native handler calls continued with no app process). |
+| T6 sleep/wake | Not run: needs a human. |
+
+Findings from these runs:
+1. **Safari delays an alarm until ~30 s after it is created.**
+   - With the transition alarm recreated on every reconcile, transitions landed up to 30 s late: 29.6 s for an expiry 0.6 s away, and 10.8 s and 12.8 s when a sync reconcile had just recreated the alarm.
+   - Keeping the existing alarm when its target is unchanged (within 1 s; Safari's `scheduledTime` is not bit-identical) brought every later transition to 0.22–0.27 s.
+   - A transition scheduled less than 30 s ahead can still be up to 30 s late.
+2. **The content script is unreliable as the only way to clear an open page.**
+   - In five open tabs (A, E2, F1, G1, J1) no blank was observed.
+   - In G1 and J1 the instrumented timer was armed (`timer-armed`, 56 s and 35 s) and never fired.
+   - In N, `tab-removed` shows tab N1 was closed 2.5 s after it loaded, and some of the other tabs were probably closed the same way while the tests ran. So these misses do not prove that WebKit suspends timers.
+   - Where the tab stayed open (N2), the timer fired 200 ms late even while the page was hidden.
+   - Either way, the **background reload of known tabs** works whatever the page state, because the browser performs the navigation and DNR blocks it. The product should use it, with the content script as a fast path that can also stop media.
+3. **`tabs.query` hides url/title of host-permitted tabs** after the extension reloads. `tabs.onUpdated` reports them. The extension has to track tab IDs itself.
+4. **A tab opened in the same instant as a policy change can load under the previous rules.** At 00:06:00 the exception's ack and the tab load were 5 ms apart, and the tab got the old block.
+5. The content script now builds the blank page with DOM calls, not `innerHTML`, so a Trusted Types CSP cannot make it throw. No `content-blank-failed` was reported after the change.
 
 ## Owner setup (do once, in order)
 
@@ -68,7 +132,7 @@ Run commands from the worktree root `.worktrees/s1-safari`. Keep two terminals o
 4. Safari → Settings → Extensions → enable **FocusPilotSpikeS1 Extension** ("FocusPilot Spike S1"). If it is missing, quit and reopen the app once, then reopen Settings. Record what Safari asks for.
 5. Pin the toolbar icon if it is not visible. Click it: the popup should show `lastNative.ok: true` and a `transport`. If `ok` is false, copy the popup text and stop.
 6. Website access: open `https://www.instagram.com/`. When Safari asks about the extension's access to instagram.com, choose the "always allow on this website" option and record the exact labels. If no prompt appears, use the toolbar icon or Settings → Websites → Extensions. If anything looks wrong, open Develop → Web Extension Background Content → FocusPilot Spike S1 and copy the console errors.
-7. Note any dialog of the form "… would like to access data from other apps" during steps 1–6, and which process it named.
+7. With the current build no "… would like to access data from other apps" dialog should appear. If one does, note the time and which process it named; `log show --predicate 'process == "tccd" && eventMessage CONTAINS "AUTHREQ_PROMPTING"'` names it.
 
 Useful at any time:
 - `spike/safari/scripts/events.sh`: app lifecycle.
@@ -89,10 +153,7 @@ Each test says what to do, what should happen, and what to record. Paste the out
 5. **Record:** `roundtrip.sh` output (latency, transport, and whether `carried by` is `app-push:policy-changed` or `alarm:sync`); `events.sh | grep push` (any `error`); the popup's `lastNative.roundTripMs`.
 
 **T2. Shared container access by the real appex** (criterion: App Group or alternative works, or the failure is documented)
-1. After T1, run: `jq -c 'select(.kind=="handler-request") | {receivedAt, transport, stores: .payload.stores}' ~/Library/Group\ Containers/group.com.focuspilot.spike.s1/FocusPilotSpikeS1/inbox.jsonl "$HOME/Library/Application Support/FocusPilotSpikeS1/inbox.jsonl" 2>/dev/null | tail -3`
-2. Expected: `transport: "app-group"` and both stores `writable: true`. If `app-group` shows `writable: false`, the `error` field is the documented failure and traffic will have used `home-exception`.
-3. Fallback end to end: `spike/safari/scripts/build.sh --no-app-group && spike/safari/scripts/install.sh`. Re-check the extension is enabled in Safari Settings and record whether the rebuild disabled it. Repeat T1 steps 1–2. Expected: `inbox.sh` shows `home-exception` as the transport. Then restore with `spike/safari/scripts/build.sh && spike/safari/scripts/install.sh`.
-4. **Record:** the jq output, any consent dialog (Owner setup step 7), and the fallback result.
+Done; see **Permission prompts** and **Results**. The App Group worked but prompted; the home-relative store works with no prompt. Do not read `~/Library/Group Containers/group.com.focuspilot.spike.s1` from a terminal: that is itself an access to another app's group container and can prompt for the terminal app.
 
 **T3. App quit; the extension keeps the last policy** (criterion: with the app quit, the extension still reads the last policy and blocks)
 1. **Start normal session · 15 min**. Wait for the `ack`.
@@ -114,7 +175,7 @@ Each test says what to do, what should happen, and what to record. Paste the out
 4. **Record:** `overruns.sh` (`session-end`), and the strict result.
 
 **T6. Sleep/wake overrun** (criterion: overrun after sleep/wake recorded)
-1. Open the app, set the window's session minutes to 6, **Start normal**, then set exception minutes to 3 and **Grant exception**. Quit the app. Open instagram.com (allowed by the exception) and leave the tab in front.
+1. Run `spike/safari/scripts/policy.sh --normal 6 && spike/safari/scripts/policy.sh --exception 3 && open -a Safari https://www.instagram.com/` (the menu-bar app need not run). Leave that tab in front.
 2. Immediately put the Mac to sleep (Apple menu → Sleep) and leave it asleep **at least 10 min**, so both transitions pass during sleep.
 3. Wake and unlock. Do not touch Safari for 2 min, then look at the tab.
 4. Expected: the open tab blanks shortly after wake (content script), the rules come off at the session end, and instagram.com loads afterwards.
@@ -161,7 +222,8 @@ For each test: pass/fail, the recorded numbers (T1 latency and transport, T4–T
 ## Known limits of this spike
 
 - Only `instagram.com` main and sub frames are blocked. Subresources from other hosts, private windows and other Safari profiles are not tested; `safariProfile` in the inbox records the profile UUID if Safari supplies one.
-- The content script needs website access for instagram.com. Without it, only DNR acts, and an already-open page is not blanked when an exception expires.
+- The content script needs website access for instagram.com. Without it, only DNR and the background tab reload act.
+- The background reload only knows tabs it saw load since the extension last started (its `tabHosts` list). A tab Safari restored without firing `tabs.onUpdated` is missed until it navigates.
 - Blanked pages reload when they become allowed again. The original page state is lost.
 - Policy revisions are wall-clock milliseconds, so changing the system clock backwards can make the extension reject new policies until it catches up. Clock changes are a known bypass anyway (Architecture).
 - The app dedupe set lives in UserDefaults and grows without bound; fine for a spike.
@@ -171,7 +233,7 @@ For each test: pass/fail, the recorded numbers (T1 latency and transport, T4–T
 
 Created outside the repo:
 - `~/Applications/FocusPilotSpikeS1.app` (with its registered appex).
-- `~/Library/Group Containers/group.com.focuspilot.spike.s1/` (policy, inbox, app events).
+- `~/Library/Group Containers/group.com.focuspilot.spike.s1/`, created by the first build (App Group claimed). Delete it in Finder; touching it from a terminal can prompt.
 - `~/Library/Application Support/FocusPilotSpikeS1/` (fallback store: policy, inbox, app events).
 - Sandbox containers: `~/Library/Containers/com.focuspilot.spike.s1.Extension` (after Safari runs the handler), `…/com.focuspilot.spike.s1.probe` and `…/com.focuspilot.spike.s1.probe-nogroup` (from `check.sh`).
 - `defaults` domain `com.focuspilot.spike.s1` (inbox dedupe set).
@@ -191,9 +253,11 @@ No Safari preferences or other apps' files were modified directly.
 - Running your Safari web extension (unsigned setting, resets when Safari quits): https://developer.apple.com/documentation/safariservices/running-your-safari-web-extension
 - Messaging between the app and JavaScript in a Safari web extension (`sendNativeMessage`, `SFExtensionMessageKey`, `connectNative` + `dispatchMessage`; Safari ignores the application ID): https://developer.apple.com/documentation/safariservices/messaging-between-the-app-and-javascript-in-a-safari-web-extension
 - `SFSafariApplication.dispatchMessage` (launches Safari if needed): https://developer.apple.com/documentation/safariservices/sfsafariapplication/dispatchmessage(withname:toextensionwithidentifier:userinfo:completionhandler:)
-- App Groups entitlement (ID formats; macOS 15 container protection and prompt): https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.application-groups
+- App Groups entitlement (ID formats: `group.<name>`, and on macOS `<team identifier>.<name>` without registration): https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.application-groups
 - `containerURL(forSecurityApplicationGroupIdentifier:)` (on macOS a URL is always returned, even for an invalid group): https://developer.apple.com/documentation/foundation/filemanager/containerurl(forsecurityapplicationgroupidentifier:)
 - App Groups: macOS vs iOS (Apple DTS, iOS-style IDs on macOS, when a profile is needed): https://developer.apple.com/forums/thread/721701
+- Accessing app group containers (macOS 15 SIP for group containers; unauthorised access prompts; `group.` needs a provisioning profile; `<TeamID>.<name>` needs none): https://developer.apple.com/documentation/xcode/accessing-app-group-containers
+- Persistent file-access prompt for ad-hoc signed apps using `group.` App Groups (Apple Developer Forums, matches what was observed): https://developer.apple.com/forums/thread/767604
 - Accessing files from the macOS App Sandbox: https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox
 - App Sandbox temporary exception entitlements (home-relative path format): https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/AppSandboxTemporaryExceptionEntitlements.html
 - Temporary exceptions are fine outside the Mac App Store (Apple DTS): https://developer.apple.com/forums/thread/776609

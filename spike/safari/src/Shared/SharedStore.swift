@@ -1,6 +1,7 @@
 // Throwaway spike for issue #1. Compiled into the app, the extension handler and the probe tool
 // (scripts/generate.sh concatenates it into each target's single source file).
 import Foundation
+import Security
 
 enum Spike {
     static let groupID = "group.com.focuspilot.spike.s1"
@@ -40,11 +41,22 @@ enum SharedStore {
         return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     }
 
-    // App Group first, home-relative temporary exception second. On macOS containerURL returns a
-    // path even for an unauthorised group ID, so only a real write proves access.
+    // True only when this binary was signed with the App Group claim (build.sh --app-group).
+    static func claimsAppGroup() -> Bool {
+        guard let task = SecTaskCreateFromSelf(nil),
+              let value = SecTaskCopyValueForEntitlement(task, "com.apple.security.application-groups" as CFString, nil)
+        else { return false }
+        return (value as? [String])?.contains(Spike.groupID) ?? false
+    }
+
+    // Home-relative temporary exception by default. The "group." App Group is only tried when the
+    // binary claims it: without a team-ID prefix or provisioning profile, every touch of that
+    // container is a "would like to access data from other apps" prompt whose Allow does not stick
+    // (SPIKE_NOTES.md, Permission prompts). On macOS containerURL returns a path even for an
+    // unauthorised group ID, so only a real write proves access.
     static func candidates() -> [StoreLocation] {
         var out: [StoreLocation] = []
-        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Spike.groupID) {
+        if claimsAppGroup(), let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Spike.groupID) {
             out.append(StoreLocation(transport: "app-group", url: group.appendingPathComponent("FocusPilotSpikeS1", isDirectory: true)))
         }
         out.append(StoreLocation(transport: "home-exception", url: realHome().appendingPathComponent(Spike.fallbackRelativePath, isDirectory: true)))

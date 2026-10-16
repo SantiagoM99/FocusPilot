@@ -4,7 +4,6 @@
 # --end | --clear | --probe.  Without arguments prints the current snapshot.
 app="$HOME/Applications/FocusPilotSpikeS1.app/Contents/MacOS/FocusPilotSpikeS1"
 if (( $# )); then exec "$app" "$@"; fi
-for f in "$HOME/Library/Group Containers/group.com.focuspilot.spike.s1/FocusPilotSpikeS1/policy.json" \
-         "$HOME/Library/Application Support/FocusPilotSpikeS1/policy.json"; do
+for f in "$HOME/Library/Application Support/FocusPilotSpikeS1/policy.json"; do
   [[ -f "$f" ]] && { echo "== $f"; cat "$f"; echo; }
 done
