@@ -27,6 +27,12 @@ public struct TaskRecord: Codable, Equatable, Sendable {
     var deadlineInstant: Date? = nil
     var deadlineTimeZone: String? = nil
     var deadlineText: String? = nil
+    var source: String? = nil
+    var sourcePane: String? = nil
+    var clientId: String? = nil
+
+    var isFromHerdr: Bool { source == Self.herdrSource }
+    static let herdrSource = "herdr"
 
     public var deadline: Deadline? {
         get {
