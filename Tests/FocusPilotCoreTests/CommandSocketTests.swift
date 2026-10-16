@@ -68,9 +68,7 @@ final class CommandSocketTests {
     }
 
     @Test func aSocketLeftByACrashIsReplaced() throws {
-        let crashed = server()
-        try crashed.start()
-        crashed.stop(removingFile: false)
+        try makeStaleSocket(at: path)
         #expect(throws: CommandSocketClient.Failure.notRunning) {
             try CommandSocketClient(path: path).send(.tasks(nil))
         }
@@ -98,4 +96,12 @@ final class CommandSocketTests {
 actor Received {
     var request: CommandRequest?
     func set(_ request: CommandRequest) { self.request = request }
+}
+
+/// A socket file nothing listens on, as a crashed app leaves behind.
+func makeStaleSocket(at path: String) throws {
+    var address = try #require(UnixSocket.address(path))
+    let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
+    #expect(UnixSocket.withAddress(&address) { bind(descriptor, $0, $1) } == 0)
+    close(descriptor)
 }

@@ -18,7 +18,6 @@ public final class CommandSocketServer: @unchecked Sendable {
     private let handler: @Sendable (CommandRequest) async -> CommandResponse
     private let lock = NSLock()
     private var source: (any DispatchSourceRead)?
-    private let closed = DispatchSemaphore(value: 0)
 
     public init(path: String, handler: @escaping @Sendable (CommandRequest) async -> CommandResponse) {
         self.path = path
@@ -50,26 +49,20 @@ public final class CommandSocketServer: @unchecked Sendable {
 
         let source = DispatchSource.makeReadSource(fileDescriptor: listener, queue: .global())
         source.setEventHandler { [weak self] in self?.acceptPending(on: listener) }
-        source.setCancelHandler { [closed] in
-            close(listener)
-            closed.signal()
-        }
+        source.setCancelHandler { close(listener) }
         lock.withLock { self.source = source }
         source.resume()
     }
 
-    /// Stops listening, returning once the socket is closed. `removingFile:
-    /// false` leaves the socket file behind, as a crash would.
-    public func stop(removingFile: Bool = true) {
+    /// Stops listening and removes the socket file. The listener closes
+    /// shortly after, without blocking the caller.
+    public func stop() {
         let source = lock.withLock {
             defer { self.source = nil }
             return self.source
         }
-        if let source {
-            source.cancel()
-            closed.wait()
-        }
-        if removingFile { unlink(path) }
+        source?.cancel()
+        unlink(path)
     }
 
     private func acceptPending(on listener: Int32) {

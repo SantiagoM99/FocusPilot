@@ -44,7 +44,7 @@ enum HerdrTaskStore {
 
     private static func scoped(_ task: TaskRecord) -> HerdrScopedTask {
         HerdrScopedTask(title: task.title, status: task.status, nextAction: task.nextAction,
-                        deadline: task.deadline.map { DeadlineText($0).exact }, isFromHerdr: task.isFromHerdr)
+                        deadline: task.deadline.map { DeadlineText($0).inspection }, isFromHerdr: task.isFromHerdr)
     }
 
     private static func result(for task: TaskRecord, request: HerdrAddRequest, hints: [String], wasAlreadyAdded: Bool,
@@ -52,7 +52,7 @@ enum HerdrTaskStore {
         let project = try task.projectId.flatMap { try ProjectRecord.fetchOne(db, key: $0) }
         return HerdrAddResult(taskID: task.id!, title: task.title, projectTitle: project?.title,
                               workspaceHasNoProject: request.caller != nil && project == nil,
-                              deadlineDescription: task.deadline.map { DeadlineText($0).exact },
+                              deadlineDescription: task.deadline.map { DeadlineText($0).inspection },
                               hints: hints, wasAlreadyAdded: wasAlreadyAdded)
     }
 

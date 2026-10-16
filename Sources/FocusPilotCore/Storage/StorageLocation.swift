@@ -30,8 +30,27 @@ public struct StorageLocation: Sendable {
         }
     }
 
-    /// `~/Library/Application Support/FocusPilot`.
-    public static func applicationSupport() -> StorageLocation {
-        StorageLocation(directory: URL.applicationSupportDirectory.appending(path: "FocusPilot", directoryHint: .isDirectory))
+    /// `~/Library/Application Support/FocusPilot`, or `FOCUSPILOT_DATA_DIR`
+    /// when set, so the app and CLI can be tried without touching the
+    /// owner's data.
+    public static func applicationSupport(environment: [String: String] = ProcessInfo.processInfo.environment)
+        -> StorageLocation {
+        if let override = environment["FOCUSPILOT_DATA_DIR"], !override.isEmpty {
+            return StorageLocation(directory: URL(fileURLWithPath: override, isDirectory: true))
+        }
+        return StorageLocation(directory: URL.applicationSupportDirectory.appending(path: "FocusPilot", directoryHint: .isDirectory))
+    }
+
+    /// The focuspilot CLI's socket and inbox, in a folder only the owner can open.
+    var commandLineDirectory: URL {
+        directory.appending(path: "CommandLine", directoryHint: .isDirectory)
+    }
+
+    public var commandSocketPath: String {
+        commandLineDirectory.appending(path: "cli.sock").path
+    }
+
+    public var inbox: TaskInbox {
+        TaskInbox(directory: commandLineDirectory)
     }
 }

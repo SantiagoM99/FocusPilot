@@ -59,7 +59,7 @@ public struct HerdrAddResult: Codable, Equatable, Sendable {
     public var projectTitle: String?
     /// The caller is in a Herdr workspace that no project is linked to.
     public var workspaceHasNoProject: Bool
-    /// `DeadlineText.exact`, e.g. "Fri 16 Oct, 23:59 · Bogotá".
+    /// `DeadlineText.inspection`, e.g. "Fri 16 Oct 2026, 23:59 · America/Bogota (GMT−5)".
     public var deadlineDescription: String?
     public var hints: [String]
     /// The request had been stored before, by an earlier attempt or import.
