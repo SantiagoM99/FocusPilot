@@ -82,6 +82,8 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-15: A project links to at most one Herdr workspace (or none). Projects can be imported from Herdr workspaces, and while FocusPilot runs, a new Herdr workspace with no project automatically becomes a linked project (once per workspace; unlinked or deleted projects are not recreated). FocusPilot only reads Herdr for this.
 - 2026-10-15: Tasks can be added and read from Herdr panes (owner or agents) through a `focuspilot` CLI. Adds go straight to the end of Next in the workspace's linked project, marked "from Herdr" and undoable; the CLI can never change Now, order, deadlines, or existing tasks. Reads are limited to the caller workspace's project plus the current Now action.
 - 2026-10-15: All user-facing text in FocusPilot is in English, placeholders included; typed capture input is still parsed in Spanish or English. (A Spanish-only request earlier the same day was withdrawn by the owner.)
+- 2026-10-16: The strict-session early-end wait is confirmed at 60 seconds, after a confirmation; the owner can cancel and keep focusing.
+- 2026-10-16: Herdr workspaces that already exist the first time FocusPilot sees a Herdr session are imported by the owner ("From Herdr…"), not auto-created; only workspaces that appear afterwards become projects automatically. Auto-sync never adopts an existing project by name.
 
 ## Sources
 
