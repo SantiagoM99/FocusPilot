@@ -49,6 +49,20 @@ enum OwnerSchema {
             try db.drop(table: TaskRecord.databaseTableName)
             try db.rename(table: "new_task", to: TaskRecord.databaseTableName)
         }
+        migrator.registerMigration("owner-v3-order") { db in
+            try db.alter(table: TaskRecord.databaseTableName) { table in
+                table.add(column: "status", .text).notNull().defaults(to: TaskStatus.next.rawValue)
+                    .check(sql: "status IN ('now', 'next', 'later', 'done')")
+                table.add(column: "rank", .integer).notNull().defaults(to: 0)
+            }
+            // Earlier tasks keep their capture order in Next. This is not an
+            // owner edit, so revision and updatedAt are left alone.
+            try db.execute(sql: "UPDATE task SET rank = id")
+            // At most one Now, whatever writes the row.
+            try db.create(index: "task_one_now", on: TaskRecord.databaseTableName, columns: ["status"],
+                          unique: true, condition: Column("status") == TaskStatus.now.rawValue)
+            try db.create(index: "task_on_projectId", on: TaskRecord.databaseTableName, columns: ["projectId"])
+        }
         return migrator
     }
 

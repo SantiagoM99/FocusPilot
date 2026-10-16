@@ -67,7 +67,9 @@ public actor TaskRepository {
         let createdAt = now()
         // One write closure: the project and the task commit together or not at all.
         return try await ownerDatabase.write { db in
-            var task = TaskRecord(id: nil, title: newTask.title, nextAction: newTask.nextAction,
+            // A capture joins the end of Next; only the owner pins a Now.
+            let lastRank = try Int.fetchOne(db, sql: "SELECT MAX(rank) FROM task WHERE status = 'next'") ?? -1
+            var task = TaskRecord(id: nil, title: newTask.title, nextAction: newTask.nextAction, rank: lastRank + 1,
                                   createdAt: createdAt, updatedAt: createdAt)
             task.deadline = newTask.deadline
             task.projectId = try newTask.projectName.map { try Self.projectID(named: $0, in: db) }
@@ -76,16 +78,69 @@ public actor TaskRepository {
         }
     }
 
-    /// Every task in capture order. Ordering by priority is not decided yet.
+    /// Open tasks (not done): the Now task, then Next and Later in manual order.
     public func todayTasks() async throws -> [TodayItem] {
+        try await ownerDatabase.read { db in try Self.openTasks(db).fetchAll(db).map(\.todayItem) }
+    }
+
+    /// One project's open tasks in the same order as Today; nil lists the
+    /// tasks filed under no project.
+    public func projectTasks(_ projectID: Int64?) async throws -> [TodayItem] {
         try await ownerDatabase.read { db in
-            try TaskRecord
-                .including(optional: TaskRecord.project)
-                .order(Column("id"))
-                .asRequest(of: TaskWithProject.self)
-                .fetchAll(db)
-                .map(\.todayItem)
+            try Self.openTasks(db).filter(Column("projectId") == projectID).fetchAll(db).map(\.todayItem)
         }
+    }
+
+    /// Projects in alphabetical order with their open tasks counted, then
+    /// "No project" if any open task has none.
+    public func projects() async throws -> [ProjectSummary] {
+        try await ownerDatabase.read { db in
+            let tasks = try Self.openTasks(db).fetchAll(db)
+            let byProject = Dictionary(grouping: tasks, by: \.task.projectId)
+            func summary(_ id: Int64?, _ title: String) -> ProjectSummary {
+                let open = byProject[id] ?? []
+                let nearest = open.compactMap(\.task.deadline).min { $0.endInstant < $1.endInstant }
+                return ProjectSummary(id: id, title: title, openTaskCount: open.count, nearestDeadline: nearest)
+            }
+            var projects = try ProjectRecord.fetchAll(db)
+                .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+                .map { summary($0.id, $0.title) }
+            if byProject[nil] != nil {
+                projects.append(summary(nil, "No project"))
+            }
+            return projects
+        }
+    }
+
+    /// Moves a task to Now, Next or Later (see `TaskOrder.move`). The reorder
+    /// is read, computed and written in one write, and every task whose
+    /// place changed gets a new revision and update time.
+    public func moveTask(_ id: Int64, to status: TaskStatus, _ placement: TaskPlacement) async throws {
+        let updatedAt = now()
+        try await ownerDatabase.write { db in
+            let positions = try Row.fetchAll(db, sql: "SELECT id, status, rank FROM task WHERE status <> 'done'")
+                .map { TaskPosition(id: $0["id"], status: TaskStatus(rawValue: $0["status"])!, rank: $0["rank"]) }
+            for change in TaskOrder.move(id, to: status, placement, in: positions) {
+                try db.execute(sql: """
+                    UPDATE task SET status = ?, rank = ?, revision = revision + 1, updatedAt = ? WHERE id = ?
+                    """, arguments: [change.status.rawValue, change.rank, updatedAt, change.id])
+            }
+        }
+    }
+
+    /// The pinned Now task, if the owner chose one.
+    public func nowTask() async throws -> TodayItem? {
+        try await ownerDatabase.read { db in
+            try Self.openTasks(db).filter(Column("status") == TaskStatus.now.rawValue).fetchOne(db)?.todayItem
+        }
+    }
+
+    private static func openTasks(_ db: Database) throws -> QueryInterfaceRequest<TaskWithProject> {
+        TaskRecord
+            .filter(Column("status") != TaskStatus.done.rawValue)
+            .including(optional: TaskRecord.project)
+            .order(sql: "CASE status WHEN 'now' THEN 0 WHEN 'next' THEN 1 ELSE 2 END, rank, id")
+            .asRequest(of: TaskWithProject.self)
     }
 
     /// Project titles for the capture sheet's popup, in alphabetical order.

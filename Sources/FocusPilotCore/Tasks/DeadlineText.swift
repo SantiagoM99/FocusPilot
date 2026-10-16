@@ -65,6 +65,19 @@ public struct DeadlineText: Sendable {
         }
     }
 
+    // MARK: Projects
+
+    /// The day only, for a project row: "Due Sat 17 Oct" or "Overdue Tue 13 Oct".
+    public func dueDay(at now: Date) -> String {
+        let today = LocalDate(containing: now, in: deadline.timeZone)
+        return (deadline.isOverdue(at: now) ? "Overdue " : "Due ") + dayAndMonth(today: today)
+    }
+
+    /// Day, time if any, and city, for a project header: "Sat 17 Oct, 23:59 · Bogotá".
+    public func dayTimeAndCity(at now: Date) -> String {
+        dayAndMonth(today: LocalDate(containing: now, in: deadline.timeZone)) + time(", ") + " · " + city
+    }
+
     /// The exact reading behind a relative label, for tooltips and detail.
     public var inspection: String {
         switch deadline.due {

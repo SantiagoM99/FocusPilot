@@ -9,13 +9,17 @@ import GRDB
 /// A CHECK constraint in `OwnerSchema` enforces that; `deadline` is the typed
 /// view of those columns.
 ///
-/// `revision` starts at 1 and is meant to grow with every change to the
-/// task, so derived values can tell they are stale; nothing edits tasks yet.
+/// `status` and `rank` place the task in Now, Next or Later in the owner's
+/// manual order. `revision` starts at 1 and grows with every change to the
+/// task, together with `updatedAt`, so derived values can tell they are
+/// stale.
 public struct TaskRecord: Codable, Equatable, Sendable {
     public var id: Int64?
     public var title: String
     public var projectId: Int64? = nil
     public var nextAction: String? = nil
+    public var status = TaskStatus.next
+    public var rank = 0
     public var revision = 1
     public var createdAt: Date
     public var updatedAt: Date

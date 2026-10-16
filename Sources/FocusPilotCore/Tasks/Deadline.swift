@@ -30,6 +30,16 @@ public struct Deadline: Hashable, Sendable {
         }
     }
 
+    /// The moment the deadline passes: its instant, or for a date-only
+    /// deadline the start of the next day in its time zone. Used to compare
+    /// deadlines of either kind.
+    public var endInstant: Date {
+        switch due {
+        case .dateOnly(let date): date.adding(days: 1).start(in: timeZone)
+        case .timed(let instant): instant
+        }
+    }
+
     /// Whether the deadline has passed at `now`. A date-only deadline is
     /// overdue only once its whole day has ended in its time zone.
     public func isOverdue(at now: Date) -> Bool {

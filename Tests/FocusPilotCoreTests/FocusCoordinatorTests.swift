@@ -41,6 +41,29 @@ struct FocusCoordinatorTests {
         #expect(try await coordinator.hasTasks() == true)
     }
 
+    @Test func currentTaskIsThePinnedNowTask() async throws {
+        let repository = try TaskRepository(location: StorageLocation(directory: makeTemporaryDirectory()))
+        let coordinator = FocusCoordinator(repository: repository)
+        try await coordinator.capture(NewTask(title: "Write the essay"))
+        let id = try #require(try await coordinator.todayTasks().first?.id)
+
+        try await coordinator.moveTask(id, to: .now, .top)
+
+        #expect(await coordinator.snapshot().currentTaskTitle == "Write the essay")
+        try await coordinator.moveTask(id, to: .next, .top)
+        #expect(await coordinator.snapshot().currentTaskTitle == nil)
+    }
+
+    @Test func capturingNeverPinsATask() async throws {
+        let repository = try TaskRepository(location: StorageLocation(directory: makeTemporaryDirectory()))
+        let coordinator = FocusCoordinator(repository: repository)
+
+        try await coordinator.capture(NewTask(title: "Write the essay"))
+
+        #expect(await coordinator.snapshot().currentTaskTitle == nil)
+        #expect(try await coordinator.todayTasks().map(\.status) == [.next])
+    }
+
     @Test func capturedTaskAppearsInToday() async throws {
         let repository = try TaskRepository(location: StorageLocation(directory: makeTemporaryDirectory()))
         let coordinator = FocusCoordinator(repository: repository)
