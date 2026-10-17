@@ -40,6 +40,22 @@ struct WrapUpStorageTests {
         #expect(try await repository.todayTasks().first?.wrapUp == nil)
     }
 
+    @Test func markingTheNowTaskDonePromotesTheFirstNextTaskInTheSameWrite() async throws {
+        let current = try await repository.addTask(NewTask(title: "Explain baseline results"))
+        let following = try await repository.addTask(NewTask(title: "Write the ablation section"))
+        try await repository.moveTask(current.id!, to: .now, .top)
+        let before = try await repository.tasks()
+
+        try await repository.saveWrapUp(sample, forTask: current.id!, markingDone: true)
+
+        #expect(try await repository.todayTasks().map(\.title) == ["Write the ablation section"])
+        #expect(try await repository.nowTask()?.id == following.id)
+        let after = try await repository.tasks()
+        #expect(after.map(\.status) == [.done, .now])
+        #expect(zip(before, after).allSatisfy { $1.revision == $0.revision + 1 && $1.updatedAt == clock.now })
+        #expect(after[0].wrapUp?.returnCue == sample.returnCue)
+    }
+
     @Test func savingForATaskThatNoLongerExistsFails() async throws {
         await #expect(throws: TaskRepository.WrapUpError.taskNotFound) {
             try await repository.saveWrapUp(sample, forTask: 42)
