@@ -55,6 +55,16 @@ struct MenuBarContent: View {
                     .font(.callout)
                     .foregroundStyle(.orange)
             }
+            // A session that reached its planned end does not open a window
+            // on its own; its wrap-up waits here.
+            if let wrapUp = model.wrapUp {
+                Button { openPlanning() } label: {
+                    Label("Wrap up “\(wrapUp.session.action)”…", systemImage: "square.and.pencil")
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                }
+                .controlSize(.large)
+            }
             Button {
                 model.requestStartFocus()
                 openPlanning()

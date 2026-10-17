@@ -23,6 +23,11 @@ struct MenuBarIcon: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(status.accessibilityLabel)
+        // Pause and Complete ask for a wrap-up, shown in the planning window.
+        .onChange(of: model.planningWindowRequests) {
+            openWindow(id: PlanningView.windowID)
+            NSApplication.shared.activate()
+        }
         .task {
             await model.refresh()
             if await model.claimPlanningWindowAtLaunch() {

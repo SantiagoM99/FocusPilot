@@ -43,6 +43,7 @@ extension AppModel {
     }
 
     func pause() async {
+        ownerEndedOrPausedAt = .now
         await run { try await $0.pause() }
     }
 
@@ -56,6 +57,7 @@ extension AppModel {
     @discardableResult
     func complete(confirmed: Bool = false) async -> Bool {
         var completion: SessionCompletion?
+        ownerEndedOrPausedAt = .now
         await run { completion = try await $0.complete(confirmed: confirmed) }
         isConfirmingEarlyEnd = completion == .needsConfirmation
         return isConfirmingEarlyEnd
