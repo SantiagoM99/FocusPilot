@@ -14,8 +14,22 @@ struct TaskInboxTests {
         repository = try TaskRepository(location: StorageLocation(directory: directory), now: { wednesdayMorningInBogota })
     }
 
-    private func importInbox() async throws -> Int {
-        try await inbox.drain { try await repository.addFromHerdr($0) }
+    private func importInbox(from inbox: TaskInbox? = nil) async throws -> Int {
+        let repository = repository
+        return try await (inbox ?? self.inbox).drain(isPermanent: TaskRepository.isPermanentAddFailure) {
+            _ = try await repository.addFromHerdr($0)
+        }.imported
+    }
+
+    private func titles() async throws -> [String] {
+        try await repository.todayTasks().map(\.title)
+    }
+
+    private func appendRaw(_ text: String) throws {
+        let handle = try FileHandle(forWritingTo: inbox.fileURL)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(text.utf8))
+        try handle.close()
     }
 
     @Test func queuedAddsAreImportedInOrder() async throws {
@@ -23,7 +37,7 @@ struct TaskInboxTests {
         try inbox.enqueue(herdrAdd("Re-run ablation by fri 23:59"))
 
         #expect(try await importInbox() == 2)
-        #expect(try await repository.todayTasks().map(\.title) == ["Reply to co-advisor", "Re-run ablation"])
+        #expect(try await titles() == ["Reply to co-advisor", "Re-run ablation"])
         #expect(try await repository.todayTasks().allSatisfy(\.isFromHerdr))
     }
 
@@ -49,17 +63,14 @@ struct TaskInboxTests {
     @Test func aFailedImportKeepsTheInboxForTheNextTry() async throws {
         try inbox.enqueue(herdrAdd("Reply to co-advisor"))
         struct DiskFull: Error {}
-        await #expect(throws: DiskFull.self) { try await inbox.drain { _ in throw DiskFull() } }
+        await #expect(throws: DiskFull.self) { try await inbox.drain(isPermanent: { _ in false }) { _ in throw DiskFull() } }
 
         #expect(try await importInbox() == 1)
     }
 
     @Test func anUnreadableLineIsSkipped() async throws {
         try inbox.enqueue(herdrAdd("Reply to co-advisor"))
-        let handle = try FileHandle(forWritingTo: inbox.fileURL)
-        try handle.seekToEnd()
-        try handle.write(contentsOf: Data("not json\n".utf8))
-        try handle.close()
+        try appendRaw("not json\n")
         try inbox.enqueue(herdrAdd("Re-run ablation"))
 
         #expect(try await importInbox() == 2)
@@ -78,5 +89,84 @@ struct TaskInboxTests {
         let folder = try FileManager.default.attributesOfItem(atPath: inbox.fileURL.deletingLastPathComponent().path)[.posixPermissions] as? Int
         #expect(file == 0o600)
         #expect(folder == 0o700)
+    }
+
+    // MARK: Failures that must not block the inbox
+
+    @Test func aPermanentFailureIsSkippedAndTheRestImported() async throws {
+        try inbox.enqueue(herdrAdd("First"))
+        try inbox.enqueue(herdrAdd("Poison"))
+        try inbox.enqueue(herdrAdd("Third"))
+        struct Rejected: Error {}
+        let repository = repository
+
+        let drained = try await inbox.drain(isPermanent: { $0 is Rejected }) { request in
+            if request.text == "Poison" { throw Rejected() }
+            _ = try await repository.addFromHerdr(request)
+        }
+
+        #expect(drained == TaskInbox.Drained(imported: 2, skipped: 1))
+        #expect(try await titles() == ["First", "Third"])
+        #expect(try await importInbox() == 0)
+    }
+
+    @Test func aTemporaryFailureKeepsOnlyWhatWasNotImported() async throws {
+        try inbox.enqueue(herdrAdd("First"))
+        try inbox.enqueue(herdrAdd("Second"))
+        struct Busy: Error {}
+        let repository = repository
+        await #expect(throws: Busy.self) {
+            try await inbox.drain(isPermanent: { _ in false }) { request in
+                if request.text == "Second" { throw Busy() }
+                _ = try await repository.addFromHerdr(request)
+            }
+        }
+
+        #expect(try await importInbox() == 1)
+        #expect(try await titles() == ["First", "Second"])
+    }
+
+    @Test func aBlankTitleIsAPermanentFailure() {
+        #expect(TaskRepository.isPermanentAddFailure(NewTask.Invalid.missingTitle))
+        struct Busy: Error {}
+        #expect(!TaskRepository.isPermanentAddFailure(Busy()))
+    }
+
+    @Test func eachDrainReadsAtMostTheLimit() async throws {
+        let small = TaskInbox(directory: inbox.fileURL.deletingLastPathComponent(), readLimit: 700)
+        for index in 1...5 { try small.enqueue(herdrAdd("Task \(index)")) }
+
+        let first = try await importInbox(from: small)
+        #expect(first >= 1 && first < 5)
+        var total = first
+        while total < 5 {
+            let next = try await importInbox(from: small)
+            #expect(next > 0)
+            total += next
+        }
+        #expect(try await titles() == (1...5).map { "Task \($0)" })
+    }
+
+    @Test func aLineLongerThanTheLimitIsSkipped() async throws {
+        let small = TaskInbox(directory: inbox.fileURL.deletingLastPathComponent(), readLimit: 700)
+        try small.enqueue(herdrAdd(String(repeating: "x", count: 2000)))
+        try small.enqueue(herdrAdd("After the long one"))
+
+        var imported = 0
+        for _ in 0..<5 { imported += try await importInbox(from: small) }
+
+        #expect(try await titles() == ["After the long one"])
+    }
+
+    // MARK: Torn writes
+
+    @Test func aLineTornByADyingCLIDoesNotSwallowTheNextAdd() async throws {
+        try inbox.enqueue(herdrAdd("Before"))
+        try appendRaw(#"{"id":"3F2A","text":"half writ"#)
+        try inbox.enqueue(herdrAdd("After"))
+
+        _ = try await importInbox()
+
+        #expect(try await titles() == ["Before", "After"])
     }
 }

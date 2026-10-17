@@ -214,6 +214,14 @@ public actor TaskRepository {
         try await ownerDatabase.read { db in try HerdrTaskStore.scope(for: caller, in: db) }
     }
 
+    /// Whether an add failed in a way retrying cannot fix, such as a blank
+    /// title or a row the schema rejects. A busy or full disk is not.
+    public static func isPermanentAddFailure(_ error: any Error) -> Bool {
+        if error is NewTask.Invalid { return true }
+        if let database = error as? DatabaseError { return database.resultCode == .SQLITE_CONSTRAINT }
+        return false
+    }
+
     func herdrSource(of taskID: Int64) async throws -> String? {
         try await ownerDatabase.read { db in try TaskRecord.fetchOne(db, key: taskID)?.sourcePane }
     }

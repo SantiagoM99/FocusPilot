@@ -150,6 +150,9 @@ public actor FocusCoordinator {
     /// Imports the adds queued while FocusPilot was closed. Returns how many
     /// were handed to the repository; already stored ones are not repeated.
     public func importInbox(_ inbox: TaskInbox) async throws -> Int {
-        try await inbox.drain { _ = try await repository.addFromHerdr($0) }
+        let repository = repository
+        return try await inbox.drain(isPermanent: TaskRepository.isPermanentAddFailure) {
+            _ = try await repository.addFromHerdr($0)
+        }.imported
     }
 }
