@@ -72,6 +72,36 @@ struct RuleStorageTests {
         }
     }
 
+    // Review of PR #39: the core validates, since the CLI and AI proposals
+    // will save rules without the Settings editor.
+    @Test func savedSitesAreNormalizedAndDeduplicated() async throws {
+        let change = try await repository.save(BlockRuleSet(
+            targets: [.site(domain: "https://www.YouTube.com/watch?v=1"), .site(domain: "youtube.com"), .site(domain: "münchen.de")],
+            activation: .always))
+
+        #expect(change.inputs.rules[0].targets == [.site(domain: "youtube.com"), .site(domain: "xn--mnchen-3ya.de")])
+    }
+
+    @Test func unusableTargetsAreRefusedInTheCore() async throws {
+        await #expect(throws: RuleError.invalidSite("not a site")) {
+            try await repository.save(BlockRuleSet(targets: [.site(domain: "not a site")], activation: .always))
+        }
+        await #expect(throws: RuleError.invalidApp) {
+            try await repository.save(BlockRuleSet(targets: [.app(bundleID: "  ", name: "Nothing")], activation: .always))
+        }
+        await #expect(throws: RuleError.invalidSite("nope")) {
+            try await repository.allow(AllowedActivity(name: "Nope", target: .site(domain: "nope")))
+        }
+        #expect(try await repository.policyInputs().rules.isEmpty)
+    }
+
+    @Test func allowedSitesAreNormalizedAndNamed() async throws {
+        let change = try await repository.allow(AllowedActivity(name: "  ", target: .site(domain: "https://Scholar.Google.com/scholar?q=x")))
+
+        #expect(change.inputs.allowed.last?.target == .site(domain: "scholar.google.com"))
+        #expect(change.inputs.allowed.last?.name == "scholar.google.com")
+    }
+
     @Test func blockingAnAllowedSiteIsRefusedAndNothingChanges() async throws {
         await #expect(throws: RuleError.alreadyAllowed(.site(domain: "overleaf.com"))) {
             try await repository.save(BlockRuleSet(targets: [.site(domain: "overleaf.com")], activation: .always))

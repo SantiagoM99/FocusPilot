@@ -27,8 +27,10 @@ public actor FocusCoordinator {
     var session: FocusSession?
     /// The last policy published, shown in Settings.
     var policy: CompiledPolicy?
-    /// When, on `uptime`, the owner confirmed ending the current strict session early.
-    var earlyEndRequestedAt: Duration?
+    /// The owner confirmed ending the current strict session early.
+    var earlyEnd: StrictWait<UUID>?
+    /// The owner confirmed a rule change that weakens the strict session.
+    var ruleWait: StrictWait<RuleEdit>?
     /// Grows with every change, so the app can drop a snapshot older than one it has.
     private var revision = 0
     private var subscribers: [UUID: AsyncStream<FocusSnapshot>.Continuation] = [:]
@@ -54,7 +56,9 @@ public actor FocusCoordinator {
 
     public func snapshot() async -> FocusSnapshot {
         FocusSnapshot(currentTaskTitle: try? await repository.nowTask()?.title, session: session,
-                      earlyEndAvailableAt: earlyEndAvailableAt(), policy: policy, revision: revision)
+                      earlyEndAvailableAt: earlyEndAvailableAt(), policy: policy,
+                      pendingRuleEdit: ruleWait.map { PendingRuleEdit(edit: $0.request, availableAt: availableAt($0)) },
+                      revision: revision)
     }
 
     /// Every snapshot from now on, starting with the current one.

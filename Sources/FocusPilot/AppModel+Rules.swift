@@ -14,14 +14,35 @@ extension AppModel {
     }
 
     /// Saves a new or edited rule set. Returns false, with `rulesError`
-    /// set, if it was refused.
+    /// set, if it was refused. A change that weakens a strict session asks
+    /// for confirmation on the Blocking tab instead; that still returns true.
     @discardableResult
     func save(_ rule: BlockRuleSet) async -> Bool {
-        await edit { try await $0.saveRuleSet(rule) }
+        await perform(.save(rule), confirmed: false)
     }
 
     func deleteRuleSet(_ id: Int64) async {
-        await edit { try await $0.deleteRuleSet(id) }
+        await perform(.delete(id), confirmed: false)
+    }
+
+    /// Sends a rule change, confirmed or not, and records whether it now
+    /// needs confirmation. The countdown comes from the snapshot.
+    @discardableResult
+    func perform(_ ruleEdit: RuleEdit, confirmed: Bool) async -> Bool {
+        var outcome: RuleEditOutcome?
+        let succeeded = await edit {
+            switch ruleEdit {
+            case .save(let rule): outcome = try await $0.saveRuleSet(rule, confirmed: confirmed)
+            case .delete(let id): outcome = try await $0.deleteRuleSet(id, confirmed: confirmed)
+            }
+        }
+        ruleEditToConfirm = outcome == .needsConfirmation ? ruleEdit : nil
+        return succeeded
+    }
+
+    func cancelRuleEdit() async {
+        ruleEditToConfirm = nil
+        await coordinator?.cancelRuleEdit()
     }
 
     @discardableResult
@@ -33,6 +54,7 @@ extension AppModel {
         await edit { try await $0.removeAllowed(id) }
     }
 
+    @discardableResult
     private func edit(_ change: (FocusCoordinator) async throws -> Void) async -> Bool {
         guard let coordinator else { return false }
         do {

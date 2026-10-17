@@ -11,6 +11,7 @@ struct BlockingSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                StrictRuleEditBanner(model: model)
                 SectionHeader("Blocked sites and apps", note: "Blocked immediately, no check-in")
                 VStack(spacing: 0) {
                     RuleTable(model: model, selection: $selection, edit: { editing = .init($0) })

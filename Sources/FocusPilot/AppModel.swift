@@ -30,6 +30,9 @@ final class AppModel {
     var allowed: [AllowedActivity] = []
     /// Set when a rule or allowed-list edit was refused or failed.
     var rulesError: String?
+    /// A weakening rule change during a strict session, waiting for the
+    /// owner to confirm it on the Blocking tab.
+    var ruleEditToConfirm: RuleEdit?
     /// Asks the planning window to show a page, e.g. Settings from ⌘,.
     var requestedPage: PlanningView.Page?
     /// Pending reconcile at the next session deadline.

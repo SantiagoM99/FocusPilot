@@ -23,6 +23,8 @@ struct RuleEditorSheet: View {
     @State private var schedule: WeeklySchedule
     @State private var typedSite = ""
     @State private var siteError: String?
+    /// Kept after adding a typed page, so the owner sees the whole domain was added.
+    @State private var addedPageNote: String?
     @Environment(\.dismiss) private var dismiss
     private let original: BlockRuleSet
 
@@ -64,6 +66,8 @@ struct RuleEditorSheet: View {
                     }
                     if let siteError {
                         Text(siteError).font(.callout).foregroundStyle(.orange)
+                    } else if let note = RuleText.wholeDomainNote(typedSite) ?? addedPageNote {
+                        Text(note).font(.callout).foregroundStyle(.orange)
                     } else {
                         Text("A site blocks the whole domain, subdomains included.")
                             .font(.callout).foregroundStyle(.secondary)
@@ -115,6 +119,7 @@ struct RuleEditorSheet: View {
             return
         }
         siteError = nil
+        addedPageNote = RuleText.wholeDomainNote(typedSite)
         typedSite = ""
         if !targets.contains(.site(domain: domain)) { targets.append(.site(domain: domain)) }
     }

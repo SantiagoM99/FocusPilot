@@ -20,14 +20,22 @@ extension TaskRepository {
         try await ownerDatabase.read { db in try Self.policyInputs(db) }
     }
 
-    /// Inserts or updates a rule set, bumping its revision on update.
+    /// Inserts or updates a rule set, bumping its revision on update. Sites
+    /// are normalized here, whoever the caller. Unless `allowWeakening`, an
+    /// update that weakens the rule throws `weakensStrictSession` and
+    /// changes nothing.
     @discardableResult
-    public func save(_ rule: BlockRuleSet) async throws -> PolicyChange {
-        try await policyChange { db in
+    public func save(_ rule: BlockRuleSet, allowWeakening: Bool = true) async throws -> PolicyChange {
+        let rule = try ActivityLists.normalized(rule)
+        return try await policyChange { db in
             try ActivityLists.validate(rule, allowed: try Self.allowed(db))
             var row = try RuleSetRow(rule)
             if let id = rule.id {
-                row.revision = (try Int.fetchOne(db, sql: "SELECT revision FROM blockRuleSet WHERE id = ?", arguments: [id]) ?? 0) + 1
+                let saved = try RuleSetRow.fetchOne(db, key: id)
+                if !allowWeakening, let old = try saved?.rule(), RuleStrength.weakens(old, to: rule) {
+                    throw RuleError.weakensStrictSession
+                }
+                row.revision = (saved?.revision ?? 0) + 1
                 try row.update(db)
             } else {
                 row.revision = 1
@@ -36,14 +44,20 @@ extension TaskRepository {
         }
     }
 
+    /// Deleting always weakens, so unless `allowWeakening` it throws
+    /// `weakensStrictSession`.
     @discardableResult
-    public func deleteRuleSet(_ id: Int64) async throws -> PolicyChange {
-        try await policyChange { db in _ = try RuleSetRow.deleteOne(db, key: id) }
+    public func deleteRuleSet(_ id: Int64, allowWeakening: Bool = true) async throws -> PolicyChange {
+        guard allowWeakening else { throw RuleError.weakensStrictSession }
+        return try await policyChange { db in _ = try RuleSetRow.deleteOne(db, key: id) }
     }
 
+    /// Allows an entry. A blocked or overlapping target is refused outright,
+    /// so allowing never weakens blocking.
     @discardableResult
     public func allow(_ entry: AllowedActivity) async throws -> PolicyChange {
-        try await policyChange { db in
+        let entry = try ActivityLists.normalized(entry)
+        return try await policyChange { db in
             try ActivityLists.validate(entry, allowed: try Self.allowed(db), rules: try Self.rules(db))
             var row = try AllowedRow(entry)
             row.id = nil

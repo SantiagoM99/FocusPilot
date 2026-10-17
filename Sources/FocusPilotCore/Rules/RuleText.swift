@@ -68,9 +68,40 @@ public enum RuleErrorText {
         switch error {
         case .noTargets: "Add at least one site or app."
         case .invalidSchedule: "Pick at least one day, and make the start and end times different."
+        case .invalidSite(let typed): "“\(typed)” isn't a site address."
+        case .invalidApp: "That app has no bundle identifier."
+        case .weakensStrictSession: "This weakens a rule during a strict session."
         case .notBlockable(let target): "\(target.displayName) is a command-line tool and can't be blocked."
         case .alreadyAllowed(let target): "\(target.displayName) is in Allowed. Remove it there first."
         case .alreadyBlocked(let target): "\(target.displayName) is blocked by a rule. Remove it there first."
         }
+    }
+}
+
+extension RuleText {
+    /// The question asked before a weakening change during a strict session.
+    public static func title(_ edit: RuleEdit, rules: [BlockRuleSet]) -> String {
+        switch edit {
+        case .delete(let id):
+            guard let rule = rules.first(where: { $0.id == id }) else { return "Remove this rule?" }
+            return "Remove the rule for \(names(rule))?"
+        case .save(let rule):
+            return "Loosen the rule for \(names(rules.first { $0.id == rule.id } ?? rule))?"
+        }
+    }
+
+    /// "You can apply it in 0:45", then "You can apply it now".
+    public static func applyCountdown(availableAt: Date, now: Date) -> String {
+        now >= availableAt ? "You can apply it now" : "You can apply it in " + MenuBarStatus.format(remaining: availableAt.timeIntervalSince(now))
+    }
+
+    /// Said under the editor's site field when the typed text names a page.
+    public static func wholeDomainNote(_ typed: String) -> String? {
+        guard SiteDomain.namesAPage(typed), let domain = SiteDomain.normalized(typed) else { return nil }
+        return "Blocks all of \(domain), not only this page."
+    }
+
+    private static func names(_ rule: BlockRuleSet) -> String {
+        rule.targets.map(\.displayName).joined(separator: ", ")
     }
 }
