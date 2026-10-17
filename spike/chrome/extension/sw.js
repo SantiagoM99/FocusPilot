@@ -22,7 +22,14 @@ function serial() {
 const observeQueue = serial();
 const reconcileQueue = serial();
 
-async function profileId() {
+// Memoised: the first wake calls this from several paths at once, and unsynchronised
+// get-then-set created two IDs on first install (hello and observations disagreed).
+let profileIdPromise = null;
+function profileId() {
+  return (profileIdPromise ??= loadOrCreateProfileId());
+}
+
+async function loadOrCreateProfileId() {
   const { profileId } = await chrome.storage.local.get("profileId");
   if (profileId) return profileId;
   const id = crypto.randomUUID();
