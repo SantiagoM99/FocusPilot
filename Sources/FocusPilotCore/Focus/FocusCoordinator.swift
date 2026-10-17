@@ -12,7 +12,7 @@ import Foundation
 public actor FocusCoordinator {
     public enum SessionError: Error, Equatable {
         case noCurrentTask
-        /// A task cannot be marked done while a session on it is running or paused.
+        /// A wrap-up was asked for a session that is still running or paused.
         case sessionStillActive
     }
 

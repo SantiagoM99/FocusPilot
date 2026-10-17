@@ -6,7 +6,7 @@ import Testing
 struct WrapUpDraftTests {
     @Test func startsFromWhatTheTaskAlreadySaysSoSavingTakesSeconds() {
         let earlier = TaskWrapUp(WrapUp(outcome: "Drafted §4.2", remainingWork: "Ablation sentence", returnCue: "Check Table 3"),
-                                 at: wednesdayMorningInBogota)
+                                 session: UUID(), at: wednesdayMorningInBogota)
         let task = TodayItem(id: 1, title: "Explain baseline results", nextAction: "Write one sentence under Table 3",
                              wrapUp: earlier)
 

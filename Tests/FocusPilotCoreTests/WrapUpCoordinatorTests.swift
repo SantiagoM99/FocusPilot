@@ -6,43 +6,34 @@ import Testing
 struct WrapUpCoordinatorTests {
     private let wrapUp = WrapUp(outcome: "Drafted §4.2", remainingWork: "Ablation sentence", returnCue: "Check Table 3")
 
-    @Test func savingAfterASessionEndsUpdatesTheTaskAndTheSnapshot() async throws {
+    @Test func savingAfterASessionEndsKeepsItInHistoryAndUpdatesTheSnapshot() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
         fixture.advance(minutes: 25)
         try await fixture.coordinator.reconcile()
-        let taskID = try #require(await fixture.coordinator.snapshot().session?.taskID)
+        let ended = try #require(await fixture.coordinator.snapshot().session)
         let revisionBefore = await fixture.coordinator.snapshot().revision
 
-        try await fixture.coordinator.saveWrapUp(wrapUp, forTask: taskID, markingDone: true)
+        try await fixture.coordinator.saveWrapUp(wrapUp, after: ended, markingDone: true)
 
         let snapshot = await fixture.coordinator.snapshot()
         #expect(snapshot.currentTaskTitle == nil)
         #expect(snapshot.revision > revisionBefore)
-        #expect(try await fixture.coordinator.todayTasks().isEmpty)
+        #expect(try await fixture.coordinator.wrapUpHistory(forTask: ended.taskID).map(\.sessionID) == [ended.id])
     }
 
-    @Test func savingWhilePausedKeepsTheSessionAndTheTaskOpen() async throws {
+    @Test func aSessionStillRunningOrPausedCannotBeWrappedUp() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+        let running = try #require(await fixture.coordinator.snapshot().activeSession)
         try await fixture.coordinator.pause()
-        let session = try #require(await fixture.coordinator.snapshot().activeSession)
+        let paused = try #require(await fixture.coordinator.snapshot().activeSession)
 
-        try await fixture.coordinator.saveWrapUp(wrapUp, forTask: session.taskID)
-
-        #expect(await fixture.coordinator.snapshot().activeSession == session)
-        #expect(try await fixture.coordinator.todayTasks().first?.wrapUp?.returnCue == "Check Table 3")
-    }
-
-    @Test func aTaskCannotBeMarkedDoneWhileItsSessionIsActive() async throws {
-        let fixture = try await SessionFixture()
-        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
-        try await fixture.coordinator.pause()
-        let session = try #require(await fixture.coordinator.snapshot().activeSession)
-
-        await #expect(throws: FocusCoordinator.SessionError.sessionStillActive) {
-            try await fixture.coordinator.saveWrapUp(wrapUp, forTask: session.taskID, markingDone: true)
+        for session in [running, paused] {
+            await #expect(throws: FocusCoordinator.SessionError.sessionStillActive) {
+                try await fixture.coordinator.saveWrapUp(wrapUp, after: session)
+            }
         }
-        #expect(try await fixture.coordinator.todayTasks().first?.wrapUp == nil)
+        #expect(try await fixture.coordinator.wrapUpHistory(forTask: running.taskID).isEmpty)
     }
 }

@@ -81,14 +81,14 @@ public actor TaskRepository {
 
     /// Open tasks (not done): the Now task, then Next and Later in manual order.
     public func todayTasks() async throws -> [TodayItem] {
-        try await ownerDatabase.read { db in try Self.openTasks(db).fetchAll(db).map(\.todayItem) }
+        try await ownerDatabase.read { db in try TaskWithProject.todayItems(Self.openTasks(db).fetchAll(db), db) }
     }
 
     /// One project's open tasks in the same order as Today; nil lists the
     /// tasks filed under no project.
     public func projectTasks(_ projectID: Int64?) async throws -> [TodayItem] {
         try await ownerDatabase.read { db in
-            try Self.openTasks(db).filter(Column("projectId") == projectID).fetchAll(db).map(\.todayItem)
+            try TaskWithProject.todayItems(Self.openTasks(db).filter(Column("projectId") == projectID).fetchAll(db), db)
         }
     }
 
@@ -134,7 +134,7 @@ public actor TaskRepository {
     /// The pinned Now task, if the owner chose one.
     public func nowTask() async throws -> TodayItem? {
         try await ownerDatabase.read { db in
-            try Self.openTasks(db).filter(Column("status") == TaskStatus.now.rawValue).fetchOne(db)?.todayItem
+            try TaskWithProject.todayItems(Self.openTasks(db).filter(Column("status") == TaskStatus.now.rawValue).fetchAll(db), db).first
         }
     }
 
