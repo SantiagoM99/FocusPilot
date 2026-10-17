@@ -1,13 +1,16 @@
-// Throwaway spike S4 probe. READ-ONLY: it only runs `herdr --version`, `status`,
+// Throwaway spike S4 probe. Default mode is READ-ONLY: `herdr --version`, `status`,
 // `session list`, `agent list|get|read` and raw-socket `ping` / `agent.list`.
-// Never add focus/prompt/send-keys/start/split/create/close/rename/move/attach/stop.
+// `focus` mode (owner-approved 2026-10-16) runs exactly one `tab focus` or `agent focus`
+// on the scratch agent `s4-scratch`, then restores the owner's tab. Never add
+// prompt/send-keys/start/split/create/close/rename/move/attach/stop.
 import AppKit
 import Darwin
 import Foundation
 
 let home = FileManager.default.homeDirectoryForCurrentUser.path
 let logDir = home + "/Library/Logs/FocusPilotHerdrProbe"
-let logPath = logDir + "/probe.log"
+let focusMode = CommandLine.arguments.dropFirst().first == "focus"
+let logPath = logDir + (focusMode ? "/focus.log" : "/probe.log")
 
 // MARK: - Logging
 
@@ -15,8 +18,11 @@ final class Log {
     private let handle: FileHandle
     init() {
         try? FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
-        FileManager.default.createFile(atPath: logPath, contents: nil)
+        if !FileManager.default.fileExists(atPath: logPath) || !focusMode {
+            FileManager.default.createFile(atPath: logPath, contents: nil)
+        }
         handle = FileHandle(forWritingAtPath: logPath)!
+        handle.seekToEndOfFile()
     }
     func line(_ s: String) {
         let stamp = ISO8601DateFormatter().string(from: Date())
@@ -322,6 +328,59 @@ func probe() {
     log.line("DONE")
 }
 
+
+// MARK: - Focus mode
+
+let scratchAgent = "s4-scratch"
+
+struct FocusState { var workspace: String?; var tab: String?; var pane: String? }
+
+func focusState(_ bin: String) -> FocusState {
+    let r = run(bin, ["api", "snapshot"])
+    let snap = (json(r.stdout)?["result"] as? [String: Any])?["snapshot"] as? [String: Any]
+    return FocusState(workspace: snap?["focused_workspace_id"] as? String,
+                      tab: snap?["focused_tab_id"] as? String,
+                      pane: snap?["focused_pane_id"] as? String)
+}
+
+func describe(_ f: FocusState) -> String { "ws=\(f.workspace ?? "?") tab=\(f.tab ?? "?") pane=\(f.pane ?? "?")" }
+
+func scratchInfo(_ bin: String) -> (status: String, pane: String, tab: String)? {
+    let r = run(bin, ["agent", "get", scratchAgent])
+    guard let a = (json(r.stdout)?["result"] as? [String: Any])?["agent"] as? [String: Any],
+          let st = a["agent_status"] as? String, let pane = a["pane_id"] as? String, let tab = a["tab_id"] as? String
+    else { log.line("agent get \(scratchAgent) failed: status \(r.status) err=\(trunc(r.err))"); return nil }
+    return (st, pane, tab)
+}
+
+/// argv: focus tab|agent. The target is always derived from the scratch agent, never taken from argv.
+func focusProbe() {
+    let kind = CommandLine.arguments.dropFirst(2).first ?? ""
+    log.line("FocusPilot S4 focus probe; kind=\(kind)")
+    logEnvironment()
+    guard kind == "tab" || kind == "agent", let bin = resolveBinary() else { log.line("ABORT: bad kind or no binary"); return }
+    let owner = focusState(bin)
+    log.line("BEFORE owner focus: \(describe(owner))")
+    guard let ownerTab = owner.tab, let s0 = scratchInfo(bin) else { log.line("ABORT: missing owner focus or scratch agent"); return }
+    log.line("BEFORE scratch \(scratchAgent): pane=\(s0.pane) tab=\(s0.tab) status=\(s0.status)")
+    guard ownerTab != s0.tab else { log.line("ABORT: owner is already on the scratch tab"); return }
+
+    let args = kind == "tab" ? ["tab", "focus", s0.tab] : ["agent", "focus", scratchAgent]
+    let f = run(bin, args)
+    log.line("FOCUS `herdr \(args.joined(separator: " "))` -> status \(f.status) wall=\(fmt(f.wallMs))ms out=\(trunc(f.out, 600)) err=\(trunc(f.err))")
+    let after = focusState(bin)
+    log.line("AFTER focus: \(describe(after)); scratch status=\(scratchInfo(bin)?.status ?? "?")")
+    Thread.sleep(forTimeInterval: 3)  // long enough for the owner to see the TUI switch
+    log.line("AFTER 3s hold: \(describe(focusState(bin))); scratch status=\(scratchInfo(bin)?.status ?? "?")")
+
+    let r = run(bin, ["tab", "focus", ownerTab])
+    log.line("RESTORE `herdr tab focus \(ownerTab)` -> status \(r.status) err=\(trunc(r.err))")
+    let restored = focusState(bin)
+    log.line("AFTER restore: \(describe(restored)); matches before: \(restored.pane == owner.pane && restored.tab == owner.tab && restored.workspace == owner.workspace)")
+    log.line("AFTER restore scratch status=\(scratchInfo(bin)?.status ?? "?")")
+    log.line("DONE")
+}
+
 // MARK: - Minimal GUI shell
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -336,7 +395,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.orderFrontRegardless()
         DispatchQueue.global().async {
-            probe()
+            if focusMode { focusProbe() } else { probe() }
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }

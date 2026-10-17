@@ -1,0 +1,48 @@
+[2026-10-17T04:36:28Z] FocusPilot S4 focus probe; kind=tab
+[2026-10-17T04:36:28Z] == App launch environment ==
+[2026-10-17T04:36:28Z] env keys: COMMAND_MODE,HOME,LOGNAME,OSLogRateLimit,PATH,SHELL,SSH_AUTH_SOCK,TMPDIR,USER,XPC_FLAGS,XPC_SERVICE_NAME,__CFBundleIdentifier,__CF_USER_TEXT_ENCODING
+[2026-10-17T04:36:28Z] PATH=/usr/bin:/bin:/usr/sbin:/sbin
+[2026-10-17T04:36:28Z] HERDR_* in app env: none
+[2026-10-17T04:36:28Z] parent pid=1 (1 = launchd, i.e. not a terminal child)
+[2026-10-17T04:36:28Z] == Binary resolution ==
+[2026-10-17T04:36:28Z] /usr/bin/env herdr --version with app PATH -> status 127 out= err=env: herdr: No such file or directory
+[2026-10-17T04:36:28Z] candidate /Users/santiagomartineznovoa/.local/bin/herdr: executable
+[2026-10-17T04:36:28Z] candidate /opt/homebrew/bin/herdr: absent
+[2026-10-17T04:36:28Z] candidate /usr/local/bin/herdr: absent
+[2026-10-17T04:36:28Z] candidate /Users/santiagomartineznovoa/.cargo/bin/herdr: absent
+[2026-10-17T04:36:28Z] zsh -lc 'command -v herdr' -> status 1 out= wall=144.4ms
+[2026-10-17T04:36:28Z] RESULT: using /Users/santiagomartineznovoa/.local/bin/herdr (symlink target: /Users/santiagomartineznovoa/.local/bin/herdr)
+[2026-10-17T04:36:28Z] /Users/santiagomartineznovoa/.local/bin/herdr --version -> status 0 out=herdr 0.9.0 wall=6.0ms
+[2026-10-17T04:36:28Z] BEFORE owner focus: ws=w5 tab=w5:t1 pane=w5:p1
+[2026-10-17T04:36:28Z] BEFORE scratch s4-scratch: pane=wH:pC tab=wH:tC status=done
+[2026-10-17T04:36:28Z] FOCUS `herdr tab focus wH:tC` -> status 0 wall=6.0ms out={"id":"cli:tab:focus","result":{"tab":{"agent_status":"idle","focused":true,"label":"s4-scratch","number":12,"pane_count":1,"tab_id":"wH:tC","workspace_id":"wH"},"type":"tab_info"}} err=
+[2026-10-17T04:36:28Z] AFTER focus: ws=wH tab=wH:tC pane=wH:pC; scratch status=idle
+[2026-10-17T04:36:31Z] AFTER 3s hold: ws=wH tab=wH:tC pane=wH:pC; scratch status=idle
+[2026-10-17T04:36:31Z] RESTORE `herdr tab focus w5:t1` -> status 0 err=
+[2026-10-17T04:36:31Z] AFTER restore: ws=w5 tab=w5:t1 pane=w5:p1; matches before: true
+[2026-10-17T04:36:31Z] AFTER restore scratch status=idle
+[2026-10-17T04:36:31Z] DONE
+[2026-10-17T04:36:42Z] FocusPilot S4 focus probe; kind=agent
+[2026-10-17T04:36:42Z] == App launch environment ==
+[2026-10-17T04:36:42Z] env keys: COMMAND_MODE,HOME,LOGNAME,OSLogRateLimit,PATH,SHELL,SSH_AUTH_SOCK,TMPDIR,USER,XPC_FLAGS,XPC_SERVICE_NAME,__CFBundleIdentifier,__CF_USER_TEXT_ENCODING
+[2026-10-17T04:36:42Z] PATH=/usr/bin:/bin:/usr/sbin:/sbin
+[2026-10-17T04:36:42Z] HERDR_* in app env: none
+[2026-10-17T04:36:42Z] parent pid=1 (1 = launchd, i.e. not a terminal child)
+[2026-10-17T04:36:42Z] == Binary resolution ==
+[2026-10-17T04:36:42Z] /usr/bin/env herdr --version with app PATH -> status 127 out= err=env: herdr: No such file or directory
+[2026-10-17T04:36:42Z] candidate /Users/santiagomartineznovoa/.local/bin/herdr: executable
+[2026-10-17T04:36:42Z] candidate /opt/homebrew/bin/herdr: absent
+[2026-10-17T04:36:42Z] candidate /usr/local/bin/herdr: absent
+[2026-10-17T04:36:42Z] candidate /Users/santiagomartineznovoa/.cargo/bin/herdr: absent
+[2026-10-17T04:36:42Z] zsh -lc 'command -v herdr' -> status 1 out= wall=141.6ms
+[2026-10-17T04:36:42Z] RESULT: using /Users/santiagomartineznovoa/.local/bin/herdr (symlink target: /Users/santiagomartineznovoa/.local/bin/herdr)
+[2026-10-17T04:36:42Z] /Users/santiagomartineznovoa/.local/bin/herdr --version -> status 0 out=herdr 0.9.0 wall=8.5ms
+[2026-10-17T04:36:42Z] BEFORE owner focus: ws=w5 tab=w5:t1 pane=w5:p1
+[2026-10-17T04:36:42Z] BEFORE scratch s4-scratch: pane=wH:pC tab=wH:tC status=done
+[2026-10-17T04:36:42Z] FOCUS `herdr agent focus s4-scratch` -> status 0 wall=6.4ms out={"id":"cli:agent:focus","result":{"agent":{"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"ebdf1af7-4734-449b-a8bd-4efac26b1a0e"},"agent_status":"idle","cwd":"/Users/santiagomartineznovoa/Projects/Personal/FocusPilot/.worktrees/s4-herdr","focused":true,"foreground_cwd":"/Users/santiagomartineznovoa/Projects/Personal/FocusPilot/.worktrees/s4-herdr","interactive_ready":true,"name":"s4-scratch","pane_id":"wH:pC","revision":2,"state_change_seq":3052,"tab_id":"wH:tC","terminal_id":"term_65e01d04c777dd3","terminal_title":"✳ Ok response","terminal_title…(667 chars) err=
+[2026-10-17T04:36:42Z] AFTER focus: ws=wH tab=wH:tC pane=wH:pC; scratch status=idle
+[2026-10-17T04:36:45Z] AFTER 3s hold: ws=wH tab=wH:tC pane=wH:pC; scratch status=idle
+[2026-10-17T04:36:45Z] RESTORE `herdr tab focus w5:t1` -> status 0 err=
+[2026-10-17T04:36:45Z] AFTER restore: ws=w5 tab=w5:t1 pane=w5:p1; matches before: true
+[2026-10-17T04:36:45Z] AFTER restore scratch status=idle
+[2026-10-17T04:36:45Z] DONE

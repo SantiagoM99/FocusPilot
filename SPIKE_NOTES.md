@@ -1,7 +1,7 @@
 # Spike S4: Use Herdr from a normal Mac app (issue #4)
 
-Date: 2026-10-13. macOS 26 (Darwin 25.6.0), Swift 6.3 CLT (no Xcode), Herdr client/server 0.9.0, protocol 22.
-This is throwaway code and is not meant to be merged. Probe app: `spike/HerdrProbe/` (`main.swift`, `Info.plist`, `build.sh`). The raw logs are `run1-inherited-env.log` (invalid launch, see below) and `run2-clean-env.log` (the run these notes rely on).
+Dates: 2026-10-13 (read-only), 2026-10-16 (focus test). macOS 26 (Darwin 25.6.0), Swift 6.3 CLT (no Xcode), Herdr client/server 0.9.0, protocol 22.
+This is throwaway code and is not meant to be merged. Probe app: `spike/HerdrProbe/` (`main.swift`, `Info.plist`, `build.sh`). The raw logs are `run1-inherited-env.log` (invalid launch, see below) `run2-clean-env.log` (the read-only run these notes rely on) and `run3-focus.log` (focus test).
 
 ## Method
 
@@ -60,9 +60,34 @@ All CLI output is treated as untrusted: parsed with `JSONSerialization` under a 
 
 *Server CPU covers all clients. Fifteen agents, some working, were active during the test, so the run-to-run noise is about ±300 ms per minute. Polling made no measurable difference to the server. Run 1 gave the same picture: CLI 11.7 ms per call, raw socket 1.1 ms. Conclusion: polling `agent list` every 5 s through the CLI costs about 0.15% of one core, which is negligible. The payload is about 9 KB per poll for 15 agents.
 
+## Focus test (2026-10-16, owner-approved; log `spike/HerdrProbe/run3-focus.log`)
+
+Setup:
+- I created a scratch tab `wH:tC` (`tab create --no-focus`) and started a scratch agent `s4-scratch` there (`claude --model haiku`, pane `wH:pC`).
+- I gave it one trivial prompt so it finished a turn unseen. Status was `done`, and `agent get`/`agent read` did not change that.
+- The probe app was launched like a Login Item: `env -i /usr/bin/open -W -n HerdrProbe.app --args focus tab|agent`. The app environment had no `HERDR_*`, PATH was `/usr/bin:/bin:/usr/sbin:/sbin`, parent pid was 1, and children got a scrubbed environment.
+- The app reads the owner's focus from `api snapshot` first. It may only target the tab or name of `s4-scratch`, which it gets from `agent get`. It holds focus for 3 s, then restores with `tab focus <owner tab>`.
+- Two focus actions were used, out of the 3 allowed. Afterwards the scratch tab was closed with `tab close wH:tC` (it was the only thing created) and the owner's focus was confirmed unchanged.
+
+| # | Command (from app) | Exit | Focus after | Scratch status before → after | Restore |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `herdr tab focus wH:tC` | 0, 6.0 ms | ws=wH tab=wH:tC pane=wH:pC | `done` → `idle` | `tab focus w5:t1` → ws=w5 tab=w5:t1 pane=w5:p1, exact match |
+| 2 | `herdr agent focus s4-scratch` | 0, 6.4 ms | ws=wH tab=wH:tC pane=wH:pC | `done` → `idle` | same, exact match |
+
+Answers:
+1. **Works from a non-pane GUI process: yes.** Both `tab focus <tab_id>` and `agent focus <name|pane_id>` succeed from a launchd-launched app with no managed-pane variables. Note that `pane focus` in 0.9.0 is **direction-only** (`--direction left|right|up|down`); it cannot target an explicit pane. So explicit navigation means `agent focus <target>` for agent panes, and `tab focus` / `workspace focus` otherwise. There is no "focus this exact non-agent pane" command.
+2. **Which TUI client it affects:** focus is **server-level state**, not per-client. The server log records `method="tab.focus"`/`"agent.focus"` with `changes_ui=true`, followed by `workspace.focus` and then `tab.focus` events. `api snapshot` exposes one `focused_workspace_id/tab_id/pane_id`. Exactly one TUI client was attached (pid 6590, connected through `herdr-client.sock`), so that client is the one that moved. The response does not name a client. With **several** attached clients the docs say "each can view its own workspace and tab" (concepts.mdx). Which client follows an API focus in that case is **untested**. Visual confirmation from the owner of the two 3-second switches (2026-10-17 04:36:28Z and 04:36:42Z) is still pending.
+3. **Marks `done` as seen: yes, for both commands.** `agent focus` turns `done` into `idle`, as the docs say ("explicit `pane focus` / `agent focus` commands mark the target seen"). The docs do not say that **`tab focus` also marks the agent in that tab as seen**, but it does. Reads (`agent get`, `agent read`) do not. Restoring focus to the owner's tab can therefore also clear a `done` state on the owner's agent. Here `w5:p1` was `working`/`idle`, so it was unaffected.
+
+Implications for FocusPilot:
+- Focus is a navigation action with side effects. It moves the single shared server focus and consumes `done` (the "unseen completion" signal).
+- FocusPilot must read status **before** any focus. It must never focus as part of polling, and it must not offer "restore previous focus" casually, because the restore also consumes `done` on the restored target.
+- Every focus must follow an explicit user action, with a revalidated target (session/socket/server pid + pane ID + agent name) right before acting.
+
 ## Not tested yet
 
-- **Pane focus (`agent focus` / `pane focus`)**. Deliberately not run; it will be tested with the owner. Open questions: does it work from a non-pane client, which TUI client does it affect, and does it mark `done` as seen?
+- Focus with **several TUI clients attached**, and focus of a session or `--machine` target other than the local default.
+- A real Login Item (`SMAppService.mainApp`) or Finder launch. Run 3 used `env -i open` as a stand-in, as in run 2.
 - Finder or Dock double-click launch, and launch as a Login Item or `SMAppService`. Run 2 only approximates these with `env -i open`.
 - **App Sandbox / hardened runtime / notarization.** The probe is unsandboxed. A sandboxed app very likely cannot run `~/.local/bin/herdr` or connect to `~/.config/herdr/herdr.sock` without entitlements or user-granted access. This is a distribution risk.
 - Named sessions other than `default` (none exist), `--machine` remote targets, and the behavior when the server is stopped or restarted. Can `--session <missing>` with `agent list` spawn a server? Not tested, to avoid creating sessions.
