@@ -103,6 +103,8 @@ public final class CommandSocketServer: @unchecked Sendable {
 }
 
 extension CommandSocketServer {
+    var openConnectionCount: Int { lock.withLock { openConnections } }
+
     fileprivate func claimConnection() -> Bool {
         lock.withLock {
             guard openConnections < maxConnections else { return false }

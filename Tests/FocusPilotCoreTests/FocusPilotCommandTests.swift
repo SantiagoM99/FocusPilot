@@ -135,6 +135,34 @@ final class FocusPilotCommandTests {
         #expect(json?["deadline"] as? String == "Fri 16 Oct 2026, 23:59 · America/Bogota (GMT−5)")
     }
 
+    @Test func jsonInsideTheTaskTextIsKept() async throws {
+        try startApp()
+
+        let quoted = await run("add", "Fix the --json flag")
+        let separate = await run("add", "Document", "--json", "output")
+
+        #expect(quoted.output.hasPrefix("Added “Fix the --json flag”"))
+        #expect(separate.output.hasPrefix("Added “Document --json output”"))
+        #expect(try await repository.tasks().map(\.title) == ["Fix the --json flag", "Document --json output"])
+    }
+
+    @Test func doubleDashEndsTheOptions() async throws {
+        try startApp()
+
+        let outcome = await run("add", "--json", "--", "--verbose", "flag", "and", "--json", "output")
+
+        let json = try JSONSerialization.jsonObject(with: Data(outcome.output.utf8)) as? [String: Any]
+        // Capture trims dashes at the ends of a title, as the sheet does.
+        #expect(json?["title"] as? String == "verbose flag and --json output")
+    }
+
+    @Test func anUnknownOptionBeforeTheTextIsAUsageError() async throws {
+        try startApp()
+        let outcome = await run("add", "--verbose", "Reply")
+        #expect(outcome.status == 2)
+        #expect(try await repository.tasks().isEmpty)
+    }
+
     @Test func aBlankAddIsAUsageError() async {
         let outcome = await run("add", "  ")
         #expect(outcome.status == 2)

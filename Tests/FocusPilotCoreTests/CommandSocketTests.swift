@@ -97,7 +97,7 @@ final class CommandSocketTests {
                 }
             }
         }
-        try await Task.sleep(for: .milliseconds(300))
+        while server.openConnectionCount < 2 { try await Task.sleep(for: .milliseconds(20)) }
 
         let start = ContinuousClock.now
         #expect(throws: CommandSocketClient.Failure.noReply) { try CommandSocketClient(path: path).send(.tasks(nil)) }

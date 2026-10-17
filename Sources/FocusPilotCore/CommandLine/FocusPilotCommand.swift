@@ -14,9 +14,11 @@ public struct FocusPilotCommand: Sendable {
 
     public static let usage = """
         Usage:
-          focuspilot add [--json] <text>   Add a task to the end of Next, marked from Herdr.
+          focuspilot add [--json] [--] <text>
+                                           Add a task to the end of Next, marked from Herdr.
                                            A trailing deadline is read like quick capture:
                                            focuspilot add "Re-run ablation by fri 23:59"
+                                           Options go before the text; after -- everything is text.
           focuspilot tasks [--json]        Show the owner's Now and this workspace's project.
 
         Tasks go to the project linked to this Herdr workspace, or to No project.
@@ -42,14 +44,37 @@ public struct FocusPilotCommand: Sendable {
     }
 
     public func run(_ arguments: [String]) -> Outcome {
-        let json = arguments.contains("--json")
-        let words = arguments.filter { $0 != "--json" }
-        switch words.first {
-        case "add": return add(words.dropFirst().joined(separator: " "), json: json)
-        case "tasks" where words.count == 1: return tasks(json: json)
+        switch arguments.first {
+        case "add":
+            guard let (json, text) = Self.options(before: arguments.dropFirst()) else {
+                return Outcome(status: 2, error: Self.usage)
+            }
+            return add(text.joined(separator: " "), json: json)
+        case "tasks":
+            guard let (json, rest) = Self.options(before: arguments.dropFirst()), rest.isEmpty else {
+                return Outcome(status: 2, error: Self.usage)
+            }
+            return tasks(json: json)
         case "help", "--help", "-h": return Outcome(status: 0, output: Self.usage)
         default: return Outcome(status: 2, error: Self.usage)
         }
+    }
+
+    /// Reads options up to the first word that is not one, or up to `--`;
+    /// the rest is the task text, kept as typed even if it contains
+    /// "--json". Nil for an unknown option.
+    private static func options(before arguments: ArraySlice<String>) -> (json: Bool, rest: ArraySlice<String>)? {
+        var json = false
+        var rest = arguments
+        while let word = rest.first, word.hasPrefix("-") {
+            rest = rest.dropFirst()
+            switch word {
+            case "--": return (json, rest)
+            case "--json": json = true
+            default: return nil
+            }
+        }
+        return (json, rest)
     }
 
     // MARK: add
