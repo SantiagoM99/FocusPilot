@@ -37,11 +37,11 @@ struct SessionStorageTests {
     }
 
     @Test func eachPublishGetsTheNextRevisionEvenAfterReopening() async throws {
-        #expect(try await repository.record(transition(nil, publishes: 2)) == [1, 2])
+        #expect(try await repository.record(transition(nil, publishes: 2)).revisions == [1, 2])
 
         let reopened = try TaskRepository(location: location)
 
-        #expect(try await reopened.record(transition(FocusSession.sample(phase: .running), publishes: 1)) == [3])
+        #expect(try await reopened.record(transition(FocusSession.sample(phase: .running), publishes: 1)).revisions == [3])
     }
 
     @Test func aNewerSessionReplacesTheOlderAsLatest() async throws {

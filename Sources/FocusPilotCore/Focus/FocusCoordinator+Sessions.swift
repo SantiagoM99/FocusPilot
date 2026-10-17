@@ -9,6 +9,9 @@ extension FocusCoordinator {
     public func launch() async throws {
         session = try await repository.latestSession()
         try await handle(.reconcile)
+        if policy == nil {
+            try await publish(repository.republish())
+        }
     }
 
     /// Starts a session on the pinned Now task.
@@ -37,9 +40,9 @@ extension FocusCoordinator {
     /// running.
     public func complete(confirmed: Bool = false) async throws -> SessionCompletion {
         if let active = session, !active.hasEnded, active.mode == .strict, now() < active.plannedEnd {
-            if earlyEndRequestedAt == nil {
+            if earlyEnd?.request != active.id {
                 guard confirmed else { return .needsConfirmation }
-                earlyEndRequestedAt = uptime()
+                earlyEnd = StrictWait(request: active.id, confirmedAt: uptime())
                 await broadcast()
             }
             if let availableAt = earlyEndAvailableAt(), now() < availableAt { return .waitUntil(availableAt) }
@@ -51,14 +54,17 @@ extension FocusCoordinator {
     /// When the confirmed early end may complete, measured on `uptime` and
     /// shown on the wall clock; `nil` when the owner has not confirmed.
     func earlyEndAvailableAt() -> Date? {
-        guard let requested = earlyEndRequestedAt else { return nil }
-        let remaining = requested + .seconds(StrictEarlyEnd.wait) - uptime()
-        return now().addingTimeInterval(max(0, remaining / .seconds(1)))
+        earlyEnd.map(availableAt)
+    }
+
+    /// When a strict wait is over, on the wall clock for display.
+    func availableAt<Request>(_ wait: StrictWait<Request>) -> Date {
+        now().addingTimeInterval(wait.remaining(at: uptime()) / .seconds(1))
     }
 
     /// The owner changed their mind about ending a strict session early.
     public func cancelEarlyEnd() async {
-        earlyEndRequestedAt = nil
+        earlyEnd = nil
         await broadcast()
     }
 
@@ -67,17 +73,19 @@ extension FocusCoordinator {
     private func handle(_ event: FocusEvent) async throws {
         let at = now()
         let transition = try FocusEngine.handle(event, session: session, at: at)
-        var revisions = try await repository.record(transition).makeIterator()
+        let recorded = try await repository.record(transition)
+        var revisions = recorded.revisions.makeIterator()
         session = transition.session
         if session?.hasEnded != false {
-            earlyEndRequestedAt = nil
+            earlyEnd = nil
+            ruleWait = nil
         }
         for effect in transition.effects {
             switch effect {
             case .persist:
                 break
-            case .publishPolicy(let policy):
-                await publisher.publish(PublishedPolicy(revision: revisions.next()!, effectiveAt: at, session: policy))
+            case .publishPolicy(let sessionPolicy):
+                await publish(revision: revisions.next()!, inputs: recorded.inputs, session: sessionPolicy, at: at)
             case .notify(let notice):
                 await notices.deliver(notice)
             }

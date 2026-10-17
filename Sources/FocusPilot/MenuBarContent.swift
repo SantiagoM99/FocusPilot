@@ -8,7 +8,6 @@ import SwiftUI
 struct MenuBarContent: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -27,9 +26,8 @@ struct MenuBarContent: View {
                 MenuRow("Open FocusPilot", shortcut: "⌘O") { openPlanning() }
                     .keyboardShortcut("o")
                 MenuRow("Settings…", shortcut: "⌘,") {
-                    openSettings()
-                    NSApplication.shared.activate()
-                    dismiss()
+                    model.requestedPage = .settings
+                    openPlanning()
                 }
                 .keyboardShortcut(",")
                 LoginItemToggle(settings: model.loginItem)

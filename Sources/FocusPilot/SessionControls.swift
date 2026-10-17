@@ -48,7 +48,7 @@ struct SessionControls: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("End this strict session early?")
                 .font(.headline)
-            Text("Strict sessions wait \(waitText) before ending. Rules stay on until then.")
+            Text("Strict sessions wait \(StrictEarlyEnd.waitText) before ending. Rules stay on until then.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {
@@ -75,11 +75,6 @@ struct SessionControls: View {
 
     private func wide(_ title: String) -> some View {
         Text(title).frame(maxWidth: .infinity)
-    }
-
-    private var waitText: String {
-        let seconds = Int(StrictEarlyEnd.wait)
-        return seconds % 60 == 0 ? "\(seconds / 60) minute\(seconds == 60 ? "" : "s")" : "\(seconds) seconds"
     }
 }
 
