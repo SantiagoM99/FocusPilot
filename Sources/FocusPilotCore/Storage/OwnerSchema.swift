@@ -112,6 +112,16 @@ enum OwnerSchema {
                 table.column("revision", .integer).notNull()
             }
         }
+        migrator.registerMigration("owner-v6-herdr-tasks") { db in
+            try db.alter(table: TaskRecord.databaseTableName) { table in
+                // 'herdr' for tasks added with the focuspilot CLI; nil for the owner's own.
+                table.add(column: "source", .text).check(sql: "source IN ('herdr')")
+                table.add(column: "sourcePane", .text)
+                // The CLI's request ID, so a retried or re-imported add is stored once.
+                table.add(column: "clientId", .text)
+            }
+            try db.create(index: "task_on_clientId", on: TaskRecord.databaseTableName, columns: ["clientId"], unique: true)
+        }
         return migrator
     }
 

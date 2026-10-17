@@ -193,6 +193,31 @@ public actor TaskRepository {
         _ = try await ownerDatabase.write { db in try HerdrLinkRecord.deleteOne(db, key: projectID) }
     }
 
+    // MARK: Tasks from the focuspilot CLI
+
+    /// Appends the task to the end of Next in the caller's linked project,
+    /// marked as from Herdr, in one write. A request ID already stored
+    /// returns that task again instead of adding a copy.
+    public func addFromHerdr(_ request: HerdrAddRequest) async throws -> HerdrAddResult {
+        let createdAt = now()
+        return try await ownerDatabase.write { db in try HerdrTaskStore.add(request, createdAt: createdAt, in: db) }
+    }
+
+    /// The owner's undo of a CLI add: deletes the task in one write. Tasks
+    /// the owner captured are refused.
+    public func undoHerdrAdd(_ taskID: Int64) async throws {
+        try await ownerDatabase.write { db in try HerdrTaskStore.undo(taskID, in: db) }
+    }
+
+    /// Now, plus the open tasks of the caller's linked project if it has one.
+    public func herdrScope(for caller: HerdrCaller?) async throws -> HerdrTaskScope {
+        try await ownerDatabase.read { db in try HerdrTaskStore.scope(for: caller, in: db) }
+    }
+
+    func herdrSource(of taskID: Int64) async throws -> String? {
+        try await ownerDatabase.read { db in try TaskRecord.fetchOne(db, key: taskID)?.sourcePane }
+    }
+
     // MARK: Cache
 
     public func storeCacheEntry(key: String, value: Data) async throws {

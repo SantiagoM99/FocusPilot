@@ -45,6 +45,29 @@ public struct HerdrServer: Hashable, Sendable {
     }
 }
 
+/// Encoded with the start time in whole milliseconds, so a server identity
+/// survives the trip between the CLI and the app exactly.
+extension HerdrServer: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case sessionName, socketPath, startedAtMilliseconds
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let milliseconds = try container.decode(Int64.self, forKey: .startedAtMilliseconds)
+        self.init(sessionName: try container.decode(String.self, forKey: .sessionName),
+                  socketPath: try container.decode(String.self, forKey: .socketPath),
+                  startedAt: Date(timeIntervalSince1970: Double(milliseconds) / 1000))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionName, forKey: .sessionName)
+        try container.encode(socketPath, forKey: .socketPath)
+        try container.encode(startedAtMilliseconds, forKey: .startedAtMilliseconds)
+    }
+}
+
 /// What FocusPilot can currently see of Herdr.
 public enum HerdrConnection: Equatable, Sendable {
     case connected(HerdrServer, [HerdrWorkspace])

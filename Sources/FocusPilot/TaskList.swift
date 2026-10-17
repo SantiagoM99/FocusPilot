@@ -13,6 +13,8 @@ struct TaskList: View {
     var showsEmptyNow = true
     var nextCaption = "Manual order · drag to reorder"
     let move: (Int64, TaskStatus, TaskPlacement) -> Void
+    /// Removes a task added from Herdr; nil hides Undo.
+    var undoHerdrAdd: ((Int64) -> Void)?
     @Binding var selection: Int64?
 
     var body: some View {
@@ -36,6 +38,10 @@ struct TaskList: View {
                     Button("Make Current (Now)") { perform(.now, on: id) }
                     Button("Move to Next") { perform(.next, on: id) }
                     Button("Move to Later") { perform(.later, on: id) }
+                    if let undoHerdrAdd, items.first(where: { $0.id == id })?.isFromHerdr == true {
+                        Divider()
+                        Button("Undo Add from Herdr") { undoHerdrAdd(id) }
+                    }
                 }
             }
         }
@@ -52,7 +58,8 @@ struct TaskList: View {
         if !members.isEmpty {
             Section {
                 ForEach(members) { item in
-                    TaskRow(item: item, showsProject: showsProject, now: now)
+                    TaskRow(item: item, showsProject: showsProject, now: now,
+                            undo: undoHerdrAdd.map { undo in { undo(item.id) } })
                 }
                 .onMove { offsets, destination in
                     guard let source = offsets.first else { return }

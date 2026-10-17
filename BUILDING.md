@@ -30,6 +30,20 @@ The login item points at one specific app on disk. Every ad hoc rebuild changes 
 
 Prefer the bundle over `swift run FocusPilot`: the bare executable has no Info.plist, so `LSUIElement` and login-item registration do not apply to it.
 
+## The focuspilot command
+
+`build-app.sh` also builds the `focuspilot` command and puts it in `FocusPilot.app/Contents/Helpers/focuspilot`. See [docs/FOCUSPILOT_CLI.md](docs/FOCUSPILOT_CLI.md) for what it does and how to put it on your PATH.
+
+To try the app and the command without touching your data, start both with `FOCUSPILOT_DATA_DIR` set to a short temporary folder:
+
+```sh
+export FOCUSPILOT_DATA_DIR=/tmp/fp-try
+build/FocusPilot.app/Contents/MacOS/FocusPilot &
+build/FocusPilot.app/Contents/Helpers/focuspilot add "Try the command by tomorrow"
+```
+
+Note that this runs under the same bundle ID as an installed FocusPilot, so it shares its settings (for example the first-launch flag). Quit the installed copy first.
+
 ## Artwork
 
 The app icon and the menu bar glyphs are drawn from the logo geometry in code (`Sources/FocusPilotCore/AppIcon` and `Sources/FocusPilotCore/MenuBar`); there are no hand-drawn image files. `build-app.sh` writes `build/artwork/AppIcon.icon` (an Icon Composer file) and compiles it into the bundle.
@@ -48,6 +62,7 @@ This writes the four menu bar glyphs in light and dark (with and without the tim
 |---|---|
 | `Sources/FocusPilotCore` | Testable logic: storage, coordinator, tasks and deadlines, login item, menu bar state, artwork geometry |
 | `Sources/FocusPilot` | The SwiftUI app: menu bar item, planning window, settings |
+| `Sources/FocusPilotCLI` | The `focuspilot` command; all its logic is `FocusPilotCommand` in core |
 | `Sources/RenderArtwork` | Build-time tool that writes `AppIcon.icon` and review images |
 | `Tests/FocusPilotCoreTests` | Swift Testing suites for `FocusPilotCore` |
 | `Packaging/Info.plist` | Bundle metadata, including `LSUIElement` |
@@ -57,4 +72,5 @@ This writes the four menu bar glyphs in light and dark (with and without the tim
 The app stores two SQLite files in `~/Library/Application Support/FocusPilot`:
 
 - `FocusPilot.sqlite`: owner data (tasks and, later, deadlines, preferences and focus rules).
+- `CommandLine/`: the `focuspilot` command's socket and its inbox of tasks queued while the app was closed. Owner-only.
 - `Cache.sqlite` (with `Cache.sqlite-wal` and `Cache.sqlite-shm`): derived values. To clear it by hand, quit the app and delete all three files; it is recreated empty on launch. If the cache cannot be opened, the app deletes and recreates it on its own; owner data is never affected.

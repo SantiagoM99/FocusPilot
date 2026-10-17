@@ -6,6 +6,9 @@ let package = Package(
     platforms: [.macOS(.v26)],
     products: [
         .executable(name: "FocusPilot", targets: ["FocusPilot"]),
+        // Installed as Contents/Helpers/focuspilot; the product name differs
+        // from the app's only by case, which collides on macOS file systems.
+        .executable(name: "focuspilot-cli", targets: ["FocusPilotCLI"]),
     ],
     dependencies: [
         // Pinned exactly: storage format and migrations depend on it.
@@ -25,6 +28,12 @@ let package = Package(
         // renders review images. Not part of the app.
         .executableTarget(
             name: "RenderArtwork",
+            dependencies: ["FocusPilotCore"]
+        ),
+        // The focuspilot command for Herdr panes. It talks to the running
+        // app over a socket and never opens the databases itself.
+        .executableTarget(
+            name: "FocusPilotCLI",
             dependencies: ["FocusPilotCore"]
         ),
         .testTarget(
