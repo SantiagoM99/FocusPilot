@@ -27,6 +27,7 @@ struct ReturnCueView: View {
                 detail("Last time", outcome)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 
@@ -34,5 +35,6 @@ struct ReturnCueView: View {
         (Text(title + ": ").foregroundStyle(.secondary) + Text(text))
             .font(.callout)
             .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
