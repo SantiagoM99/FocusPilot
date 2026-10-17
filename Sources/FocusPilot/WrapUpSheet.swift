@@ -1,18 +1,19 @@
 import FocusPilotCore
 import SwiftUI
 
-/// The session wrap-up sheet (design 06): what got done, what remains, and
-/// what to start with next time, which becomes the task's next action and
-/// the return cue shown first on resuming.
+/// The session wrap-up sheet (design 06), shown when a session ends: what
+/// got done, what remains, and what to start with next time, which becomes
+/// the task's next action and the return cue shown first on resuming.
 ///
-/// It must take seconds: the fields start from what the task already says,
+/// The text lives in `AppModel.wrapUp`, not here, so it survives the sheet
+/// being dismissed and shown again. It must take seconds: the fields start
+/// from what the task already says,
 /// Return moves to the next field and saves from the last, ⌘⏎ saves from
 /// anywhere, and Esc skips without writing anything. Fields are vertical
 /// text fields rather than text editors so Tab and Return move between them.
 struct WrapUpSheet: View {
     let model: AppModel
     let prompt: WrapUpPrompt
-    @State private var draft: WrapUpDraft
     @State private var marksTaskDone = false
     @State private var isSaving = false
     @State private var error: String?
@@ -20,12 +21,6 @@ struct WrapUpSheet: View {
 
     private enum Field: Hashable {
         case outcome, remainingWork, returnCue
-    }
-
-    init(model: AppModel, prompt: WrapUpPrompt) {
-        self.model = model
-        self.prompt = prompt
-        _draft = State(initialValue: model.draft(for: prompt))
     }
 
     var body: some View {
@@ -40,9 +35,9 @@ struct WrapUpSheet: View {
             }
 
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
-                row("What got done", text: $draft.outcome, field: .outcome, next: .remainingWork)
-                row("What remains", text: $draft.remainingWork, field: .remainingWork, next: .returnCue)
-                row("Next time, start with", text: $draft.returnCue, field: .returnCue, next: nil,
+                row("What got done", text: text(\.outcome), field: .outcome, next: .remainingWork)
+                row("What remains", text: text(\.remainingWork), field: .remainingWork, next: .returnCue)
+                row("Next time, start with", text: text(\.returnCue), field: .returnCue, next: nil,
                     note: "Becomes the task's next action and is shown first when you resume.")
             }
 
@@ -54,10 +49,8 @@ struct WrapUpSheet: View {
 
             Divider()
             HStack(spacing: 8) {
-                if prompt.moment == .ended {
-                    Toggle("Mark task complete", isOn: $marksTaskDone)
-                        .toggleStyle(.checkbox)
-                }
+                Toggle("Mark task complete", isOn: $marksTaskDone)
+                    .toggleStyle(.checkbox)
                 Spacer()
                 Button("Skip") { model.skipWrapUp() }
                     .keyboardShortcut(.cancelAction)
@@ -72,6 +65,12 @@ struct WrapUpSheet: View {
         .padding(20)
         .frame(width: 560)
         .onAppear { focused = .outcome }
+    }
+
+    /// A field of the model's draft for this prompt.
+    private func text(_ field: WritableKeyPath<WrapUpDraft, String>) -> Binding<String> {
+        Binding(get: { model.wrapUp?.draft[keyPath: field] ?? "" },
+                set: { if model.wrapUp?.id == prompt.id { model.wrapUp?.draft[keyPath: field] = $0 } })
     }
 
     private func row(_ title: String, text: Binding<String>, field: Field, next: Field?, note: String? = nil) -> some View {
@@ -100,7 +99,7 @@ struct WrapUpSheet: View {
         guard !isSaving else { return }
         isSaving = true
         Task {
-            error = await model.saveWrapUp(draft, for: prompt, markingDone: marksTaskDone)
+            error = await model.saveWrapUp(markingDone: marksTaskDone)
             isSaving = false
         }
     }
