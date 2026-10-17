@@ -84,6 +84,7 @@ struct ProjectsView: View {
                          nextCaption: "Manual order within the project",
                          move: { id, status, placement in Task { await model.move(id, to: status, placement) } },
                          undoHerdrAdd: { id in Task { await model.undoHerdrAdd(id) } },
+                     activeSessionTaskID: model.snapshot.activeSession?.taskID,
                          selection: $taskSelection)
             }
         } else if model.projects.isEmpty {

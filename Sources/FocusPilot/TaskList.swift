@@ -15,6 +15,8 @@ struct TaskList: View {
     let move: (Int64, TaskStatus, TaskPlacement) -> Void
     /// Removes a task added from Herdr; nil hides Undo.
     var undoHerdrAdd: ((Int64) -> Void)?
+    /// Undo is not offered for the task a session is running on.
+    var activeSessionTaskID: Int64?
     @Binding var selection: Int64?
 
     var body: some View {
@@ -38,7 +40,8 @@ struct TaskList: View {
                     Button("Make Current (Now)") { perform(.now, on: id) }
                     Button("Move to Next") { perform(.next, on: id) }
                     Button("Move to Later") { perform(.later, on: id) }
-                    if let undoHerdrAdd, items.first(where: { $0.id == id })?.isFromHerdr == true {
+                    if let undoHerdrAdd,
+                       items.first(where: { $0.id == id })?.offersHerdrUndo(activeSessionTaskID: activeSessionTaskID) == true {
                         Divider()
                         Button("Undo Add from Herdr") { undoHerdrAdd(id) }
                     }
@@ -59,7 +62,8 @@ struct TaskList: View {
             Section {
                 ForEach(members) { item in
                     TaskRow(item: item, showsProject: showsProject, now: now,
-                            undo: undoHerdrAdd.map { undo in { undo(item.id) } })
+                            undo: item.offersHerdrUndo(activeSessionTaskID: activeSessionTaskID)
+                                ? undoHerdrAdd.map { undo in { undo(item.id) } } : nil)
                 }
                 .onMove { offsets, destination in
                     guard let source = offsets.first else { return }

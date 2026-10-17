@@ -204,7 +204,7 @@ public actor TaskRepository {
     }
 
     /// The owner's undo of a CLI add: deletes the task in one write. Tasks
-    /// the owner captured are refused.
+    /// the owner captured, the Now task and done tasks are refused.
     public func undoHerdrAdd(_ taskID: Int64) async throws {
         try await ownerDatabase.write { db in try HerdrTaskStore.undo(taskID, in: db) }
     }

@@ -140,8 +140,10 @@ public actor FocusCoordinator {
 
     // MARK: Tasks from the focuspilot CLI
 
-    /// The owner's undo of a task added from Herdr.
+    /// The owner's undo of a task added from Herdr. The task a session is
+    /// running on is refused, wherever it sits in the list.
     public func undoHerdrAdd(_ taskID: Int64) async throws {
+        if let active = await snapshot().activeSession, active.taskID == taskID { throw HerdrTaskError.inRunningSession }
         try await repository.undoHerdrAdd(taskID)
     }
 
