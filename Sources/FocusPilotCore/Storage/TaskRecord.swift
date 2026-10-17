@@ -34,6 +34,7 @@ public struct TaskRecord: Codable, Equatable, Sendable {
     var isFromHerdr: Bool { source == Self.herdrSource }
     static let herdrSource = "herdr"
 
+
     public var deadline: Deadline? {
         get {
             guard let deadlineText, let zone = deadlineTimeZone.flatMap(TimeZone.init(identifier:)) else { return nil }
