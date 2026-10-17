@@ -131,7 +131,14 @@ Limits: covers only listed apps; iCloud sync can take seconds to a minute; app n
 
 Current installation inspected on 2026-10-13: client/server 0.9.0, protocol 22, compatible. Commands available include agent list/get/read/focus/prompt and workspace create/list. No undocumented subscription API is assumed; start with bounded polling and refresh on explicit user actions.
 
-The current Herdr skill permits control only from a Herdr-managed pane. It is guidance for this coding session, not proof that the future desktop app has suitable CLI/socket access. Validate external app access, endpoint selection, sandbox constraints, and launch environment with an explicit prototype. Do not spoof managed-pane environment variables to bypass checks.
+The current Herdr skill permits control only from a Herdr-managed pane. Spike S4 (#4, 2026-10-16) showed that a GUI app outside Herdr has the access it needs. The test app was unsandboxed and was launched with an empty environment: no `HERDR_*`, launchd `PATH`, parent pid 1. Do not spoof managed-pane environment variables. Run every Herdr child process with a scrubbed environment, because `open` from a terminal passes `HERDR_PANE_ID` and `HERDR_SOCKET_PATH` to the app.
+
+- Confirmed: the binary is resolved from a configured path or fixed install locations. `herdr status --json` gates on version, protocol and `compatible`. `herdr session list --json` returns session names and socket paths. `agent list`, `agent get` and `agent read` work.
+- Confirmed: focus works from the app through `agent focus <name|pane_id>` or `tab focus <tab_id>`. In 0.9.0, `pane focus` only takes a direction (`--direction left|right|up|down`), so it cannot target an explicit pane.
+- Confirmed: there is one shared server focus, a single `focused_workspace_id`/`tab_id`/`pane_id`. A focus command moves the attached TUI client's view.
+- Confirmed: `agent focus` and `tab focus` both mark the target agent seen, turning `done` into `idle`. Reads do not. FocusPilot therefore focuses only on an explicit owner click (Open agent). It never focuses while polling, and it never restores the previous focus automatically, because a restore would also clear `done` on the restored pane.
+- Polling `agent list` every 5 s costs about 11 ms and 7 ms CPU per CLI call. The raw socket takes about 1 ms. Neither changed server CPU measurably.
+- Platform assumptions still to validate: behavior with several attached TUI clients (the docs say each client can view its own workspace and tab), a real Login Item (`SMAppService`) launch, and the App Sandbox. A sandboxed build likely cannot run `~/.local/bin/herdr` or connect to `~/.config/herdr/*.sock`, which is a distribution risk for the Developer ID route.
 
 Different sessions/machines can reuse IDs. Store server/session identity with target IDs; avoid UI-focused defaults. Agent name and process occupant may change. Revalidate before navigation/prompting. No auto-answering approval dialogs.
 
