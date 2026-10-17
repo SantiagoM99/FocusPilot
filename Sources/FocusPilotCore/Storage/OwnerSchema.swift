@@ -122,6 +122,16 @@ enum OwnerSchema {
             }
             try db.create(index: "task_on_clientId", on: TaskRecord.databaseTableName, columns: ["clientId"], unique: true)
         }
+        migrator.registerMigration("owner-v8-wrapup") { db in
+            // The last wrap-up per task. Existing tasks have none, and adding
+            // these columns is not an owner edit, so revisions stay.
+            try db.alter(table: TaskRecord.databaseTableName) { table in
+                table.add(column: "lastOutcome", .text)
+                table.add(column: "remainingWork", .text)
+                table.add(column: "returnCue", .text)
+                table.add(column: "wrappedUpAt", .datetime)
+            }
+        }
         return migrator
     }
 
