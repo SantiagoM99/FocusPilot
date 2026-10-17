@@ -36,7 +36,7 @@ extension AppModel {
     func saveWrapUp(_ draft: WrapUpDraft, for prompt: WrapUpPrompt, markingDone: Bool) async -> String? {
         guard let coordinator else { return startupError }
         do {
-            try await coordinator.saveWrapUp(draft.wrapUp, forTask: prompt.session.taskID, markingDone: markingDone)
+            try await coordinator.saveWrapUp(draft.wrapUp, after: prompt.session, markingDone: markingDone)
         } catch {
             return "Could not save the wrap-up: \(error.localizedDescription)"
         }

@@ -31,9 +31,15 @@ struct TaskWithProject: Decodable, FetchableRecord {
     var task: TaskRecord
     var project: ProjectRecord?
 
-    var todayItem: TodayItem {
+    func todayItem(wrapUp: TaskWrapUp?) -> TodayItem {
         TodayItem(id: task.id!, title: task.title, status: task.status, projectTitle: project?.title,
                   nextAction: task.nextAction, deadline: task.deadline, isFromHerdr: task.isFromHerdr,
-                  wrapUp: task.wrapUp)
+                  wrapUp: wrapUp)
+    }
+
+    /// Today items with each task's latest wrap-up.
+    static func todayItems(_ rows: [TaskWithProject], _ db: Database) throws -> [TodayItem] {
+        let latest = try WrapUpRecord.latest(forTasks: rows.map { $0.task.id! }, db)
+        return rows.map { $0.todayItem(wrapUp: latest[$0.task.id!]) }
     }
 }
