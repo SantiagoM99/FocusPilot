@@ -79,6 +79,35 @@ final class CommandSocketTests {
         #expect(try CommandSocketClient(path: path).send(.tasks(nil)) == .tasks(scope))
     }
 
+    @Test func connectionsBeyondTheCapAreTurnedAway() async throws {
+        let gate = Gate()
+        let server = CommandSocketServer(path: path, maxConnections: 2) { _ in
+            await gate.wait()
+            return .refused("released")
+        }
+        try server.start()
+        defer { server.stop() }
+        let path = path
+        // Blocking clients run on dispatch threads, never on the concurrency
+        // pool the server's handlers need.
+        let held = (0..<2).map { _ in
+            Task {
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global().async { continuation.resume(returning: try? CommandSocketClient(path: path).send(.tasks(nil))) }
+                }
+            }
+        }
+        try await Task.sleep(for: .milliseconds(300))
+
+        let start = ContinuousClock.now
+        #expect(throws: CommandSocketClient.Failure.noReply) { try CommandSocketClient(path: path).send(.tasks(nil)) }
+        #expect(ContinuousClock.now - start < .seconds(2))
+
+        await gate.open()
+        for task in held { #expect(await task.value == .refused("released")) }
+        #expect(try CommandSocketClient(path: path).send(.tasks(nil)) == .refused("released"))
+    }
+
     @Test func stoppingRemovesTheSocket() throws {
         let server = server()
         try server.start()
@@ -104,4 +133,21 @@ func makeStaleSocket(at path: String) throws {
     let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
     #expect(UnixSocket.withAddress(&address) { bind(descriptor, $0, $1) } == 0)
     close(descriptor)
+}
+
+/// Holds handlers until opened.
+actor Gate {
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        waiting.forEach { $0.resume() }
+        waiting = []
+    }
 }

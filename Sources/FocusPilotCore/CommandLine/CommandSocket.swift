@@ -15,12 +15,18 @@ public final class CommandSocketServer: @unchecked Sendable {
     }
 
     private let path: String
+    private let maxConnections: Int
     private let handler: @Sendable (CommandRequest) async -> CommandResponse
     private let lock = NSLock()
     private var source: (any DispatchSourceRead)?
+    private var openConnections = 0
 
-    public init(path: String, handler: @escaping @Sendable (CommandRequest) async -> CommandResponse) {
+    /// `maxConnections` bounds the connections handled at once; more are
+    /// closed at once, so a runaway client cannot tie up the app.
+    public init(path: String, maxConnections: Int = 16,
+                handler: @escaping @Sendable (CommandRequest) async -> CommandResponse) {
         self.path = path
+        self.maxConnections = maxConnections
         self.handler = handler
     }
 
@@ -71,7 +77,7 @@ public final class CommandSocketServer: @unchecked Sendable {
             guard connection >= 0 else { return }
             var uid = uid_t()
             var gid = gid_t()
-            guard getpeereid(connection, &uid, &gid) == 0, uid == getuid() else {
+            guard getpeereid(connection, &uid, &gid) == 0, uid == getuid(), claimConnection() else {
                 close(connection)
                 continue
             }
@@ -83,16 +89,31 @@ public final class CommandSocketServer: @unchecked Sendable {
                 guard let line = UnixSocket.readLine(connection),
                       let request = try? JSONDecoder().decode(CommandRequest.self, from: line)
                 else {
-                    close(connection)
+                    self.release(connection)
                     return
                 }
                 Task {
                     let response = await handler(request)
                     if let data = try? JSONEncoder().encode(response) { UnixSocket.writeLine(data, to: connection) }
-                    close(connection)
+                    self.release(connection)
                 }
             }
         }
+    }
+}
+
+extension CommandSocketServer {
+    fileprivate func claimConnection() -> Bool {
+        lock.withLock {
+            guard openConnections < maxConnections else { return false }
+            openConnections += 1
+            return true
+        }
+    }
+
+    fileprivate func release(_ connection: Int32) {
+        close(connection)
+        lock.withLock { openConnections -= 1 }
     }
 }
 
