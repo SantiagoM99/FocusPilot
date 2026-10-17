@@ -28,7 +28,11 @@ struct StartFocusSheet: View {
                 if let task = model.nowTask {
                     Text(task.title)
                         .font(.title2.weight(.semibold))
-                    if let nextAction = task.nextAction {
+                    // The return cue comes first when there is one (#20).
+                    if let wrapUp = task.wrapUp {
+                        ReturnCueView(wrapUp: wrapUp)
+                            .padding(.top, 6)
+                    } else if let nextAction = task.nextAction {
                         Text(nextAction)
                             .foregroundStyle(.secondary)
                     }

@@ -31,11 +31,16 @@ struct NowCard: View {
                 }
                 if let nextAction = item.nextAction {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Next action")
+                        Text(nextAction == item.wrapUp?.returnCue ? "Next action · return cue from last session" : "Next action")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Text(nextAction)
                             .textSelection(.enabled)
+                        if let remaining = item.wrapUp?.remainingWork {
+                            (Text("Remains: ").foregroundStyle(.secondary) + Text(remaining))
+                                .font(.callout)
+                                .padding(.top, 2)
+                        }
                     }
                 }
                 if let model {
@@ -64,7 +69,7 @@ struct NowCard: View {
             if session.taskID == item.id {
                 VStack(alignment: .leading, spacing: 10) {
                     SessionHeader(session: session, now: model.now, timeFont: .title3.weight(.semibold))
-                    SessionControls(model: model)
+                    SessionControls(model: model, showsReturnCue: false)
                 }
                 .frame(maxWidth: 360)
             } else {

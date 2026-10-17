@@ -25,6 +25,12 @@ final class AppModel {
     /// A strict session is ending early and every session surface shows the
     /// confirmation, wherever Complete was chosen.
     var isConfirmingEarlyEnd = false
+    /// The wrap-up waiting for the owner; see `AppModel+WrapUp.swift`.
+    var wrapUp: WrapUpPrompt?
+    /// Grows each time the planning window should come forward; `MenuBarIcon` opens it.
+    var planningWindowRequests = 0
+    /// When the owner last pressed Pause or Complete; their wrap-up may bring the window forward.
+    @ObservationIgnored var ownerEndedOrPausedAt: Date?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
@@ -138,6 +144,7 @@ final class AppModel {
     func show(_ latest: FocusSnapshot) {
         now = .now
         guard latest.revision >= snapshot.revision else { return }
+        noticeWrapUp(from: snapshot.session, to: latest.session)
         snapshot = latest
         if latest.activeSession == nil || latest.earlyEndAvailableAt != nil {
             isConfirmingEarlyEnd = false

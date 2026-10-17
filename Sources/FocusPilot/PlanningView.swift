@@ -47,6 +47,9 @@ struct PlanningView: View {
         .sheet(isPresented: Bindable(model).isStartingFocus) {
             StartFocusSheet(model: model)
         }
+        .sheet(item: Bindable(model).wrapUp) { prompt in
+            WrapUpSheet(model: model, prompt: prompt)
+        }
         .environment(model)
         .task { await model.refresh() }
         // LSUIElement keeps the app out of the Dock, but while the planning
