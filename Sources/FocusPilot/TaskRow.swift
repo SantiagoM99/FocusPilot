@@ -20,7 +20,7 @@ struct TaskRow: View {
                 TaskMeta(item: item, showsProject: showsProject, now: now)
                     .font(.callout)
             }
-            if item.isFromHerdr, let undo {
+            if let undo {
                 Spacer()
                 Button("Undo", action: undo)
                     .buttonStyle(.link)

@@ -71,6 +71,7 @@ struct PlanningView: View {
             TaskList(items: model.today, showsProject: true,
                      move: { id, status, placement in Task { await model.move(id, to: status, placement) } },
                      undoHerdrAdd: { id in Task { await model.undoHerdrAdd(id) } },
+                     activeSessionTaskID: model.snapshot.activeSession?.taskID,
                      selection: $todaySelection)
         }
     }

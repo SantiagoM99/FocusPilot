@@ -85,4 +85,8 @@ public struct HerdrTaskScope: Codable, Equatable, Sendable {
 
 public enum HerdrTaskError: Error, Equatable {
     case notFromHerdr
+    /// The owner pinned it; undo is for tasks still waiting in Next or Later.
+    case isNow
+    case isDone
+    case inRunningSession
 }

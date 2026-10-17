@@ -204,7 +204,7 @@ public actor TaskRepository {
     }
 
     /// The owner's undo of a CLI add: deletes the task in one write. Tasks
-    /// the owner captured are refused.
+    /// the owner captured, the Now task and done tasks are refused.
     public func undoHerdrAdd(_ taskID: Int64) async throws {
         try await ownerDatabase.write { db in try HerdrTaskStore.undo(taskID, in: db) }
     }
@@ -212,6 +212,14 @@ public actor TaskRepository {
     /// Now, plus the open tasks of the caller's linked project if it has one.
     public func herdrScope(for caller: HerdrCaller?) async throws -> HerdrTaskScope {
         try await ownerDatabase.read { db in try HerdrTaskStore.scope(for: caller, in: db) }
+    }
+
+    /// Whether an add failed in a way retrying cannot fix, such as a blank
+    /// title or a row the schema rejects. A busy or full disk is not.
+    public static func isPermanentAddFailure(_ error: any Error) -> Bool {
+        if error is NewTask.Invalid { return true }
+        if let database = error as? DatabaseError { return database.resultCode == .SQLITE_CONSTRAINT }
+        return false
     }
 
     func herdrSource(of taskID: Int64) async throws -> String? {
