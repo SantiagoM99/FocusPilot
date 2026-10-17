@@ -84,6 +84,8 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-15: All user-facing text in FocusPilot is in English, placeholders included; typed capture input is still parsed in Spanish or English. (A Spanish-only request earlier the same day was withdrawn by the owner.)
 - 2026-10-16: The strict-session early-end wait is confirmed at 60 seconds, after a confirmation; the owner can cancel and keep focusing.
 - 2026-10-16: Herdr workspaces that already exist the first time FocusPilot sees a Herdr session are imported by the owner ("From Herdr…"), not auto-created; only workspaces that appear afterwards become projects automatically. Auto-sync never adopts an existing project by name.
+- 2026-10-17: During a strict session, weakening a block rule (deleting it, loosening its activation or schedule, or allowing a blocked target) needs the same confirmation and 60-second wait as ending early; adding or tightening rules is immediate.
+- 2026-10-17: The wrap-up sheet appears only when a session ends, not on pauses. Every wrap-up is kept as history per task; the latest one drives the next action and the return cue.
 
 ## Sources
 
