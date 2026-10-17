@@ -47,4 +47,11 @@ struct WrapUpPromptTests {
         #expect(WrapUpPrompt.after(nil, ended) == nil, "ended while the app was quit")
         #expect(WrapUpPrompt.after(running, session(.paused(since: minutes(20)), id: UUID())) == nil, "another session")
     }
+
+    @Test func pausingAndThenEndingTheSameSessionAreTwoPrompts() throws {
+        let paused = try #require(WrapUpPrompt.after(session(.running), session(.paused(since: minutes(20)))))
+        let ended = try #require(WrapUpPrompt.after(session(.running), session(.ended(at: minutes(50), reason: .completed))))
+
+        #expect(paused.id != ended.id)
+    }
 }

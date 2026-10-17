@@ -2,7 +2,7 @@ import Foundation
 
 /// Asks the owner for a wrap-up when the session they are watching pauses
 /// or ends (#20), so the app shows the sheet exactly then.
-public struct WrapUpPrompt: Equatable, Sendable {
+public struct WrapUpPrompt: Equatable, Sendable, Identifiable {
     public enum Moment: Equatable, Sendable {
         case paused, ended
     }
@@ -13,6 +13,12 @@ public struct WrapUpPrompt: Equatable, Sendable {
     public init(session: FocusSession, moment: Moment) {
         self.session = session
         self.moment = moment
+    }
+
+    /// One per session and moment, so a sheet for the pause is replaced
+    /// when the same session then ends.
+    public var id: String {
+        "\(session.id.uuidString)-\(moment)"
     }
 
     /// The prompt for a change from `previous` to `current`, or nil.
