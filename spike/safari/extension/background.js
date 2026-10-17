@@ -1,4 +1,4 @@
-// Throwaway spike for issue #1. Every wake path calls reconcile(), which fetches the latest
+// Throwaway spike for issues #1 and #3. Every wake path calls reconcile(), which fetches the latest
 // snapshot through the native handler when it can, and otherwise enforces the last stored policy
 // against this worker's own clock. The app never has to be running.
 // policy.js is listed before this file in manifest background.scripts and defines FPPolicy.
@@ -77,7 +77,7 @@ async function exchange(reason) {
       await browser.storage.local.set({ outbox: current.filter((o) => !sentSeqs.has(o.seq)) });
     }
     await browser.storage.local.set({ lastNative: nativeResult });
-    return { policy: resp?.policy ?? null, nativeResult };
+    return { policy: resp?.policy ?? null, command: resp?.command ?? null, nativeResult };
   } catch (e) {
     const nativeResult = { ok: false, at: new Date().toISOString(), error: String(e?.message ?? e) };
     await browser.storage.local.set({ lastNative: nativeResult });
@@ -85,19 +85,41 @@ async function exchange(reason) {
   }
 }
 
-async function applyRules(domains) {
+// S3: blocked loads go to the extension's own blocked page (DNR redirect to extensionPath) instead
+// of Safari's "Failed to open page"; if Safari refuses the redirect rule, plain block is the
+// fallback. URL-scoped exceptions are higher-priority allow rules for that one page.
+const BLOCKED_PAGE = "blocked.html";
+async function applyRules(result) {
   const existing = await browser.declarativeNetRequest.getDynamicRules();
-  const addRules = domains.map((d, i) => ({
-    id: RULE_BASE + i,
-    priority: 1,
-    action: { type: "block" },
-    condition: { urlFilter: `||${d}/`, resourceTypes: RESOURCE_TYPES },
-  }));
-  await browser.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: existing.map((r) => r.id),
-    addRules,
-  });
-  return addRules.map((r) => r.id);
+  const rules = (type) => [
+    ...result.blockedDomains.map((d, i) => ({
+      id: RULE_BASE + i,
+      priority: 1,
+      action: type === "redirect" ? { type, redirect: { extensionPath: "/" + BLOCKED_PAGE } } : { type },
+      condition: { urlFilter: `||${d}/`, resourceTypes: ["main_frame"] },
+    })),
+    ...result.blockedDomains.map((d, i) => ({
+      id: RULE_BASE + 100 + i,
+      priority: 1,
+      action: { type: "block" },
+      condition: { urlFilter: `||${d}/`, resourceTypes: ["sub_frame"] },
+    })),
+    ...result.allowedUrls.map((a, i) => ({
+      id: RULE_BASE + 200 + i,
+      priority: 2,
+      action: { type: "allow" },
+      condition: { urlFilter: "||" + a.key, resourceTypes: RESOURCE_TYPES },
+    })),
+  ];
+  let action = "redirect";
+  try {
+    await browser.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: rules("redirect") });
+  } catch (e) {
+    action = "block";
+    await observe("dnr-redirect-refused", { error: String(e?.message ?? e) });
+    await browser.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: rules("block") });
+  }
+  return { action, ids: (await browser.declarativeNetRequest.getDynamicRules()).map((r) => r.id) };
 }
 
 async function scheduleTransition(at) {
@@ -118,7 +140,7 @@ function reconcile(reason) {
 
 async function reconcileNow(reason) {
   const { policy: stored = null, lastEval = null } = await browser.storage.local.get(["policy", "lastEval"]);
-  const { policy: fetched, nativeResult } = await exchange(reason);
+  const { policy: fetched, command, nativeResult } = await exchange(reason);
 
   let policy = stored;
   if (fetched && (!stored || fetched.revision > stored.revision)) policy = fetched;
@@ -128,9 +150,10 @@ async function reconcileNow(reason) {
 
   const now = Date.now();
   const result = P.evaluate(policy, now);
-  const ruleIds = await applyRules(result.blockedDomains);
+  const { action: dnrAction, ids: ruleIds } = await applyRules(result);
   const appliedAt = Date.now();
-  const { known: knownTabs, reloaded } = await reloadBlockedTabs(result.blockedDomains);
+  const { known: knownTabs, redirected, ownerTabsSkipped } = await enforceOpenTabs(result, reason);
+  const commandResult = await runCommand(command);
   await scheduleTransition(result.nextTransitionAt);
 
   const samePolicy = lastEval && policy && lastEval.revision === policy.revision;
@@ -154,6 +177,8 @@ async function reconcileNow(reason) {
     sessionId: policy?.session?.sessionId ?? null,
     blockedDomains: result.blockedDomains,
     ruleIds,
+    dnrAction,
+    allowedUrls: result.allowedUrls,
     sessionActive: result.sessionActive,
     strictPastEnd: result.strictPastEnd,
     activeExceptions: result.activeExceptions,
@@ -163,9 +188,11 @@ async function reconcileNow(reason) {
     nativeError: nativeResult.error,
     nativeTransport: nativeResult.transport ?? null,
     portOpen: !!port,
-    reloaded,
+    redirected,
+    ownerTabsSkipped,
     knownTabs,
-    tabs: await testTabs(),
+    commandResult,
+    hostAccess: await hostAccess(),
   });
   // Second round trip so the ack lands in the inbox now rather than on the next wake.
   await exchange(reason + ":ack");
@@ -196,81 +223,162 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg?.type === "page-event") {
     const { type, ...details } = msg;
-    queue(() => observe("page-event", { ...details, tabUrlHost: sender?.url ? new URL(sender.url).hostname : null }))
-      .then(() => reconcile("page-event"));
+    const tabId = sender?.tab?.id ?? null;
+    queue(async () => {
+      if (details.probe && tabId != null) await trackTab(tabId, sender.url, { probe: details.probe });
+      await observe("page-event", { ...details, tabId, receivedAtMs: Date.now() });
+    });
+    return false;
+  }
+  // The content script found its page blocked (expiry, SPA navigation, new policy) and has
+  // already stopped media; the browser performs the navigation, which page timers cannot block.
+  if (msg?.type === "enforce-me") {
+    const tabId = sender?.tab?.id;
+    queue(async () => {
+      const r = await redirectTab(tabId, sender.url, "content:" + msg.reason);
+      await observe("enforce-me", { tabId, reason: msg.reason, href: msg.href, ...r });
+      return r;
+    }).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "blocked-page-load") {
+    const tabId = sender?.tab?.id ?? null;
+    queue(async () => {
+      const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+      if (tabId != null && tabHosts[tabId]) {
+        tabHosts[tabId] = { ...tabHosts[tabId], onBlockedPage: true, at: new Date().toISOString() };
+        await browser.storage.local.set({ tabHosts });
+      }
+      await observe("blocked-page-load", { tabId, loadedAtMs: msg.loadedAtMs, params: msg.params, probe: tabHosts[tabId]?.probe ?? null });
+    });
     return false;
   }
   return false;
 });
 
-// What each test-domain tab shows right now: Safari's error page after a DNR block, the content
-// script's blank page, or the site. Host-permitted tabs only, so no "tabs" permission is needed.
-async function testTabs() {
+async function hostAccess() {
+  const out = {};
+  for (const d of ["instagram.com", "youtube.com"]) {
+    try {
+      out[d] = await browser.permissions.contains({ origins: [`*://*.${d}/*`] });
+    } catch (e) {
+      out[d] = String(e?.message ?? e);
+    }
+  }
+  return out;
+}
+
+// Tabs are known from tabs.onUpdated and content-script messages; Safari hides their url from
+// tabs.query (S1 finding 3). The spike only ever navigates or closes probe tabs: tabs it opened
+// itself with #fp-probe=NAME. The owner's own tabs on these domains are counted and left alone.
+const WATCHED = ["instagram.com", "youtube.com"];
+async function trackTab(tabId, url, extra = {}) {
+  const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+  const prev = tabHosts[tabId] ?? {};
+  let host = null;
   try {
-    // Safari's url filter matched nothing here, so list every tab Safari reveals: without the
-    // "tabs" permission it hides url and title for hosts outside host_permissions.
-    const all = await browser.tabs.query({});
-    // Only tabs on hosts the extension may access come with a url (the test domain).
-    const test = all.filter((t) => t.url);
-    return {
-      hostAccess: await browser.permissions.contains({ origins: ["*://*.instagram.com/*"] }),
-      total: all.length,
-      withoutUrl: all.filter((t) => !t.url).length,
-      test: test.map((t) => ({ id: t.id, status: t.status, title: t.title ?? null, url: t.url, active: t.active })),
-    };
+    host = new URL(url).hostname;
+  } catch {}
+  const probe = extra.probe ?? prev.probe ?? (url?.match(/[#&]fp-probe=([\w-]+)/)?.[1] || null);
+  tabHosts[tabId] = { ...prev, host, url: probe ? url : null, probe, onBlockedPage: false, at: new Date().toISOString() };
+  await browser.storage.local.set({ tabHosts });
+  return tabHosts[tabId];
+}
+
+function blockedPageUrl(params) {
+  return browser.runtime.getURL(BLOCKED_PAGE) + "?" + new URLSearchParams(params);
+}
+
+async function redirectTab(tabId, fromUrl, why) {
+  const at = Date.now();
+  try {
+    await browser.tabs.update(tabId, { url: blockedPageUrl({ why, at, from: fromUrl ?? "" }) });
+    return { ok: true, redirectCalledAtMs: at, updateMs: Date.now() - at };
   } catch (e) {
-    return String(e?.message ?? e);
+    return { ok: false, redirectCalledAtMs: at, error: String(e?.message ?? e) };
   }
 }
 
-// DNR cannot touch a page that is already loaded, and WebKit stops a page's timers while Safari is
-// in the background, so the content script cannot be relied on to blank in time. The background
-// keeps running, though: reload every known tab on a newly blocked domain so DNR blocks the load.
-// Tabs are known from tabs.onUpdated; Safari hides their url from tabs.query.
-async function reloadBlockedTabs(blockedDomains) {
+// DNR cannot touch a page that is already loaded, so on every policy evaluation each known probe
+// tab whose page is now blocked is sent to the blocked page. This is the "redirect matching open
+// tabs on activation" path, and the backstop when a page's own timer is late or suspended.
+async function enforceOpenTabs(result, reason) {
   const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
-  const out = [];
+  const redirected = [];
+  let ownerTabsSkipped = 0;
   for (const [id, info] of Object.entries(tabHosts)) {
-    if (info.blockedPage || !blockedDomains.some((d) => P.hostMatches(info.host, d))) continue;
-    try {
-      await browser.tabs.reload(Number(id));
-      out.push({ tabId: Number(id), host: info.host, ok: true });
-    } catch (e) {
-      out.push({ tabId: Number(id), host: info.host, ok: false, error: String(e?.message ?? e) });
-      delete tabHosts[id];
+    if (info.onBlockedPage || !info.host || !result.blockedDomains.some((d) => P.hostMatches(info.host, d))) continue;
+    if (!info.probe) {
+      ownerTabsSkipped++;
+      continue;
     }
+    if (!P.isBlocked(result, info.url)) continue;
+    const r = await redirectTab(Number(id), info.url, "background:" + reason);
+    redirected.push({ tabId: Number(id), probe: info.probe, url: info.url, ...r });
+    if (r.ok) tabHosts[id] = { ...info, onBlockedPage: true };
+    else delete tabHosts[id];
   }
   await browser.storage.local.set({ tabHosts });
-  return { known: tabHosts, reloaded: out };
+  return { known: tabHosts, redirected, ownerTabsSkipped };
+}
+
+async function runCommand(command) {
+  if (!command?.id) return null;
+  const { lastCommandId = null } = await browser.storage.local.get("lastCommandId");
+  if (command.id === lastCommandId) return null;
+  await browser.storage.local.set({ lastCommandId: command.id });
+  if (command.action !== "close-probe-tabs") return { id: command.id, error: "unknown action" };
+  const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+  const closed = [];
+  for (const [id, info] of Object.entries(tabHosts)) {
+    if (!info.probe) continue;
+    try {
+      await browser.tabs.remove(Number(id));
+      closed.push({ tabId: Number(id), probe: info.probe, ok: true });
+    } catch (e) {
+      closed.push({ tabId: Number(id), probe: info.probe, ok: false, error: String(e?.message ?? e) });
+    }
+    delete tabHosts[id];
+  }
+  await browser.storage.local.set({ tabHosts });
+  return { id: command.id, closed };
 }
 
 browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
   queue(async () => {
     const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
     if (!(tabId in tabHosts)) return;
+    const probe = tabHosts[tabId].probe;
     delete tabHosts[tabId];
     await browser.storage.local.set({ tabHosts });
-    await observe("tab-removed", { tabId, ...removeInfo });
+    await observe("tab-removed", { tabId, probe, ...removeInfo });
   });
 });
 
-// Tab loads on the host-permitted test domain only (no "tabs" permission, so Safari exposes url and
-// title only for hosts the extension may access). A DNR-blocked load shows here with Safari's
-// error page while content-load never arrives.
+// Safari exposes url and title here only for host-permitted pages and the extension's own pages.
+// A url change on a probe tab with no load (status) is a single-page-app navigation; the
+// background checks it as well as the content script, whichever is first.
 browser.tabs.onUpdated.addListener((tabId, change, tab) => {
+  const url = tab?.url ?? change.url ?? "";
+  const atMs = Date.now();
+  if (url.startsWith(browser.runtime.getURL(BLOCKED_PAGE))) return;
   let host = null;
   try {
-    host = new URL(tab?.url ?? change.url ?? "").hostname;
+    host = new URL(url).hostname;
   } catch {}
-  if (!host || !P.hostMatches(host, "instagram.com")) return;
+  if (!host || !WATCHED.some((d) => P.hostMatches(host, d))) return;
   if (!("status" in change) && !("title" in change) && !("url" in change)) return;
   queue(async () => {
-    const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
-    // Safari's own error page after a DNR block; reloading it again would only loop.
-    const blockedPage = (tab?.title ?? change.title) === "Failed to open page";
-    tabHosts[tabId] = { host, blockedPage, at: new Date().toISOString() };
-    await browser.storage.local.set({ tabHosts });
-    await observe("tab-updated", { tabId, ...change, tabUrl: tab?.url ?? null, tabTitle: tab?.title ?? null, tabStatus: tab?.status ?? null });
+    const info = await trackTab(tabId, url);
+    if (!info.probe) return;
+    await observe("tab-updated", { tabId, probe: info.probe, ...change, tabUrl: url, tabTitle: tab?.title ?? null, tabStatus: tab?.status ?? null, atMs });
+    if (!change.url) return;
+    const { policy = null } = await browser.storage.local.get("policy");
+    const result = P.evaluate(policy, Date.now());
+    if (P.isBlocked(result, url)) {
+      const r = await redirectTab(tabId, url, "background:tab-url-changed");
+      await observe("tab-url-blocked", { tabId, probe: info.probe, url, sinceUpdateMs: Date.now() - atMs, ...r });
+    }
   });
 });
 

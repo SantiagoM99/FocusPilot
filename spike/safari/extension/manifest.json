@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FocusPilot Spike S1",
-  "version": "0.0.13",
+  "version": "0.0.16",
   "description": "Throwaway spike: Safari enforces a focus policy without the app.",
   "background": {
     "scripts": [
@@ -16,12 +16,14 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*.instagram.com/*"
+    "*://*.instagram.com/*",
+    "*://*.youtube.com/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "*://*.instagram.com/*"
+        "*://*.instagram.com/*",
+        "*://*.youtube.com/*"
       ],
       "js": [
         "policy.js",
@@ -34,5 +36,17 @@
     "default_title": "FocusPilot Spike S1",
     "default_popup": "popup.html",
     "default_icon": "toolbar-icon.svg"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "blocked.html",
+        "blocked.js"
+      ],
+      "matches": [
+        "*://*.instagram.com/*",
+        "*://*.youtube.com/*"
+      ]
+    }
+  ]
 }

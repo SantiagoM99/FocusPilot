@@ -55,6 +55,9 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         if let policy = SharedStore.readJSON(location.url.appendingPathComponent(Spike.policyFile)) {
             response["policy"] = policy
         }
+        if let command = SharedStore.readJSON(location.url.appendingPathComponent(Spike.commandFile)) {
+            response["command"] = command
+        }
         complete(context, response)
     }
 

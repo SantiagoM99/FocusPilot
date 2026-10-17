@@ -11,6 +11,7 @@ enum Spike {
     static let policyFile = "policy.json"
     static let inboxFile = "inbox.jsonl"
     static let appEventsFile = "app-events.jsonl"
+    static let commandFile = "command.json"
 }
 
 struct StoreLocation {

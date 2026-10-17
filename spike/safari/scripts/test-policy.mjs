@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
-const ctx = { globalThis: {} };
+const ctx = { globalThis: {}, URL };
 vm.runInNewContext(readFileSync(new URL("../extension/policy.js", import.meta.url), "utf8"), ctx);
 const P = ctx.globalThis.FPPolicy;
 
@@ -42,3 +42,13 @@ assert.equal(P.hostMatches("www.instagram.com", "instagram.com"), true);
 assert.equal(P.hostMatches("notinstagram.com", "instagram.com"), false);
 assert.deepEqual([...P.evaluate(null, t0).blockedDomains], [], "no policy blocks nothing");
 console.log("policy.js: all checks passed");
+
+// S3: a URL-scoped exception allows one YouTube video and nothing else on the domain.
+const yt = { revision: 2, alwaysOn: [], session: { sessionId: "y", mode: "normal", startsAt: at(0), endsAt: at(10), ended: false,
+  domains: ["instagram.com", "youtube.com"], exceptions: [{ id: "u", domain: "youtube.com", url: "https://www.youtube.com/watch?v=AAA", expiresAt: at(3) }] } };
+const r2 = P.evaluate(yt, t0 + 2 * 60_000);
+assert.equal(P.isBlocked(r2, "https://www.youtube.com/watch?v=AAA&t=30s"), false, "the excepted video plays");
+assert.equal(P.isBlocked(r2, "https://www.youtube.com/watch?v=BBB"), true, "another video is blocked");
+assert.equal(P.isBlocked(r2, "https://www.youtube.com/"), true, "the home page is blocked");
+assert.equal(P.isBlocked(P.evaluate(yt, t0 + 3 * 60_000), "https://www.youtube.com/watch?v=AAA"), true, "the video is blocked at expiry");
+assert.equal(P.evaluate(yt, t0 + 2 * 60_000).nextTransitionAt, t0 + 3 * 60_000);

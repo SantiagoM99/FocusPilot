@@ -11,6 +11,8 @@ import SwiftUI
 
 enum PolicyWriter {
     static let domain = "instagram.com"
+    // S3 (issue #3) adds YouTube; exceptions name one of these domains, optionally one exact URL.
+    static let domains = ["instagram.com", "youtube.com"]
 
     static func iso(_ date: Date) -> String {
         let f = ISO8601DateFormatter()
@@ -35,16 +37,18 @@ enum PolicyWriter {
             "startsAt": iso(now),
             "endsAt": iso(now.addingTimeInterval(minutes * 60)),
             "ended": false,
-            "domains": [domain],
+            "domains": domains,
             "exceptions": [[String: Any]](),
         ]
     }
 
-    static func withException(minutes: Double) -> [String: Any]? {
+    static func withException(minutes: Double, domain: String = domain, url: String? = nil) -> [String: Any]? {
         guard var policy = current(), var session = policy["session"] as? [String: Any] else { return nil }
         let expiresAt = Date().addingTimeInterval(minutes * 60)
         var exceptions = session["exceptions"] as? [[String: Any]] ?? []
-        exceptions.append(["id": "exc-\(Int(Date().timeIntervalSince1970 * 1000))", "domain": domain, "expiresAt": iso(expiresAt)])
+        var exception: [String: Any] = ["id": "exc-\(Int(Date().timeIntervalSince1970 * 1000))", "domain": domain, "expiresAt": iso(expiresAt)]
+        if let url { exception["url"] = url }
+        exceptions.append(exception)
         session["exceptions"] = exceptions
         policy["session"] = session
         return policy
@@ -108,13 +112,24 @@ enum CLI {
         case "--normal", "--strict":
             push(PolicyWriter.publish(session: PolicyWriter.session(mode: args[1] == "--strict" ? "strict" : "normal", minutes: minutes(2))))
         case "--exception":
-            guard let p = PolicyWriter.withException(minutes: minutes(2)) else { print("no session"); exit(2) }
+            // --exception MIN [DOMAIN [URL]]: a URL-scoped exception leaves the rest of the domain blocked.
+            guard let p = PolicyWriter.withException(minutes: minutes(2), domain: args.count > 3 ? args[3] : PolicyWriter.domain, url: args.count > 4 ? args[4] : nil)
+            else { print("no session"); exit(2) }
             push(PolicyWriter.publish(session: p["session"], base: p))
         case "--end":
             guard let p = PolicyWriter.ended() else { print("no session"); exit(2) }
             push(PolicyWriter.publish(session: p["session"], base: p))
         case "--clear":
             push(PolicyWriter.publish(session: nil))
+        case "--close-probe-tabs":
+            // S3: asks the extension to close the tabs the spike opened (marked #fp-probe=…). No
+            // AppleScript: the command rides the next native round trip, nudged by the push.
+            let id = "cmd-\(Int(Date().timeIntervalSince1970 * 1000))"
+            for (location, probe) in SharedStore.probeAll() where probe.writable {
+                try? SharedStore.writeAtomically(["id": id, "action": "close-probe-tabs", "writtenAt": PolicyWriter.iso(Date())], to: location.url.appendingPathComponent(Spike.commandFile))
+            }
+            AppEvents.log("command", ["id": id, "action": "close-probe-tabs"])
+            push((Int(Date().timeIntervalSince1970 * 1000), ["command"], []))
         case "--extension-state":
             var text = "pending"
             SFSafariExtensionManager.getStateOfSafariExtension(withIdentifier: Spike.extensionBundleID) { state, error in
@@ -127,7 +142,7 @@ enum CLI {
         case "--unregister-login-item":
             do { try SMAppService.mainApp.unregister(); print("unregistered") } catch { print("unregister: \(error)") }
         default:
-            print("usage: --probe | --normal MIN | --strict MIN | --exception MIN | --end | --clear | --extension-state | --login-status | --unregister-login-item")
+            print("usage: --probe | --normal MIN | --strict MIN | --exception MIN [DOMAIN [URL]] | --close-probe-tabs | --end | --clear | --extension-state | --login-status | --unregister-login-item")
             exit(2)
         }
         return true
