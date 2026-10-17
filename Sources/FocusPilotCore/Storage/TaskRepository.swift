@@ -15,7 +15,7 @@ public actor TaskRepository {
     // Internal only so this actor's extensions in other files can write.
     let ownerDatabase: DatabasePool
     private let cacheDatabase: DatabasePool
-    private let now: @Sendable () -> Date
+    let now: @Sendable () -> Date
 
     /// Opens (creating if needed) both databases in `location` and brings each
     /// up to date with its own migrations. `now` stamps created and updated

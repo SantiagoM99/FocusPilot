@@ -9,6 +9,9 @@ import GRDB
 /// A CHECK constraint in `OwnerSchema` enforces that; `deadline` is the typed
 /// view of those columns.
 ///
+/// `lastOutcome`, `remainingWork`, `returnCue` and `wrappedUpAt` hold the
+/// last session wrap-up; `wrapUp` is their typed view.
+///
 /// `status` and `rank` place the task in Now, Next or Later in the owner's
 /// manual order. `revision` starts at 1 and grows with every change to the
 /// task, together with `updatedAt`, so derived values can tell they are
@@ -33,6 +36,18 @@ public struct TaskRecord: Codable, Equatable, Sendable {
 
     var isFromHerdr: Bool { source == Self.herdrSource }
     static let herdrSource = "herdr"
+
+    var lastOutcome: String? = nil
+    var remainingWork: String? = nil
+    var returnCue: String? = nil
+    var wrappedUpAt: Date? = nil
+
+    /// The last wrap-up, if one was ever saved.
+    public var wrapUp: TaskWrapUp? {
+        wrappedUpAt.map {
+            TaskWrapUp(WrapUp(outcome: lastOutcome, remainingWork: remainingWork, returnCue: returnCue), at: $0)
+        }
+    }
 
     public var deadline: Deadline? {
         get {
