@@ -59,7 +59,7 @@ struct MenuBarContent: View {
             // on its own; its wrap-up waits here.
             if let wrapUp = model.wrapUp {
                 Button { openPlanning() } label: {
-                    Label("Wrap up “\(wrapUp.session.action)”…", systemImage: "square.and.pencil")
+                    Label("Wrap up “\(wrapUp.prompt.session.action)”…", systemImage: "square.and.pencil")
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                 }

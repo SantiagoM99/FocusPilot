@@ -36,11 +36,11 @@ final class AppModel {
     /// Asks the planning window to show a page, e.g. Settings from ⌘,.
     var requestedPage: PlanningView.Page?
     /// The wrap-up waiting for the owner; see `AppModel+WrapUp.swift`.
-    var wrapUp: WrapUpPrompt?
+    var wrapUp: PendingWrapUp?
     /// Grows each time the planning window should come forward; `MenuBarIcon` opens it.
     var planningWindowRequests = 0
-    /// When the owner last pressed Pause or Complete; their wrap-up may bring the window forward.
-    @ObservationIgnored var ownerEndedOrPausedAt: Date?
+    /// When the owner last pressed Complete; their wrap-up may bring the window forward.
+    @ObservationIgnored var ownerCompletedAt: Date?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)

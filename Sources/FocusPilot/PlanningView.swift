@@ -48,8 +48,8 @@ struct PlanningView: View {
         .sheet(isPresented: Bindable(model).isStartingFocus) {
             StartFocusSheet(model: model)
         }
-        .sheet(item: Bindable(model).wrapUp) { prompt in
-            WrapUpSheet(model: model, prompt: prompt)
+        .sheet(item: Bindable(model).wrapUp) { pending in
+            WrapUpSheet(model: model, prompt: pending.prompt)
         }
         .environment(model)
         .task { await model.refresh() }
