@@ -37,6 +37,18 @@ struct AddRateLimitTests {
     }
 }
 
+extension AddRateLimitTests {
+    @Test func panesIdleForAMinuteAreForgotten() {
+        var limit = AddRateLimit()
+        for pane in 0..<50 { _ = limit.allow("w4:p\(pane)", at: start) }
+        #expect(limit.trackedPanes == 50)
+
+        _ = limit.allow("w5:p1", at: start.addingTimeInterval(61))
+
+        #expect(limit.trackedPanes == 1)
+    }
+}
+
 @Suite("Command service")
 struct CommandServiceTests {
     private let repository: TaskRepository

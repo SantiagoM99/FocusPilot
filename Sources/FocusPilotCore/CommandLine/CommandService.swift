@@ -24,16 +24,21 @@ public struct AddRateLimit: Sendable {
 
     public init() {}
 
-    /// Records the add and returns true if it is within the limit.
+    /// Records the add and returns true if it is within the limit. Panes
+    /// with no add in the last window are forgotten, so closed panes do not
+    /// pile up for as long as the app runs.
     public mutating func allow(_ pane: String, at now: Date) -> Bool {
-        let kept = (recent[pane] ?? []).filter { now.timeIntervalSince($0) < Self.window }
-        guard kept.count < Self.limit else {
-            recent[pane] = kept
-            return false
+        recent = recent.compactMapValues { times in
+            let kept = times.filter { now.timeIntervalSince($0) < Self.window }
+            return kept.isEmpty ? nil : kept
         }
+        let kept = recent[pane] ?? []
+        guard kept.count < Self.limit else { return false }
         recent[pane] = kept + [now]
         return true
     }
+
+    var trackedPanes: Int { recent.count }
 
     /// The key adds are counted under; every add from outside Herdr shares one.
     public static func key(for caller: HerdrCaller?) -> String {
