@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "FocusPilot Spike S2",
-  "version": "0.0.1",
-  "description": "Throwaway spike: native messaging, DNR policy, lifecycle observations.",
+  "version": "0.0.2",
+  "description": "Throwaway spike S2/S3: native messaging, DNR policy, lifecycle observations, already-open pages.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAygCpHT/caM47jc64hI1Y8y/ucWK4g8q4DVq1bNBjewk1YDZHqq/d4or1ysCDKv1p9urkBPlpktdMTEk+Z7Hl0zPanU/MGrNWXuzsza0vLFvJNrV9XR99isMG9HOTJbiVtm0VlRExbVxNMp4FCOLGFtBx06J0Q2nL6l0Bu2RitLRfvEfOLOyZV+GK7hhg4cevQznczzMebuC6AYb38sWaUvhEX8K1Mz0tVy43QIJf8FVlgygvIYIcK5E1uJUwgepB8pZIg3Nkh+3HAW5azSTPRkMCVuBA2a02WN5yy97L4BzZOFUfXUzz/ut1Fy/iemOMlpHLKy1n77RKDpIjdIWHLwIDAQAB",
   "minimum_chrome_version": "120",
   "incognito": "spanning",
@@ -18,5 +18,37 @@
   "action": {
     "default_title": "FocusPilot Spike S2",
     "default_popup": "popup.html"
-  }
+  },
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.instagram.com/*",
+    "*://*.example.com/*",
+    "*://*.example.org/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.instagram.com/*"
+      ],
+      "js": [
+        "match.js",
+        "cs.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "blocked.html"
+      ],
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.instagram.com/*",
+        "*://*.example.com/*",
+        "*://*.example.org/*"
+      ]
+    }
+  ]
 }

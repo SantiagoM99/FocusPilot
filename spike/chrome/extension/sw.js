@@ -2,7 +2,10 @@
 // policy is enforced against this worker's own clock, with or without the native host.
 // Lifecycle facts: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle
 
+importScripts("match.js");
+
 const HOST = "com.focuspilot.spike";
+const BACKUP_GRACE_MS = 1500; // S3: content script acts first; the worker redirects only if the page is still there after this
 const SAFETY_ALARM_MINUTES = 15; // long on purpose: a short period would mask whether the port alone keeps the worker alive
 const RULE_BASE = { always: 1000, session: 2000, exception: 3000 };
 const RESOURCE_TYPES = ["main_frame", "sub_frame"];
@@ -75,7 +78,7 @@ function desiredRules(policy, now) {
   const rules = [];
   const notes = { sessionActive: false, strictPastEnd: false, activeExceptions: [] };
   (policy?.alwaysOn ?? []).forEach((r, i) =>
-    rules.push(blockRule(RULE_BASE.always + i, r.domain)));
+    rules.push(...blockRules(RULE_BASE.always + 2 * i, r.domain)));
 
   const s = policy?.session;
   if (s && !s.ended && now >= Date.parse(s.startsAt)) {
@@ -83,7 +86,7 @@ function desiredRules(policy, now) {
     if (!pastEnd || s.mode === "strict") {
       notes.sessionActive = true;
       notes.strictPastEnd = pastEnd;
-      s.domains.forEach((d, i) => rules.push(blockRule(RULE_BASE.session + i, d)));
+      s.domains.forEach((d, i) => rules.push(...blockRules(RULE_BASE.session + 2 * i, d)));
       s.exceptions.filter((e) => now < Date.parse(e.expiresAt)).forEach((e, i) => {
         notes.activeExceptions.push(e.id);
         rules.push({
@@ -98,8 +101,13 @@ function desiredRules(policy, now) {
   return { rules, notes };
 }
 
-function blockRule(id, domain) {
-  return { id, priority: 1, action: { type: "block" }, condition: { urlFilter: `||${domain}`, resourceTypes: RESOURCE_TYPES } };
+// S3: top-level loads go to the blocked page (redirect needs host permission for the domain);
+// frames are plainly blocked.
+function blockRules(id, domain) {
+  return [
+    { id, priority: 1, action: { type: "redirect", redirect: { extensionPath: "/blocked.html?reason=dnr" } }, condition: { urlFilter: `||${domain}`, resourceTypes: ["main_frame"] } },
+    { id: id + 1, priority: 1, action: { type: "block" }, condition: { urlFilter: `||${domain}`, resourceTypes: ["sub_frame"] } },
+  ];
 }
 
 // Positive values are how late the worker removed a rule relative to the instant it should
@@ -139,11 +147,12 @@ async function reconcileNow(trigger) {
   const state = { trigger, at: new Date(now).toISOString(), revision: policy?.revision ?? null, ruleIds: rules.map((r) => r.id), ...notes };
   await chrome.storage.local.set({ lastReconcile: state });
   await observe("reconcile", { ...state, changed, ...overruns(policy, before, rules, now) });
+  await enforceOpenTabs(trigger, policy);
   return state;
 }
 
 function stripRule(r) {
-  return { id: r.id, priority: r.priority, action: r.action, condition: { urlFilter: r.condition.urlFilter, resourceTypes: r.condition.resourceTypes } };
+  return { id: r.id, priority: r.priority, action: { type: r.action.type, extensionPath: r.action.redirect?.extensionPath }, condition: { urlFilter: r.condition.urlFilter, resourceTypes: r.condition.resourceTypes } };
 }
 
 async function scheduleNextBoundary(policy, now) {
@@ -204,6 +213,105 @@ async function connect(reason) {
   await chrome.storage.local.set({ connection: { state: "connected", at: new Date().toISOString(), swInstance } });
   await observeQueue(flush);
 }
+
+// ---- S3: pages that are already loaded -------------------------------------------------
+// Tab URLs are visible through host permissions alone (no "tabs" permission). Only tabs the
+// spike opened (registered by the content script from the ?fpspike marker) are acted on;
+// matching owner tabs are only counted.
+
+const tabsQueue = serial();
+
+function isExtensionUrl(url) {
+  return url.startsWith(chrome.runtime.getURL(""));
+}
+
+async function currentPolicy() {
+  return (await chrome.storage.local.get("policyRecord")).policyRecord?.policy ?? null;
+}
+
+async function spikeTabs() {
+  return (await chrome.storage.local.get("spikeTabs")).spikeTabs ?? {};
+}
+
+async function redirectTab(tabId, from, reason, decidedAt) {
+  const q = new URLSearchParams({ from, reason, decidedAt: String(decidedAt) });
+  await chrome.tabs.update(tabId, { url: chrome.runtime.getURL("blocked.html") + "?" + q });
+  await observe("sw-redirect", { tabId, from, reason, decidedAt, redirectIssuedAt: Date.now() });
+}
+
+async function backup(tabId, trigger, decidedAt) {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab?.url || isExtensionUrl(tab.url)) return;
+  if (decide(await currentPolicy(), tab.url, Date.now()).blocked) await redirectTab(tabId, tab.url, `sw-backup:${trigger}`, decidedAt);
+}
+
+async function enforceOpenTabs(trigger, policy) {
+  const now = Date.now();
+  const mine = await spikeTabs();
+  let ownerTabsMatching = 0;
+  for (const tab of await chrome.tabs.query({})) {
+    if (!tab.url || isExtensionUrl(tab.url)) continue;
+    const d = decide(policy, tab.url, now);
+    const spike = mine[tab.id];
+    if (!spike) { if (d.blocked) ownerTabsMatching++; continue; }
+    if (spike.csInstance && !spike.passive) {
+      chrome.tabs.sendMessage(tab.id, { type: "policy", policy, trigger }).catch(() => {});
+      if (d.blocked) setTimeout(() => backup(tab.id, trigger, now), BACKUP_GRACE_MS);
+    } else if (d.blocked) {
+      await redirectTab(tab.id, tab.url, `sw:${trigger}`, now);
+    }
+  }
+  if (ownerTabsMatching) await observe("owner-tabs-not-touched", { trigger, count: ownerTabsMatching });
+}
+
+chrome.tabs.onRemoved.addListener(async (tabId, info) => {
+  if ((await spikeTabs())[tabId]) observe("spike-tab-removed", { tabId, windowClosing: info.isWindowClosing, at: Date.now() });
+});
+chrome.tabs.onReplaced.addListener((added, removed) => {
+  tabsQueue(async () => {
+    const mine = await spikeTabs();
+    if (!mine[removed]) return;
+    mine[added] = mine[removed];
+    delete mine[removed];
+    await chrome.storage.local.set({ spikeTabs: mine });
+    await observe("spike-tab-replaced", { removed, added, at: Date.now() });
+  });
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, change) => {
+  if (!change.url || isExtensionUrl(change.url)) return;
+  const spike = (await spikeTabs())[tabId];
+  if (!spike) return;
+  const now = Date.now();
+  const d = decide(await currentPolicy(), change.url, now);
+  if (!d.blocked) return;
+  await observe("sw-saw-blocked-url", { tabId, url: change.url, seenAt: now });
+  if (spike.passive) await redirectTab(tabId, change.url, "sw:tabs.onUpdated", now);
+  else setTimeout(() => backup(tabId, "tabs.onUpdated", now), BACKUP_GRACE_MS);
+});
+
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  const tabId = sender.tab?.id;
+  if (msg.type === "cs-hello") {
+    tabsQueue(async () => {
+      const mine = await spikeTabs();
+      if (msg.marker) mine[tabId] = { marker: msg.marker, passive: msg.marker.includes("passive"), registeredAt: Date.now() };
+      if (mine[tabId]) mine[tabId].csInstance = msg.csInstance;
+      await chrome.storage.local.set({ spikeTabs: mine });
+      const enforce = !!mine[tabId];
+      await observe("cs-hello", { tabId, enforce, marker: msg.marker, host: new URL(msg.url).hostname, url: enforce ? msg.url : undefined, loadedAt: msg.loadedAt, visibility: msg.visibility, prerendering: msg.prerendering });
+      reply({ policy: await currentPolicy(), enforce });
+    });
+    return true;
+  }
+  if (msg.type === "cs-report") {
+    const { type, kind, ...details } = msg;
+    observe(kind, { tabId, ...details });
+  }
+  if (msg.type === "blocked-shown") {
+    observe("blocked-shown", { tabId, ...msg.params, shownAt: msg.shownAt, navigationStart: msg.navigationStart });
+  }
+});
 
 chrome.runtime.onStartup.addListener(() => { reconcile("onStartup"); connect("onStartup"); });
 chrome.runtime.onInstalled.addListener((d) => {

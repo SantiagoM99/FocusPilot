@@ -105,9 +105,65 @@ Run from the worktree root. Chrome 155 is installed.
 ## Known limits of this spike
 
 - `profileId` is a random UUID created when the extension is installed in a profile. Removing and reinstalling the extension makes a new one. Chrome exposes no stable profile ID to extensions without the `identity` permission and a signed-in profile.
-- DNR rules do not close or redirect already-open tabs or stop buffered media. The content-script expiry candidate from the Architecture is not built here.
+- DNR rules do not close or redirect already-open tabs or stop buffered media. The content-script candidate was built and measured for S3 (see the S3 section).
 - `example.com` subresources and other resource types are not blocked (main_frame and sub_frame only).
 - The host polls the policy file. The app/helper shared-location question (App Group etc.) belongs to the Safari spike.
+
+## S3: Already-open pages and playing video (Chrome half of issue #3)
+
+Run 2026-10-17 13:30–13:46 UTC on the same branch, extension, host and profile (Chrome 155.0.8059.40, macOS 26). Another agent covers Safari. No owner clicks were needed. Every blocking policy lasted 1–2 min or less and was reset with `set-policy.sh none` straight after each test; the final state is policy `none` with no DNR rules.
+
+### What was added
+
+| Piece | Path | What it does |
+|---|---|---|
+| Content script | `extension/cs.js` (+ shared `match.js`) | Injected at `document_start` on `*.youtube.com` and `*.instagram.com`. It holds the exception expiry in a page `setTimeout`, so it does not depend on the service worker. It detects same-document URL changes three ways (Navigation API `currententrychange`, YouTube's `yt-navigate-finish`, a 250 ms poll). On a block it pauses every `video`/`audio` element, then replaces the page with `blocked.html`. |
+| Shared decision | `extension/match.js` | The same allow/block decision as the DNR rules (always-on, session, URL-scoped exceptions), evaluated for one URL. Used by both the worker and the content script. |
+| Blocked page | `extension/blocked.html`, `blocked.js` | Web-accessible extension page. It reports when it was shown and why. |
+| Worker changes | `extension/sw.js` | DNR now redirects top-level loads to `blocked.html` and blocks frames. On every reconcile it checks open tabs. Tabs with a live content script get the policy pushed and the content script acts first; the worker redirects any tab still on a blocked URL 1.5 s later. Tabs without a content script, or marked `passive`, are redirected at once. `tabs.onUpdated` catches SPA URL changes as a second path. |
+| Control page | `extension/control.html?cmd=reload\|status\|spike-tabs\|close-spike-tabs` | Opened from the terminal with `open -a`. Extension pages are served from disk without a reload, and an extension page may call `chrome.runtime.reload()`. That loaded the new manifest and content script with **no click**. The unpacked reload granted the new host permissions with no prompt (checked with `chrome.permissions.getAll()`). |
+| Policy script | `scripts/set-policy.sh` | `FP_DOMAINS`, `FP_EXCEPTIONS` (DNR-style `\|\|domain` or `\|prefix`), and durations in seconds (`25s`). |
+
+**Owner safety.** The spike acts only on tabs it opened itself. A tab is marked by `?fpspike=flags` in the URL it was opened with, and the content script registers it at `document_start`, because YouTube strips the unknown parameter 1–1.6 s after load. Matching owner tabs are only counted, never touched; none were counted during the run. The test flags: `mute` mutes media on its first `play` event, `play` starts muted playback if the page did not autoplay, `spa` clicks an in-app link after 8 s, and `passive` turns off the content script's own blocking so the worker path can be measured.
+
+### Results
+
+Delays are from the triggering instant (exception expiry, host `policy-sent`, or the Navigation API `navigate` event) to `blocked.html` reporting itself shown. All runs had the worker awake, with its native port open.
+
+| Criterion | Result | Measured |
+|---|---|---|
+| Playing YouTube video stopped and replaced when its exception expires | **Pass** | Content-script path (A): the timer fired 1 ms late; the video, playing at 21.6 s and muted, was paused at +3 ms; the blocked page showed at **+67 ms**. Worker-only path (A3, content script passive): `alarm:boundary` redirect, blocked page at **+68 ms**. The DNR exception rule came off at +0 to +1 ms. |
+| Instagram (playing reel) | **Pass** | (E) A reel playing muted and looping: the timer fired 7 ms late; blocked page at **+51 ms**. |
+| Blocked-domain tabs open at session start are redirected | **Pass** | (B, second run) YouTube in the foreground, playing at 11.0 s: the pushed policy made the content script pause at +31 ms and the blocked page showed at **+94 ms**. A background Instagram tab (passive, so the worker redirected it): **+64 ms**. In the first run the YouTube video was already paused by Chrome or YouTube once Instagram opened in front of it, so the playing case relies on the second run. |
+| YouTube in-app (SPA) navigation caught | **Pass** | (C) A URL-scoped exception for one video; a click on another video changed the URL in the same document 12 ms later. Navigation API `currententrychange` caught it in ≤1 ms: video paused, blocked page at **+63 ms**. The worker's `tabs.onUpdated` saw it at +28 ms. (C2, worker only): blocked page at **+68 ms**. `yt-navigate-finish` and the poll never saw it first. |
+| Instagram SPA navigation caught | **Pass** | (D) An exception for `/instagram/`; an in-app move to `/` was caught in 0 ms, blocked page at **+47 ms**. |
+| Content script orphaned by an extension update or reload | **Degraded** | (F) After a reload, the old content script on the open tab could no longer reach the extension, and the video kept playing. The worker backup redirected at the 1.5 s grace: blocked page at **+1.57 s**. |
+
+The SPA clicks were synthetic (`a.click()` from the content script), so YouTube's and Instagram's own routers did the navigation. Detection reads URL changes, not how they started, so a real click should behave the same. That is not separately verified.
+
+### Required Chrome permissions
+
+- `host_permissions` for each blocked domain (`*://*.youtube.com/*`, `*://*.instagram.com/*`). They are needed for: DNR `redirect` to the blocked page (plain `block` does not need them), reading `tab.url` and `changeInfo.url` for those sites, and injecting the content script. Install warning: "Read and change your data on …".
+- `declarativeNetRequest`, `storage`, `alarms`, `nativeMessaging` (already present from S2).
+- `web_accessible_resources`: `blocked.html` for the blocked domains, so pages and redirects can navigate to it.
+- Not needed: `tabs` (host permissions expose the URLs that matter), `webNavigation`. Recommended: `scripting`, to re-inject the content script into open tabs from `onInstalled` (see the orphaned-script case).
+
+### Unsupported, degraded or untested cases
+
+- **After an extension update or reload:** open pages keep an orphaned content script that cannot act. Enforcement falls back to the worker; delay ≈ grace period (1.57 s measured), and media plays until then. Fix: re-inject with `scripting.executeScript` on `onInstalled`, or ping the content script before trusting it.
+- **Chrome closes tabs showing the extension's own pages when the extension reloads or updates.** Observed: 11 blocked-page tabs closed at two reloads. An extension update therefore drops every blocked-page tab and its "from" context.
+- **Exception expiry across sleep:** untested. Chrome timers on macOS may not count time spent asleep, so the content-script timer could fire late by the sleep duration. The worker alarm (wall clock) and the S2 reconcile-on-wake are the backstop. Recommended: re-evaluate in the content script on `visibilitychange`/`resume`/`focus`. Unverified platform assumption; test it with the S2 sleep owner step.
+- **Hidden tabs:** Chrome throttles timers in background tabs. One-shot timers are expected to be at most about 1 s late, more after 5 min hidden. Only the worker path was measured on a background tab.
+- **Embeds on other sites** (YouTube iframes, `youtube-nocookie.com`): not handled. The content script runs only on top frames of the listed hosts, and DNR blocks only new frame loads, so an already-playing embed continues.
+- **The user withdraws site access** for the extension (Chrome's per-site access setting): the content script and redirect stop. The plain DNR block rule would still apply. Untested; the app should check `chrome.permissions.contains` and report degraded.
+- **Incognito and other profiles:** as in S2. Incognito needs "Allow in Incognito", and each profile runs its own instance. Not tested for S3.
+- **Picture-in-Picture, Media Session, casting:** not tested. Navigating the page should end PiP, but casting to another device continues outside Chrome.
+- **Autoplay:** no gesture was needed. The YouTube watch page autoplayed **with sound** on this profile when opened in the foreground; muted playback through `play()` also worked; Instagram reels autoplayed muted.
+- **Test interference:** two early YouTube test tabs that played with sound were closed by something outside the spike, most likely the owner, 5 s and 37 s after opening. With `mute`, later tabs were left alone.
+
+### Remaining unknowns
+
+The sleep and hidden-tab timer cases above; orphaned-script recovery through re-injection; real (trusted) user clicks for SPA navigation; incognito; and the case where the worker is asleep without a native port at expiry (the S2 measurement of 195 ms applies only to removing the DNR rule).
 
 ## Uninstall
 
@@ -130,3 +186,10 @@ No Chrome profile files or preferences were modified directly.
 - `chrome.alarms`: https://developer.chrome.com/docs/extensions/reference/api/alarms
 - `chrome.declarativeNetRequest` (dynamic rules persist across sessions): https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest
 - Manifest `key` and extension ID: https://developer.chrome.com/docs/extensions/reference/manifest/key
+- Content scripts (`run_at`, isolated world, not injected into already-open tabs): https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts
+- `web_accessible_resources`: https://developer.chrome.com/docs/extensions/reference/manifest/web-accessible-resources
+- `chrome.tabs` (URL visible with matching host permission): https://developer.chrome.com/docs/extensions/reference/api/tabs
+- `chrome.runtime.reload`: https://developer.chrome.com/docs/extensions/reference/api/runtime#method-reload
+- Navigation API: https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API
+- Autoplay policy: https://developer.chrome.com/blog/autoplay
+- Timer throttling in hidden pages: https://developer.chrome.com/blog/timer-throttling-in-chrome-88

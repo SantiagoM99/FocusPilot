@@ -6,11 +6,15 @@
 #   set-policy.sh strict MIN                same, but keeps blocking past the end until "end"
 #   set-policy.sh end                       app confirms the current session ended
 #   set-policy.sh always                    always-on block of example.org, no session
+# Durations are minutes, or seconds with an "s" suffix (e.g. 90s).
+# S3 overrides: FP_DOMAINS="youtube.com instagram.com" sets the session domains, and
+# FP_EXCEPTIONS="||youtube.com |https://www.youtube.com/watch?v=ID" sets the exception URL filters
+# (all expire after EXC). Defaults keep the S2 behaviour.
 set -euo pipefail
 data_dir="$HOME/Library/Application Support/FocusPilotSpike"
 policy="$data_dir/policy.json"
 mkdir -p "$data_dir"
-in_min() { date -u -v+"$1"M +%Y-%m-%dT%H:%M:%SZ; }
+in_min() { if [[ $1 == *s ]]; then date -u -v+"${1%s}"S +%Y-%m-%dT%H:%M:%SZ; else date -u -v+"$1"M +%Y-%m-%dT%H:%M:%SZ; fi; }
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 revision=$(python3 -c 'import time; print(int(time.time()*1000))')
 cmd=${1:-none}
@@ -22,11 +26,12 @@ case $cmd in
   normal|strict)
     exceptions='[]'
     if [[ -n "${3:-}" ]]; then
-      exceptions=$(jq -n --arg e "$(in_min $3)" '[{"id":"exc-allowed","urlFilter":"||example.com/allowed","expiresAt":$e}]')
+      exceptions=$(jq -n --arg e "$(in_min $3)" --arg f "${FP_EXCEPTIONS:-||example.com/allowed}" \
+        '[$f | split(" ") | to_entries[] | {id: "exc-\(.key)", urlFilter: .value, expiresAt: $e}]')
     fi
     session=$(jq -n --arg id "session-$revision" --arg mode $cmd --arg start "$now" --arg end "$(in_min $2)" \
-      --argjson exc "$exceptions" \
-      '{sessionId:$id, mode:$mode, startsAt:$start, endsAt:$end, ended:false, domains:["example.com"], exceptions:$exc}')
+      --argjson exc "$exceptions" --arg domains "${FP_DOMAINS:-example.com}" \
+      '{sessionId:$id, mode:$mode, startsAt:$start, endsAt:$end, ended:false, domains:($domains | split(" ")), exceptions:$exc}')
     ;;
   end)
     session=$(jq '.session | if . == null then null else .ended = true end' "$policy")
