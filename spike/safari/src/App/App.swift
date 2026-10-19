@@ -121,6 +121,15 @@ enum CLI {
             push(PolicyWriter.publish(session: p["session"], base: p))
         case "--clear":
             push(PolicyWriter.publish(session: nil))
+        case "--inspect-tabs", "--dnr-mode":
+            // --dnr-mode redirect|block switches the DNR action for blocked domains (S3 comparison).
+            let id = "cmd-\(Int(Date().timeIntervalSince1970 * 1000))"
+            var cmd: [String: Any] = ["id": id, "action": args[1] == "--dnr-mode" ? "dnr-mode" : "inspect-tabs", "writtenAt": PolicyWriter.iso(Date())]
+            if args[1] == "--dnr-mode" { cmd["mode"] = args.count > 2 ? args[2] : "redirect" }
+            for (location, probe) in SharedStore.probeAll() where probe.writable {
+                try? SharedStore.writeAtomically(cmd, to: location.url.appendingPathComponent(Spike.commandFile))
+            }
+            push((Int(Date().timeIntervalSince1970 * 1000), ["command"], []))
         case "--close-probe-tabs":
             // S3: asks the extension to close the tabs the spike opened (marked #fp-probe=…). No
             // AppleScript: the command rides the next native round trip, nudged by the push.
@@ -142,7 +151,7 @@ enum CLI {
         case "--unregister-login-item":
             do { try SMAppService.mainApp.unregister(); print("unregistered") } catch { print("unregister: \(error)") }
         default:
-            print("usage: --probe | --normal MIN | --strict MIN | --exception MIN [DOMAIN [URL]] | --close-probe-tabs | --end | --clear | --extension-state | --login-status | --unregister-login-item")
+            print("usage: --probe | --normal MIN | --strict MIN | --exception MIN [DOMAIN [URL]] | --close-probe-tabs | --inspect-tabs | --dnr-mode redirect|block | --end | --clear | --extension-state | --login-status | --unregister-login-item")
             exit(2)
         }
         return true

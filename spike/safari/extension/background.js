@@ -33,6 +33,8 @@ async function installId() {
 
 async function observe(kind, details = {}) {
   const { nextSeq = 1, outbox = [] } = await browser.storage.local.get(["nextSeq", "outbox"]);
+  // S3: Safari's storage.local quota was hit (every later set threw), so cap the unsent outbox.
+  if (outbox.length > 200) outbox.splice(0, outbox.length - 200);
   outbox.push({
     type: "observation",
     kind,
@@ -43,7 +45,11 @@ async function observe(kind, details = {}) {
     workerAgeMs: Date.now() - workerStartedAt,
     ...details,
   });
-  await browser.storage.local.set({ nextSeq: nextSeq + 1, outbox });
+  try {
+    await browser.storage.local.set({ nextSeq: nextSeq + 1, outbox });
+  } catch (e) {
+    await browser.storage.local.set({ nextSeq: nextSeq + 1, outbox: outbox.slice(-20), lastStorageError: String(e?.message ?? e) });
+  }
 }
 
 // One native round trip: hands the handler every unsent observation and gets the current policy
@@ -72,11 +78,17 @@ async function exchange(reason) {
       stores: resp?.stores ?? null,
       error: resp?.error ?? null,
     };
-    if (resp?.ok && resp.appended === outbox.length) {
-      const { outbox: current = [] } = await browser.storage.local.get("outbox");
-      await browser.storage.local.set({ outbox: current.filter((o) => !sentSeqs.has(o.seq)) });
+    // Storage writes must not lose the response (S3: Safari threw "Exceeded storage quota" here).
+    try {
+      if (resp?.ok && resp.appended === outbox.length) {
+        const { outbox: current = [] } = await browser.storage.local.get("outbox");
+        await browser.storage.local.set({ outbox: current.filter((o) => !sentSeqs.has(o.seq)) });
+      }
+      await browser.storage.local.set({ lastNative: nativeResult });
+    } catch (e) {
+      nativeResult.storageError = String(e?.message ?? e);
+      await browser.storage.local.remove("outbox").catch(() => {});
     }
-    await browser.storage.local.set({ lastNative: nativeResult });
     return { policy: resp?.policy ?? null, command: resp?.command ?? null, nativeResult };
   } catch (e) {
     const nativeResult = { ok: false, at: new Date().toISOString(), error: String(e?.message ?? e) };
@@ -111,9 +123,10 @@ async function applyRules(result) {
       condition: { urlFilter: "||" + a.key, resourceTypes: RESOURCE_TYPES },
     })),
   ];
-  let action = "redirect";
+  const { dnrMode = "redirect" } = await browser.storage.local.get("dnrMode");
+  let action = dnrMode;
   try {
-    await browser.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: rules("redirect") });
+    await browser.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: rules(dnrMode) });
   } catch (e) {
     action = "block";
     await observe("dnr-redirect-refused", { error: String(e?.message ?? e) });
@@ -141,6 +154,8 @@ function reconcile(reason) {
 async function reconcileNow(reason) {
   const { policy: stored = null, lastEval = null } = await browser.storage.local.get(["policy", "lastEval"]);
   const { policy: fetched, command, nativeResult } = await exchange(reason);
+  // Commands first: closing probe tabs must not wait on anything that can fail below.
+  const commandResult = await runCommand(command);
 
   let policy = stored;
   if (fetched && (!stored || fetched.revision > stored.revision)) policy = fetched;
@@ -153,7 +168,6 @@ async function reconcileNow(reason) {
   const { action: dnrAction, ids: ruleIds } = await applyRules(result);
   const appliedAt = Date.now();
   const { known: knownTabs, redirected, ownerTabsSkipped } = await enforceOpenTabs(result, reason);
-  const commandResult = await runCommand(command);
   await scheduleTransition(result.nextTransitionAt);
 
   const samePolicy = lastEval && policy && lastEval.revision === policy.revision;
@@ -186,12 +200,13 @@ async function reconcileNow(reason) {
     overruns,
     nativeOk: nativeResult.ok,
     nativeError: nativeResult.error,
+    storageError: nativeResult.storageError ?? null,
     nativeTransport: nativeResult.transport ?? null,
     portOpen: !!port,
     redirected,
     ownerTabsSkipped,
-    knownTabs,
     commandResult,
+    knownTabCount: Object.keys(knownTabs).length,
     hostAccess: await hostAccess(),
   });
   // Second round trip so the ack lands in the inbox now rather than on the next wake.
@@ -225,6 +240,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const { type, ...details } = msg;
     const tabId = sender?.tab?.id ?? null;
     queue(async () => {
+      if ((await releasedProbes()).includes(details.probe)) return;
       if (details.probe && tabId != null) await trackTab(tabId, sender.url, { probe: details.probe });
       await observe("page-event", { ...details, tabId, receivedAtMs: Date.now() });
     });
@@ -232,9 +248,14 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   // The content script found its page blocked (expiry, SPA navigation, new policy) and has
   // already stopped media; the browser performs the navigation, which page timers cannot block.
+  if (msg?.type === "hello") {
+    releasedProbes().then((r) => sendResponse({ released: r.includes(msg.probe) }));
+    return true;
+  }
   if (msg?.type === "enforce-me") {
     const tabId = sender?.tab?.id;
     queue(async () => {
+      if ((await releasedProbes()).includes(msg.probe)) return { ok: false, released: true };
       const r = await redirectTab(tabId, sender.url, "content:" + msg.reason);
       await observe("enforce-me", { tabId, reason: msg.reason, href: msg.href, ...r });
       return r;
@@ -318,15 +339,58 @@ async function enforceOpenTabs(result, reason) {
     if (r.ok) tabHosts[id] = { ...info, onBlockedPage: true };
     else delete tabHosts[id];
   }
+  // Tab ids change when the extension reloads (S3), so tracked ids go stale and tabs opened before
+  // the reload are unknown. Sweep tabs.query too: Safari returns url for host-permitted tabs.
+  let swept = 0;
+  try {
+    for (const t of await browser.tabs.query({})) {
+      if (!t.url || redirected.some((r) => r.tabId === t.id)) continue;
+      const probe = t.url.match(/[#&]fp-probe=([\w-]+)/)?.[1];
+      if (!P.isBlocked(result, t.url)) continue;
+      if (!probe || (await releasedProbes()).includes(probe)) {
+        ownerTabsSkipped++;
+        continue;
+      }
+      swept++;
+      const r = await redirectTab(t.id, t.url, "background-sweep:" + reason);
+      redirected.push({ tabId: t.id, probe, url: t.url, via: "query", ...r });
+    }
+  } catch (e) {
+    redirected.push({ via: "query", ok: false, error: String(e?.message ?? e) });
+  }
   await browser.storage.local.set({ tabHosts });
-  return { known: tabHosts, redirected, ownerTabsSkipped };
+  return { known: tabHosts, redirected, ownerTabsSkipped, swept };
+}
+
+// A probe tab the owner starts using becomes theirs: "release-probes" makes the spike forget it.
+async function releasedProbes() {
+  // s1ig: the owner took over that Instagram probe tab on 2026-10-19.
+  const { releasedProbes = [] } = await browser.storage.local.get("releasedProbes");
+  return [...new Set(["s1ig", ...releasedProbes])];
 }
 
 async function runCommand(command) {
   if (!command?.id) return null;
   const { lastCommandId = null } = await browser.storage.local.get("lastCommandId");
   if (command.id === lastCommandId) return null;
-  await browser.storage.local.set({ lastCommandId: command.id });
+  await browser.storage.local.set({ lastCommandId: command.id }).catch(() => {});
+  if (command.action === "release-probes") {
+    const names = command.probes ?? [];
+    const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+    for (const [id, info] of Object.entries(tabHosts)) if (names.includes(info.probe)) delete tabHosts[id];
+    await browser.storage.local.set({ tabHosts, releasedProbes: [...new Set([...(await releasedProbes()), ...names])] });
+    return { id: command.id, released: names };
+  }
+  // Spike tabs are marked #fp-probe=NAME, or ?fp=dnr for unmarked DNR-only checks.
+  const mine = (t) => /[#&?]fp(-probe)?=/.test(t.url ?? "") || (t.url ?? "").startsWith(browser.runtime.getURL(BLOCKED_PAGE));
+  if (command.action === "dnr-mode") {
+    await browser.storage.local.set({ dnrMode: command.mode });
+    return { id: command.id, dnrMode: command.mode };
+  }
+  if (command.action === "inspect-tabs") {
+    const all = await browser.tabs.query({});
+    return { id: command.id, tabs: all.filter(mine).map((t) => ({ id: t.id, url: t.url, title: t.title, status: t.status })), total: all.length };
+  }
   if (command.action !== "close-probe-tabs") return { id: command.id, error: "unknown action" };
   const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
   const closed = [];
@@ -340,8 +404,24 @@ async function runCommand(command) {
     }
     delete tabHosts[id];
   }
-  await browser.storage.local.set({ tabHosts });
-  return { id: command.id, closed };
+  // Tab ids did not survive an extension reload (S3), so also find probe tabs by their URL marker.
+  let queried = null;
+  try {
+    const all = await browser.tabs.query({});
+    queried = { total: all.length, withUrl: all.filter((t) => t.url).length };
+    for (const t of all.filter(mine)) {
+      try {
+        await browser.tabs.remove(t.id);
+        closed.push({ tabId: t.id, url: t.url, ok: true, via: "query" });
+      } catch (e) {
+        closed.push({ tabId: t.id, url: t.url, ok: false, via: "query", error: String(e?.message ?? e) });
+      }
+    }
+  } catch (e) {
+    queried = String(e?.message ?? e);
+  }
+  await browser.storage.local.set({ tabHosts }).catch(() => {});
+  return { id: command.id, closed, queried };
 }
 
 browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
@@ -371,6 +451,12 @@ browser.tabs.onUpdated.addListener((tabId, change, tab) => {
   queue(async () => {
     const info = await trackTab(tabId, url);
     if (!info.probe) return;
+    if ((await releasedProbes()).includes(info.probe)) {
+      const { tabHosts = {} } = await browser.storage.local.get("tabHosts");
+      delete tabHosts[tabId];
+      await browser.storage.local.set({ tabHosts });
+      return;
+    }
     await observe("tab-updated", { tabId, probe: info.probe, ...change, tabUrl: url, tabTitle: tab?.title ?? null, tabStatus: tab?.status ?? null, atMs });
     if (!change.url) return;
     const { policy = null } = await browser.storage.local.get("policy");
@@ -382,8 +468,31 @@ browser.tabs.onUpdated.addListener((tabId, change, tab) => {
   });
 });
 
+// S3: storage.local filled up (quota errors on every set). Report what holds the space straight to
+// the native handler (storage itself cannot take a write), then drop the unsent outbox.
+async function storageCheck() {
+  const all = await browser.storage.local.get(null);
+  const sizes = Object.fromEntries(Object.entries(all).map(([k, v]) => [k, JSON.stringify(v ?? null).length]));
+  const total = Object.values(sizes).reduce((a, b) => a + b, 0);
+  let dropped = false;
+  if (total > 1_000_000) {
+    await browser.storage.local.remove(["outbox"]);
+    dropped = true;
+  }
+  try {
+    await browser.runtime.sendNativeMessage(NATIVE_APP, {
+      type: "sync",
+      reason: "storage-check",
+      installId: all.installId ?? "unknown",
+      workerInstance,
+      records: [{ type: "observation", kind: "storage-check", seq: -1, observedAt: new Date().toISOString(), sizes, total, dropped, outboxLength: all.outbox?.length ?? 0 }],
+    });
+  } catch {}
+}
+
 browser.alarms.get("sync").then((a) => {
   if (!a) browser.alarms.create("sync", { periodInMinutes: SYNC_PERIOD_MINUTES });
 });
 openPort();
+queue(storageCheck);
 reconcile("worker-start");

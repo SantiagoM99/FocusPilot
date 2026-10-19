@@ -1,7 +1,7 @@
-# Spike S1 notes: Safari keeps blocking without the app
+# Spike S1 notes: Safari keeps blocking without the app (plus S3, Safari half)
 
 Issue: SantiagoM99/FocusPilot#1. Branch `spike/s1-safari`. Throwaway code; not for merge.
-Status: T1–T5 run inside Safari on 2026-10-15/16 without owner clicks (see **Results**). The repeated permission prompts are explained and gone (see **Permission prompts**). Open: T6 sleep/wake (needs a human), T7–T9.
+Status: T1–T5 run inside Safari on 2026-10-15/16 without owner clicks (see **Results**). The repeated permission prompts are explained and gone (see **Permission prompts**). Open: T6 sleep/wake (needs a human), T7–T9. S3 (issue #3, Safari half) was run on 2026-10-19 (see **S3**).
 
 Environment: macOS 26.6.2 (25G83), Safari 26.6.2, Xcode 27.0 (27A266a). No signing identities on the Mac, so everything is signed ad hoc (`codesign -s -`, "Sign to Run Locally").
 
@@ -121,6 +121,76 @@ Findings from these runs:
 3. **`tabs.query` hides url/title of host-permitted tabs** after the extension reloads. `tabs.onUpdated` reports them. The extension has to track tab IDs itself.
 4. **A tab opened in the same instant as a policy change can load under the previous rules.** At 00:06:00 the exception's ack and the tab load were 5 ms apart, and the tab got the old block.
 5. The content script now builds the blank page with DOM calls, not `innerHTML`, so a Trusted Types CSP cannot make it throw. No `content-blank-failed` was reported after the change.
+
+## S3: already-open pages and playing video, Safari half (2026-10-19)
+
+Issue: SantiagoM99/FocusPilot#3. Same branch, app and extension (now v0.0.25). Run without owner clicks: the policy changed only through `policy.sh`, and pages loaded only with `open -a Safari <url>`. No AppleScript, no Safari restart, no settings changes. Times are UTC, from the extension's own observations (`observedAt`, `loadedAtMs`) and the app's `policy-published` events.
+
+### What was added for S3
+
+- **Domains and exceptions.** The session blocks `instagram.com` and `youtube.com`. `policy.sh --exception MIN [DOMAIN [URL]]` grants a domain exception or a URL-scoped one, an exact page (Decision 0003). `policy.js` gains `pageKey` (YouTube: video id only) and `isBlocked(result, href)`. A URL exception becomes a priority-2 DNR `allow` rule.
+- **Blocked page.** `extension/blocked.html` reports `blocked-page-load` with its own timestamp, so arrival is measured, not assumed.
+- **Probe tabs only.** The extension navigates or closes only tabs the spike opened, marked `#fp-probe=NAME` (or `?fp=…` for DNR-only checks). The mark persists in `sessionStorage` across the site's own navigations. Probe options: `autoplay=1` (muted `play()`), `spa=N` (after N s, `click()` an in-page link to another video). Probe media is force-muted on every `play`/`volumechange`.
+- **Content script** (both domains). On a timer at the next transition, on a policy change, on visibility and on a URL change, it evaluates the policy against `location.href`. If blocked, it pauses and mutes media, then asks the background to `tabs.update` the tab to the blocked page. Blanking in place is a fallback only. URL changes are detected by `yt-navigate-finish`, `popstate` and a 250 ms `location.href` poll.
+- **Background.** On every policy evaluation it redirects known probe tabs whose page is now blocked. It also sweeps `tabs.query({})`, which Safari answers with url for host-permitted tabs. `tabs.onUpdated` with a url change on a probe tab is checked too, as a second SPA path.
+- **App CLI commands** for no-click runs: `--close-probe-tabs`, `--inspect-tabs` (url, title, status of spike tabs) and `--dnr-mode redirect|block`. They are carried as `command.json` on the next native round trip, nudged by the push.
+
+### Results
+
+| Acceptance criterion | Case | Result |
+|---|---|---|
+| Playing video stopped and replaced at exception expiry | YouTube, domain exception, muted video playing in the foreground tab (t2) | **Pass.** Expiry 18:34:03.476. The content timer fired +51 ms. The video was paused at +54 ms (`paused: false → true` at t=38.6 s). The blocked page loaded at **+239 ms**. The DNR alarm's overrun was 365 ms. |
+| Same | YouTube and Instagram exceptions expiring while both tabs are **hidden** (another tab in front) (t4) | **Pass via the background only.** Neither page timer fired: WebKit suspended them in hidden tabs. The `transition` alarm ran at +267 ms and redirected both. Blocked page at **+397 ms** (YouTube) and **+278 ms** (Instagram). |
+| Open tabs on blocked domains redirected at session start | 3 probe tabs (YouTube playing muted, YouTube hidden, Instagram) open, then `--normal 2` (t1) | **Pass.** Published 18:29:07.735. The ack redirected all three at +115–176 ms, and the blocked page loaded in all three at **+414–416 ms**. |
+| Same | Tab opened **before the extension reloaded** (update), then a session starts (t5) | **Fail with tracked tab ids, pass with a `tabs.query` sweep.** After the reload Safari gave every tab a new id. The stored id failed ("Tab not found"), the old content script was orphaned, and the video kept playing under an active block. With the sweep, the blocked page loaded **+235 ms** after publish. |
+| YouTube in-app (SPA) navigation caught | URL exception for one video, then the probe clicks a related video (t3b) | **Pass.** Click 18:35:10.723. The URL poll saw `watch?v=aqz…` → `watch?v=aIUI…` at +104 ms, media was paused at +107 ms, and the blocked page loaded at **+228 ms** after the click. Earlier, an in-app navigation that the probe did not start (t3a) was caught the same way: 110 ms from detection to the blocked page. `yt-navigate-finish` never came first. Background `tabs.onUpdated` did not report the YouTube SPA url change before the redirect; it did report Instagram's SPA url changes. |
+| Fresh load during a block | New tab on a blocked domain | **DNR `block`: pass** ("Failed to open page" on both domains, no content script ran). **DNR `redirect` to `extensionPath`: fails open.** Safari accepted the rule with no error, but Instagram loaded normally in 2 of 2 runs, and the YouTube tab ended on a page the extension cannot read. Use `block`, and send open tabs to the blocked page with `tabs.update`. |
+
+### Findings
+
+1. **Autoplay works headless when muted, but YouTube can autoplay with sound by itself.**
+   - Muted `play()` from the content script started playback without a gesture in a foreground tab (`autoplay-ok`).
+   - A hidden tab did not load the video at all (`readyState 0`) until shown.
+   - On the first run, YouTube replaced the probe's muted `play()` (`AbortError`) with its own **unmuted** autoplay; Safari's per-site setting allowed it. Two probe tabs played with sound from 18:21:40 to 18:24:57, until the extension could close them.
+   - Probe media is now force-muted. The product must not rely on the browser's autoplay policy to keep video silent.
+2. **Tab ids are not stable in Safari.**
+   - Navigating a tab to the extension's blocked page fires `tabs.onRemoved` for the old id and reappears under a new id (process swap).
+   - Reloading the extension renumbers every tab.
+   - State keyed by tab id goes stale. The product should find tabs with `tabs.query` at each activation and expiry, not keep an id list. (S1 finding 3 said `tabs.query` hides urls; with "Always Allow" per-site access it now returns them for the granted hosts.)
+3. **Page timers cannot be the mechanism.**
+   - In a foreground tab the content script was fastest: pause in ~50 ms, blocked page in ~240 ms.
+   - In hidden tabs no timer fired. The background `transition` alarm plus `tabs.update` did the job at +0.3–0.4 s.
+   - The product needs both. The content script is the fast path and the only thing that stops media instantly. The background redirect is the guarantee.
+4. **`storage.local.set` threw "Exceeded storage quota" with only 35 KB stored.**
+   - This happened once, after ~2 days with the extension unloaded, and stopped after the `outbox` key was removed. The cause is unknown.
+   - Because the error was inside the native-exchange `try`, it also dropped the native response: commands and policy updates were lost until it was patched.
+   - Storage failures must never block enforcement.
+5. **Extension reloads orphan content scripts.**
+   - One open tab got a fresh content script after an update and another did not.
+   - Blocked-page tabs (extension URLs) appeared to be closed by the reload.
+6. **Why the extension disappeared between 10-17 and 10-19 (stale registration).**
+   - On 10-17 the reinstall happened while "Allow unsigned extensions" was evidently off. Safari logged "Computing the code signing dictionary failed … does not have a code signature" and rejected that plug-in registration.
+   - After the owner re-enabled the setting (10-19), Safari still did not list or load the extension. Relaunching the app did not change that, because Safari had already evaluated that registration.
+   - A stale duplicate LaunchServices registration of the build-folder copy also existed.
+   - Fix, no Safari restart: `lsregister -u` the build copy, then `lsregister -f` the installed app, then `pluginkit -a` the appex and `pluginkit -e use`. That gave the plug-in a new registration UUID, and Safari loaded it within the same second (`onInstalled:install`). Signatures were unchanged throughout (ad hoc, hardened runtime, same entitlements as the 10-15 build).
+   - For later runs: install only to `~/Applications`, and unregister the build-folder copy.
+7. **The owner used one probe tab.** One Instagram probe tab (`s1ig`) was taken over and browsed by the owner. It was released (`releasedProbes`), so the spike stopped tracking, muting or redirecting it, and it was left open. Its navigation is not recorded here.
+
+### Permissions (Safari)
+
+- `host_permissions` for `*://*.youtube.com/*` and `*://*.instagram.com/*`. The owner must grant website access per site ("Always Allow"). This is needed for the content script, for urls in `tabs.query`/`tabs.onUpdated`, and therefore for finding open tabs. A new host in an update is not granted automatically: youtube.com stayed `false` until the owner granted it.
+- `declarativeNetRequest` (the `block` and `allow` rules), `alarms`, `storage`, `nativeMessaging`.
+- No `tabs` permission was needed.
+- `web_accessible_resources` is needed only for a DNR redirect or a page-initiated navigation to the blocked page. Neither is used in the final design.
+
+### Unsupported or not tested (do not claim protection)
+
+- DNR `redirect` to an extension page (fails open, above).
+- Private windows, other Safari profiles, and tabs whose host the owner has not granted (no content script, no url, so no open-tab redirect; DNR `block` still applies to new loads).
+- Picture-in-picture, background audio after the tab is hidden, and media in cross-origin iframes on other sites (for example YouTube embeds) were not tested.
+- What a hidden tab's video does between being hidden and the expiry was not measured: its timers were suspended.
+- Sleep/wake (S1 T6) is still pending.
+- The owner's own tabs were never touched. Six were open on these domains at the last activation (`ownerTabsSkipped: 6`); the product would redirect them.
 
 ## Owner setup (do once, in order)
 
@@ -265,6 +335,9 @@ No Safari preferences or other apps' files were modified directly.
 - Blocking content with your Safari web extension (`block` needs only `declarativeNetRequest`; redirect needs host access): https://developer.apple.com/documentation/safariservices/blocking-content-with-your-safari-web-extension
 - Optimizing your web extension for Safari (non-persistent background, unloading, alarms): https://developer.apple.com/documentation/safariservices/optimizing-your-web-extension-for-safari
 - Assessing browser compatibility: https://developer.apple.com/documentation/safariservices/assessing-your-safari-web-extension-s-browser-compatibility
+- `tabs.query` / `tabs.update` / `tabs.onUpdated` (MDN, WebExtensions API used by Safari): https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs
+- `declarativeNetRequest` rule actions (`block`, `allow`, `redirect.extensionPath`): https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/declarativeNetRequest/RuleAction
+- WebKit autoplay policy (muted autoplay allowed without a gesture): https://webkit.org/blog/7734/auto-play-policy-changes-for-macos/
 - Managing Safari web extension permissions (website access): https://developer.apple.com/documentation/safariservices/managing-safari-web-extension-permissions
 - `SMAppService.mainApp`, `register()`, `.requiresApproval`: https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp, https://developer.apple.com/documentation/servicemanagement/smappservice/register(), https://developer.apple.com/documentation/servicemanagement/smappservice/status-swift.enum/requiresapproval
 - `SFSafariExtensionManager.getStateOfSafariExtension`: https://developer.apple.com/documentation/safariservices/sfsafariextensionmanager/getstateofsafariextension(withidentifier:completionhandler:)

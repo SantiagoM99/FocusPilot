@@ -24,6 +24,14 @@
     opts = new URLSearchParams(sessionStorage.getItem("fpOpts") ?? "");
   } catch {}
   if (!probe) return;
+  let released = false;
+  function release() {
+    released = true;
+    try {
+      sessionStorage.removeItem("fpProbe");
+      sessionStorage.removeItem("fpOpts");
+    } catch {}
+  }
 
   let timer = null;
   let timerDueAt = null;
@@ -31,6 +39,7 @@
   let lastHref = location.href;
 
   function report(event, details = {}) {
+    if (released) return;
     browser.runtime
       .sendMessage({ type: "page-event", event, probe, href: location.href, atMs: Date.now(), visibility: document.visibilityState, ...details })
       .catch(() => {});
@@ -63,6 +72,8 @@
   }
 
   async function enforce(reason, result, dueAt) {
+    const { released: r } = await browser.runtime.sendMessage({ type: "hello", probe }).catch(() => ({}));
+    if (r) return release();
     enforced = true;
     const now = Date.now();
     const before = mediaState();
@@ -73,7 +84,7 @@
     report("media-stopped", { reason, lateMs: dueAt != null ? now - dueAt : null, before, after: mediaState() });
     let resp = null;
     try {
-      resp = await browser.runtime.sendMessage({ type: "enforce-me", reason, href: location.href });
+      resp = await browser.runtime.sendMessage({ type: "enforce-me", probe, reason, href: location.href });
     } catch (e) {
       resp = { ok: false, error: String(e?.message ?? e) };
     }
@@ -84,6 +95,7 @@
   }
 
   async function check(reason) {
+    if (released) return;
     const { policy = null } = await browser.storage.local.get("policy");
     const now = Date.now();
     const result = P.evaluate(policy, now);
@@ -114,7 +126,7 @@
   // yt-navigate-finish after its router swaps the page; a 250 ms URL poll covers sites that do
   // not, and history changes made by the page's own pushState are invisible to this isolated world.
   function urlMaybeChanged(via) {
-    if (location.href === lastHref) return;
+    if (released || location.href === lastHref) return;
     const from = lastHref;
     lastHref = location.href;
     report("spa-nav", { via, from, to: location.href });
@@ -131,6 +143,12 @@
     report("visibility");
     if (!document.hidden) safeCheck("visible");
   });
+
+  // Probe tabs stay muted whatever the site does (YouTube autoplays with sound when Safari's
+  // per-site setting allows it, and replaced our muted play() with its own).
+  document.addEventListener("play", (e) => { if (!released) e.target.muted = true; }, true);
+  document.addEventListener("volumechange", (e) => { if (!released && !e.target.muted) e.target.muted = true; }, true);
+  setInterval(() => { if (!released) for (const m of media()) if (!m.muted) m.muted = true; }, 500);
 
   // Probe helpers: start playback without a user gesture (muted, which WebKit allows), and
   // report media state so "was playing" is measured, not assumed.
@@ -170,5 +188,5 @@
     }, spaAfter * 1000);
   }
 
-  safeCheck("load");
+  browser.runtime.sendMessage({ type: "hello", probe }).then((r) => (r?.released ? release() : safeCheck("load")), () => safeCheck("load"));
 })();
