@@ -5,6 +5,7 @@ import SwiftUI
 /// (design 15). Pinning a task here changes the one global Now.
 struct ProjectsView: View {
     let model: AppModel
+    var showReviewQueue: () -> Void = {}
     @State private var projectSelection: ProjectSummary.ID?
     @State private var taskSelection: Int64?
     @State private var isImporting = false
@@ -86,6 +87,8 @@ struct ProjectsView: View {
                          undoHerdrAdd: { id in Task { await model.undoHerdrAdd(id) } },
                      activeSessionTaskID: model.snapshot.activeSession?.taskID,
                          selection: $taskSelection)
+                    .taskInspector(model: model, items: model.projectItems, selection: $taskSelection,
+                                   showReviewQueue: showReviewQueue)
             }
         } else if model.projects.isEmpty {
             ContentUnavailableView("No projects yet", systemImage: "folder",

@@ -89,3 +89,20 @@ public struct NewReviewItem: Equatable, Sendable {
     public var paneID: String
     public var server: HerdrServer
 }
+
+/// The agents offered when linking a task: those in the task's project's
+/// workspace first and preselected, then the rest in Herdr's order. Agents
+/// already linked to the task are left out. Nothing is linked until the
+/// owner confirms.
+public struct AgentLinkChoices: Equatable, Sendable {
+    public var agents: [HerdrAgent]
+    public var preselected: Set<String>
+
+    public init(_ all: [HerdrAgent], on server: HerdrServer, projectLink: HerdrLink?, linked: [TaskAgentLink]) {
+        let free = all.filter { agent in !linked.contains { $0.server == server && $0.paneID == agent.paneID } }
+        let workspace = projectLink.flatMap { $0.server == server ? $0.workspaceID : nil }
+        let inProject = free.filter { $0.workspaceID == workspace }
+        agents = inProject + free.filter { $0.workspaceID != workspace }
+        preselected = Set(inProject.map(\.paneID))
+    }
+}

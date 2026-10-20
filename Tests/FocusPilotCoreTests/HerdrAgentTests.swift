@@ -137,3 +137,31 @@ struct HerdrCommandAllowlistTests {
         #expect(everyCommand.filter(\.changesHerdrFocus) == [.agentFocus(paneID: "w4:p2")])
     }
 }
+
+@Suite("Choosing agents to link")
+struct AgentLinkChoicesTests {
+    private let nlpLink = HerdrLink(server: herdrServer, workspaceID: "w4", label: "NLP report", cwd: nil)
+    private let agents = [agent(.idle, pane: "w3:pJ", name: nil), agent(.working, pane: "w4:p2"),
+                          agent(.done, pane: "w4:pA", name: "seeds")]
+
+    @Test func theProjectsWorkspaceComesFirstAndIsPreselected() {
+        let choices = AgentLinkChoices(agents, on: herdrServer, projectLink: nlpLink, linked: [])
+        #expect(choices.agents.map(\.paneID) == ["w4:p2", "w4:pA", "w3:pJ"])
+        #expect(choices.preselected == ["w4:p2", "w4:pA"])
+    }
+
+    @Test func aProjectLinkFromAnotherServerInstancePreselectsNothing() {
+        let stale = HerdrLink(server: restartedHerdrServer, workspaceID: "w4", label: "NLP report", cwd: nil)
+        #expect(AgentLinkChoices(agents, on: herdrServer, projectLink: stale, linked: []).preselected.isEmpty)
+        #expect(AgentLinkChoices(agents, on: herdrServer, projectLink: nil, linked: []).preselected.isEmpty)
+    }
+
+    @Test func agentsAlreadyLinkedToTheTaskAreLeftOut() {
+        let linked = TaskAgentLink(id: 1, taskID: 1, server: herdrServer, paneID: "w4:p2", workspaceID: "w4",
+                                   tabID: "w4:t2", name: "ablation", kind: "claude", label: "ablation",
+                                   workspaceLabel: nil, lastStatus: .working, statusChangedAt: wednesdayMorningInBogota)
+        let choices = AgentLinkChoices(agents, on: herdrServer, projectLink: nlpLink, linked: [linked])
+        #expect(choices.agents.map(\.paneID) == ["w4:pA", "w3:pJ"])
+        #expect(choices.preselected == ["w4:pA"])
+    }
+}
