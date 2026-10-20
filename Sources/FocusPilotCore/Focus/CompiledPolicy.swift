@@ -113,10 +113,10 @@ public struct CompiledPolicy: Hashable, Codable, Sendable {
     }
 }
 
-/// Delivers policies to the browser extensions. Delivery itself arrives with
-/// the extensions (#13, #16); until then the app uses `PolicyNotDelivered`.
+/// Delivers policies to the browser extensions; the app uses
+/// `ChromePolicyMailbox` (#16).
 public protocol PolicyPublisher: Sendable {
-    func publish(_ policy: CompiledPolicy) async
+    func publish(_ delivery: PolicyDelivery) async
 }
 
 /// Tells the owner about a session event, such as reaching the planned end.
@@ -124,10 +124,10 @@ public protocol FocusNoticeSink: Sendable {
     func deliver(_ notice: FocusNotice) async
 }
 
-/// Keeps nothing: no extension is installed to receive policies yet.
+/// Keeps nothing, for previews and tests that do not check delivery.
 public struct PolicyNotDelivered: PolicyPublisher {
     public init() {}
-    public func publish(_ policy: CompiledPolicy) async {}
+    public func publish(_ delivery: PolicyDelivery) async {}
 }
 
 /// Drops notices; the app supplies a sink that shows them.

@@ -4,10 +4,12 @@ import Synchronization
 
 /// Keeps every policy the coordinator publishes, in order.
 actor RecordingPolicyPublisher: PolicyPublisher {
-    private(set) var published: [CompiledPolicy] = []
+    private(set) var deliveries: [PolicyDelivery] = []
 
-    func publish(_ policy: CompiledPolicy) async {
-        published.append(policy)
+    var published: [CompiledPolicy] { deliveries.map(\.policy) }
+
+    func publish(_ delivery: PolicyDelivery) async {
+        deliveries.append(delivery)
     }
 }
 
