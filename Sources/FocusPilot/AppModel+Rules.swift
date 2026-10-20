@@ -62,6 +62,8 @@ extension AppModel {
             rulesError = nil
         } catch let error as RuleError {
             rulesError = RuleErrorText.message(error)
+            // Show the rule as it is now, so the owner can check it.
+            if error == .ruleChanged { await loadRules() }
             return false
         } catch {
             rulesError = "Could not save: \(error.localizedDescription)"

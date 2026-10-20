@@ -140,6 +140,7 @@ struct RuleErrorTextTests {
         #expect(RuleErrorText.message(.alreadyBlocked(.app(bundleID: "com.burbn.instagram", name: "Instagram")))
             == "Instagram is blocked by a rule. Remove it there first.")
         #expect(RuleErrorText.message(.notBlockable(.tool(command: "herdr"))) == "herdr is a command-line tool and can't be blocked.")
+        #expect(RuleErrorText.message(.ruleChanged) == "This rule changed since you opened it. Check it and try again.")
     }
 }
 

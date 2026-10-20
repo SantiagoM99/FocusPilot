@@ -42,6 +42,33 @@ struct RuleStorageTests {
         #expect(change.inputs.rules == [BlockRuleSet(id: rule.id, targets: rule.targets, activation: rule.activation, revision: 2)])
     }
 
+    // Review of PR #39: an edit made from an older copy of the rule must not
+    // silently undo the changes saved since.
+    @Test func savingFromAnOlderCopyIsRefusedAndNothingChanges() async throws {
+        let first = try #require(try await repository.save(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always)).inputs.rules.first)
+        var newer = first
+        newer.targets.append(.site(domain: "x.com"))
+        try await repository.save(newer)
+        var stale = first
+        stale.activation = .sessionOnly
+
+        await #expect(throws: RuleError.ruleChanged) { try await repository.save(stale) }
+        #expect(try await repository.policyInputs().rules.first?.targets.count == 2)
+    }
+
+    @Test func deletingAnOlderRevisionIsRefused() async throws {
+        let first = try #require(try await repository.save(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always)).inputs.rules.first)
+        var newer = first
+        newer.targets.append(.site(domain: "x.com"))
+        try await repository.save(newer)
+
+        await #expect(throws: RuleError.ruleChanged) { try await repository.deleteRuleSet(first.id!, revision: first.revision) }
+        #expect(try await repository.policyInputs().rules.count == 1)
+        await #expect(throws: RuleError.ruleChanged) { try await repository.save(first) }
+        try await repository.deleteRuleSet(first.id!, revision: 2)
+        await #expect(throws: RuleError.ruleChanged) { try await repository.save(newer) }
+    }
+
     @Test func rulesSurviveRelaunch() async throws {
         let schedule = WeeklySchedule(days: [.sat, .sun], from: ClockTime(22, 0), to: ClockTime(2, 0), timeZone: newYork)
         let saved = try await repository.save(BlockRuleSet(targets: [.site(domain: "reddit.com"), .app(bundleID: "com.valve.steam", name: "Steam")],

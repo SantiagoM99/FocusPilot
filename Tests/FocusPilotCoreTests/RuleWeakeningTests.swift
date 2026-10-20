@@ -84,7 +84,7 @@ struct StrictRuleWaitTests {
         let availableAt = fixture.clock.now.addingTimeInterval(StrictEarlyEnd.wait)
         #expect(result == .waitUntil(availableAt))
         #expect(try await fixture.coordinator.ruleSets() == [rule])
-        #expect(await fixture.coordinator.snapshot().pendingRuleEdit == PendingRuleEdit(edit: .delete(rule.id!), availableAt: availableAt))
+        #expect(await fixture.coordinator.snapshot().pendingRuleEdit == PendingRuleEdit(edit: .delete(rule.id!), availableAt: availableAt, expiresAt: availableAt.addingTimeInterval(StrictEarlyEnd.applyWindow)))
         fixture.advance(seconds: 30)
         #expect(try await fixture.coordinator.deleteRuleSet(rule.id!) == .waitUntil(availableAt))
     }
@@ -140,6 +140,72 @@ struct StrictRuleWaitTests {
         fixture.advance(minutes: 1)
 
         #expect(try await fixture.coordinator.deleteRuleSet(other.id!) == .needsConfirmation)
+    }
+
+    // Review of PR #39: the repro. A finished wait must not apply over a
+    // tightening made in between, nor undo it.
+    @Test func aWaitedEditCannotUndoATighteningMadeMeanwhile() async throws {
+        let (fixture, rule) = try await strictFixture()
+        var both = rule
+        both.targets.append(.site(domain: "instagram.com"))
+        try await fixture.coordinator.saveRuleSet(both)
+        both = try #require(await fixture.coordinator.ruleSets().first)
+        var withoutInstagram = both
+        withoutInstagram.targets = [.site(domain: "youtube.com")]
+        _ = try await fixture.coordinator.saveRuleSet(withoutInstagram, confirmed: true)
+        fixture.advance(minutes: 1)
+        var tighter = both
+        tighter.targets.append(.site(domain: "x.com"))
+
+        #expect(try await fixture.coordinator.saveRuleSet(tighter) == .saved)
+        #expect(await fixture.coordinator.snapshot().pendingRuleEdit == nil)
+        await #expect(throws: RuleError.ruleChanged) { try await fixture.coordinator.saveRuleSet(withoutInstagram) }
+        #expect(try await fixture.coordinator.ruleSets().first?.targets.count == 3)
+    }
+
+    @Test func aWaitedDeleteIsRefusedIfTheRuleChanged() async throws {
+        let (fixture, rule) = try await strictFixture()
+        _ = try await fixture.coordinator.deleteRuleSet(rule.id!, confirmed: true)
+        fixture.advance(minutes: 1)
+        // Changed outside the coordinator, e.g. by the CLI later.
+        var tighter = rule
+        tighter.activation = .always
+        try await TaskRepository(location: fixture.location).save(tighter)
+
+        await #expect(throws: RuleError.ruleChanged) { try await fixture.coordinator.deleteRuleSet(rule.id!) }
+        #expect(try await fixture.coordinator.ruleSets().count == 1)
+    }
+
+    @Test func anyOtherEditClearsTheWait() async throws {
+        let (fixture, rule) = try await strictFixture()
+        _ = try await fixture.coordinator.deleteRuleSet(rule.id!, confirmed: true)
+
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "x.com")], activation: .always))
+
+        #expect(await fixture.coordinator.snapshot().pendingRuleEdit == nil)
+        fixture.advance(minutes: 1)
+        #expect(try await fixture.coordinator.deleteRuleSet(rule.id!) == .needsConfirmation)
+    }
+
+    @Test func aFinishedWaitExpiresIfNotApplied() async throws {
+        let (fixture, rule) = try await strictFixture()
+        _ = try await fixture.coordinator.deleteRuleSet(rule.id!, confirmed: true)
+        let pending = try #require(await fixture.coordinator.snapshot().pendingRuleEdit)
+        #expect(pending.expiresAt == pending.availableAt.addingTimeInterval(StrictEarlyEnd.applyWindow))
+
+        fixture.advance(seconds: StrictEarlyEnd.wait + StrictEarlyEnd.applyWindow + 1)
+
+        #expect(await fixture.coordinator.snapshot().pendingRuleEdit == nil)
+        #expect(try await fixture.coordinator.deleteRuleSet(rule.id!) == .needsConfirmation)
+        #expect(try await fixture.coordinator.ruleSets() == [rule])
+    }
+
+    @Test func aFinishedWaitStillAppliesWithinItsWindow() async throws {
+        let (fixture, rule) = try await strictFixture()
+        _ = try await fixture.coordinator.deleteRuleSet(rule.id!, confirmed: true)
+        fixture.advance(seconds: StrictEarlyEnd.wait + StrictEarlyEnd.applyWindow - 1)
+
+        #expect(try await fixture.coordinator.deleteRuleSet(rule.id!) == .saved)
     }
 
     @Test func cancellingClearsTheWait() async throws {

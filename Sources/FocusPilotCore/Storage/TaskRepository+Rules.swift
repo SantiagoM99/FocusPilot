@@ -21,9 +21,11 @@ extension TaskRepository {
     }
 
     /// Inserts or updates a rule set, bumping its revision on update. Sites
-    /// are normalized here, whoever the caller. Unless `allowWeakening`, an
-    /// update that weakens the rule throws `weakensStrictSession` and
-    /// changes nothing.
+    /// are normalized here, whoever the caller. An update must carry the
+    /// stored revision, or it throws `ruleChanged`: it was made from an older
+    /// copy and would undo the edits since. Unless `allowWeakening`, an
+    /// update that weakens the rule throws `weakensStrictSession`. Either
+    /// way nothing changes.
     @discardableResult
     public func save(_ rule: BlockRuleSet, allowWeakening: Bool = true) async throws -> PolicyChange {
         let rule = try ActivityLists.normalized(rule)
@@ -31,11 +33,13 @@ extension TaskRepository {
             try ActivityLists.validate(rule, allowed: try Self.allowed(db))
             var row = try RuleSetRow(rule)
             if let id = rule.id {
-                let saved = try RuleSetRow.fetchOne(db, key: id)
-                if !allowWeakening, let old = try saved?.rule(), RuleStrength.weakens(old, to: rule) {
+                guard let saved = try RuleSetRow.fetchOne(db, key: id), saved.revision == rule.revision else {
+                    throw RuleError.ruleChanged
+                }
+                if !allowWeakening, RuleStrength.weakens(try saved.rule(), to: rule) {
                     throw RuleError.weakensStrictSession
                 }
-                row.revision = (saved?.revision ?? 0) + 1
+                row.revision = saved.revision + 1
                 try row.update(db)
             } else {
                 row.revision = 1
@@ -45,11 +49,17 @@ extension TaskRepository {
     }
 
     /// Deleting always weakens, so unless `allowWeakening` it throws
-    /// `weakensStrictSession`.
+    /// `weakensStrictSession`. With a `revision`, it throws `ruleChanged`
+    /// unless the stored rule still has it.
     @discardableResult
-    public func deleteRuleSet(_ id: Int64, allowWeakening: Bool = true) async throws -> PolicyChange {
+    public func deleteRuleSet(_ id: Int64, revision: Int? = nil, allowWeakening: Bool = true) async throws -> PolicyChange {
         guard allowWeakening else { throw RuleError.weakensStrictSession }
-        return try await policyChange { db in _ = try RuleSetRow.deleteOne(db, key: id) }
+        return try await policyChange { db in
+            if let revision, try RuleSetRow.fetchOne(db, key: id)?.revision != revision {
+                throw RuleError.ruleChanged
+            }
+            _ = try RuleSetRow.deleteOne(db, key: id)
+        }
     }
 
     /// Allows an entry. A blocked or overlapping target is refused outright,

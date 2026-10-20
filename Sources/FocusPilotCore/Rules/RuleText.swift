@@ -74,6 +74,7 @@ public enum RuleErrorText {
         case .notBlockable(let target): "\(target.displayName) is a command-line tool and can't be blocked."
         case .alreadyAllowed(let target): "\(target.displayName) is in Allowed. Remove it there first."
         case .alreadyBlocked(let target): "\(target.displayName) is blocked by a rule. Remove it there first."
+        case .ruleChanged: "This rule changed since you opened it. Check it and try again."
         }
     }
 }

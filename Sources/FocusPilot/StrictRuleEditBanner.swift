@@ -4,11 +4,12 @@ import SwiftUI
 /// During a strict session, weakening a rule asks first, then counts down
 /// `StrictEarlyEnd.wait` before it can be applied (decision 0003,
 /// 2026-10-17), like ending the session early. Blocking stays on meanwhile.
+/// An unapplied change disappears `StrictEarlyEnd.applyWindow` after it.
 struct StrictRuleEditBanner: View {
     let model: AppModel
 
     var body: some View {
-        if let pending = model.snapshot.pendingRuleEdit {
+        if let pending = model.snapshot.pendingRuleEdit, model.now < pending.expiresAt {
             banner(RuleText.title(pending.edit, rules: model.ruleSets),
                    detail: RuleText.applyCountdown(availableAt: pending.availableAt, now: model.now)) {
                 Button("Keep Rule") { Task { await model.cancelRuleEdit() } }

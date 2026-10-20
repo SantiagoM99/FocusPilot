@@ -7,7 +7,9 @@ import Foundation
 /// During a strict session, an edit that weakens a rule (decision 0003,
 /// 2026-10-17) first returns `needsConfirmation`, then waits
 /// `StrictEarlyEnd.wait` from the confirmation, like ending early. Adding or
-/// tightening rules is immediate.
+/// tightening rules is immediate. A confirmed change applies only to the rule
+/// as it was confirmed, within `StrictEarlyEnd.applyWindow` after the wait,
+/// and any other edit drops it.
 extension FocusCoordinator {
     public func ruleSets() async throws -> [BlockRuleSet] {
         try await repository.policyInputs().rules
@@ -35,11 +37,11 @@ extension FocusCoordinator {
 
     /// Allowing is never weakening: a blocked or overlapping target is refused.
     public func allow(_ entry: AllowedActivity) async throws {
-        try await publish(repository.allow(entry))
+        try await commit(repository.allow(entry))
     }
 
     public func removeAllowed(_ id: Int64) async throws {
-        try await publish(repository.removeAllowed(id))
+        try await commit(repository.removeAllowed(id))
     }
 
     private var strictRulesApply: Bool {
@@ -49,33 +51,66 @@ extension FocusCoordinator {
 
     private func perform(_ edit: RuleEdit, confirmed: Bool) async throws -> RuleEditOutcome {
         guard strictRulesApply else {
-            try await publish(apply(edit, allowWeakening: true))
+            try await commit(apply(edit, revision: nil, allowWeakening: true))
             return .saved
         }
-        if let wait = ruleWait, wait.request == edit {
+        if let wait = ruleWait, wait.hasExpired(at: uptime()) {
+            ruleWait = nil
+            await broadcast()
+        }
+        if let wait = ruleWait, wait.request.edit == edit {
             let availableAt = availableAt(wait)
             if now() < availableAt { return .waitUntil(availableAt) }
             ruleWait = nil
-            try await publish(apply(edit, allowWeakening: true))
+            do {
+                try await commit(apply(edit, revision: wait.request.ruleRevision, allowWeakening: true))
+            } catch {
+                await broadcast()
+                throw error
+            }
             return .saved
         }
         do {
-            try await publish(apply(edit, allowWeakening: false))
+            try await commit(apply(edit, revision: nil, allowWeakening: false))
             return .saved
         } catch RuleError.weakensStrictSession {
             guard confirmed else { return .needsConfirmation }
-            let wait = StrictWait(request: edit, confirmedAt: uptime())
+            let confirmedEdit = ConfirmedRuleEdit(edit: edit, ruleRevision: try await storedRevision(of: edit))
+            let wait = StrictWait(request: confirmedEdit, confirmedAt: uptime())
             ruleWait = wait
             await broadcast()
             return .waitUntil(availableAt(wait))
         }
     }
 
-    private func apply(_ edit: RuleEdit, allowWeakening: Bool) async throws -> PolicyChange {
+    /// A save already carries the revision it was made from; a delete is
+    /// pinned to the rule as stored when the owner confirmed it.
+    private func storedRevision(of edit: RuleEdit) async throws -> Int? {
+        switch edit {
+        case .save(let rule): rule.revision
+        case .delete(let id): try await repository.policyInputs().rules.first { $0.id == id }?.revision
+        }
+    }
+
+    private func apply(_ edit: RuleEdit, revision: Int?, allowWeakening: Bool) async throws -> PolicyChange {
         switch edit {
         case .save(let rule): try await repository.save(rule, allowWeakening: allowWeakening)
-        case .delete(let id): try await repository.deleteRuleSet(id, allowWeakening: allowWeakening)
+        case .delete(let id): try await repository.deleteRuleSet(id, revision: revision, allowWeakening: allowWeakening)
         }
+    }
+
+    /// A pending weakening change was confirmed against the lists before
+    /// this edit, so the edit drops it.
+    private func commit(_ change: PolicyChange) async {
+        ruleWait = nil
+        await publish(change)
+    }
+
+    /// The waiting rule change, unless its apply window has passed.
+    func pendingRuleEdit() -> PendingRuleEdit? {
+        guard let wait = ruleWait, !wait.hasExpired(at: uptime()) else { return nil }
+        return PendingRuleEdit(edit: wait.request.edit, availableAt: availableAt(wait),
+                               expiresAt: now().addingTimeInterval(wait.untilExpiry(at: uptime()) / .seconds(1)))
     }
 
     func publish(_ change: PolicyChange) async {

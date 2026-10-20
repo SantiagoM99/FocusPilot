@@ -64,6 +64,9 @@ public enum RuleError: Error, Equatable {
     case notBlockable(ActivityTarget)
     case alreadyAllowed(ActivityTarget)
     case alreadyBlocked(ActivityTarget)
+    /// The rule was edited or deleted since this copy was read, so saving
+    /// it would undo that change.
+    case ruleChanged
 }
 
 /// Keeps the blocked and allowed lists from contradicting each other: the
