@@ -86,6 +86,7 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-16: Herdr workspaces that already exist the first time FocusPilot sees a Herdr session are imported by the owner ("From Herdr…"), not auto-created; only workspaces that appear afterwards become projects automatically. Auto-sync never adopts an existing project by name.
 - 2026-10-17: During a strict session, weakening a block rule (deleting it, loosening its activation or schedule, or allowing a blocked target) needs the same confirmation and 60-second wait as ending early; adding or tightening rules is immediate.
 - 2026-10-17: The wrap-up sheet appears only when a session ends, not on pauses. Every wrap-up is kept as history per task; the latest one drives the next action and the return cue.
+- 2026-10-20: Chrome first. Without a paid Apple developer account, Safari disables the unsigned FocusPilot extension whenever Safari quits, so FocusPilot enforces blocking through Chrome first (#16). #13 (FocusPilot's own Safari extension) is deferred. For now Safari is covered by an owner-chosen third-party blocker from the Mac App Store, shown in protection status as "external blocker, not verified". If that blocker exposes Shortcuts actions, FocusPilot may start and stop it with sessions (to be validated). Spike S3 passed in both browsers (#3).
 
 ## Sources
 
