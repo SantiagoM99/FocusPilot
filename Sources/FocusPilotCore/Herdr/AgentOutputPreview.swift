@@ -2,8 +2,8 @@ import Foundation
 
 /// An agent's visible screen reduced to plain text lines for display.
 ///
-/// The text comes from a terminal and is untrusted: escape sequences and
-/// control characters are removed so nothing is interpreted, it is never
+/// The text comes from a terminal and is untrusted: escape sequences,
+/// control and format characters are removed so nothing is interpreted, it is never
 /// executed or rendered as markup, and only the last lines are kept.
 public struct AgentOutputPreview: Equatable, Sendable {
     static let maximumLines = 40
@@ -17,8 +17,7 @@ public struct AgentOutputPreview: Equatable, Sendable {
         let all = Self.strippingEscapes(raw)
             .components(separatedBy: .newlines)
             .map { line in
-                String(line.unicodeScalars.filter { $0.properties.generalCategory != .control || $0 == "\t" }.map(Character.init))
-                    .trimmingCharacters(in: .whitespaces)
+                PlainText.removingInvisibles(line).trimmingCharacters(in: .whitespaces)
             }
             .filter(Self.hasText)
         lines = all.suffix(Self.maximumLines).map { String($0.prefix(Self.maximumLineLength)) }

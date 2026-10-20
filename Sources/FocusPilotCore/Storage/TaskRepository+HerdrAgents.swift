@@ -30,6 +30,11 @@ extension TaskRepository {
         return try await ownerDatabase.write { db in try HerdrAgentStore.record(agents, on: server, at: observedAt, in: db) }
     }
 
+    /// Updates the link's name after the agent was renamed in Herdr.
+    public func relinkAgent(_ linkID: Int64, to agent: HerdrAgent) async throws {
+        try await ownerDatabase.write { db in try HerdrAgentStore.relink(linkID, to: agent, in: db) }
+    }
+
     public func storeOutput(_ output: AgentOutputPreview, forReviewItem id: Int64) async throws {
         try await ownerDatabase.write { db in try HerdrAgentStore.storeOutput(output, forReviewItem: id, in: db) }
     }

@@ -75,7 +75,11 @@ enum HerdrPaneID {
 
 /// Parses `herdr agent list` output. The reply is untrusted: any field of
 /// the wrong type, or a pane ID of the wrong shape, rejects the whole reply.
+/// Names and titles are shown and stored, so they are made plain and cut.
 enum HerdrAgentList {
+    static let maximumTitleLength = 200
+    static let maximumNameLength = 64
+
     static func parse(_ data: Data) -> [HerdrAgent]? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let result = root["result"] as? [String: Any],
@@ -88,16 +92,47 @@ enum HerdrAgentList {
                   let kind = item["agent"] as? String, let status = item["agent_status"] as? String,
                   optional(item["name"], String.self), optional(item["terminal_title_stripped"], String.self)
             else { return nil }
-            let title = (item["terminal_title_stripped"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            agents.append(HerdrAgent(paneID: pane, workspaceID: workspace, tabID: tab, name: item["name"] as? String,
+            let title = (item["terminal_title_stripped"] as? String).flatMap { cut($0, maximumTitleLength) }
+            let name = (item["name"] as? String).flatMap { cut($0, maximumNameLength) }
+            agents.append(HerdrAgent(paneID: pane, workspaceID: workspace, tabID: tab, name: name,
                                      kind: kind, status: HerdrAgentStatus(herdr: status), title: title))
         }
         return agents
     }
 
+    private static func cut(_ text: String, _ length: Int) -> String? {
+        let plain = PlainText.removingInvisibles(text).trimmingCharacters(in: .whitespaces)
+        return plain.isEmpty ? nil : String(plain.prefix(length))
+    }
+
     /// True when the value is absent or of the expected type.
     private static func optional<T>(_ value: Any?, _ type: T.Type) -> Bool {
         value == nil || value is T
+    }
+}
+
+extension HerdrAgents {
+    /// The same reading with terminal titles left out, to tell whether
+    /// anything but a title changed.
+    public var ignoringTitles: HerdrAgents {
+        guard case .connected(let server, let agents) = self else { return self }
+        return .connected(server, agents.map { var agent = $0; agent.title = nil; return agent })
+    }
+}
+
+/// Text from a terminal made safe to show as is.
+enum PlainText {
+    /// Removes control characters (except tab) and format characters: bidi
+    /// overrides and isolates could reorder what is shown, and zero-width
+    /// characters hide text.
+    static func removingInvisibles(_ text: String) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.filter { scalar in
+            switch scalar.properties.generalCategory {
+            case .control: scalar == "\t"
+            case .format: false
+            default: true
+            }
+        }))
     }
 }
 

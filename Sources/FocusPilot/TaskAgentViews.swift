@@ -91,6 +91,10 @@ private struct AgentLinkView: View {
                 Button("Open agent") { Task { await model.openAgent(link.id) } }
                     .disabled(!state.canOpen)
                     .help("Shows this agent's pane in Herdr. Herdr then marks its result as seen.")
+                if case .renamed = state {
+                    Button("Relink") { Task { await model.relinkAgent(link.id) } }
+                        .help("Keep following this agent under its new name.")
+                }
                 if reviewCount > 0 {
                     Button("Review (\(reviewCount))", action: showReviewQueue)
                 }
@@ -113,6 +117,7 @@ struct AgentStateLabel: View {
     var body: some View {
         switch state {
         case .live(let agent): AgentActivityLabel(activity: agent.status.activity)
+        case .renamed(let agent): dot("Renamed in Herdr to “\(agent.name ?? agent.kind)”", .orange, filled: false)
         case .replaced: dot("Another agent in this pane", .orange, filled: false)
         case .notFound: dot("Not found in Herdr", .orange, filled: false)
         case .unknown: dot("Herdr unavailable", .gray, filled: false)
@@ -172,7 +177,7 @@ struct AgentLinkSheet: View {
 
     private var choices: (server: HerdrServer, choices: AgentLinkChoices)? {
         guard case .connected(let server, let list)? = agents else { return nil }
-        let projectLink = model.projects.first { $0.id != nil && $0.title == task.projectTitle }?.herdrLink
+        let projectLink = task.projectID.flatMap { id in model.projects.first { $0.id == id }?.herdrLink }
         return (server, AgentLinkChoices(list, on: server, projectLink: projectLink,
                                          linked: model.agentLinks.filter { $0.taskID == task.id }))
     }

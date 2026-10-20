@@ -46,6 +46,9 @@ public struct TaskAgentLink: Equatable, Sendable, Identifiable {
 /// What can be said about a linked agent right now.
 public enum AgentLinkState: Equatable, Sendable {
     case live(HerdrAgent)
+    /// The same program in the pane under a new name. Probably the same
+    /// agent renamed; the owner can relink it.
+    case renamed(HerdrAgent)
     /// The pane now holds a different agent; the link no longer applies.
     case replaced
     /// The pane is gone, or Herdr restarted and its pane IDs were reissued.
@@ -62,7 +65,13 @@ public enum AgentLinkState: Equatable, Sendable {
             self = .notFound
             return
         }
-        self = link.isSameAgent(as: current, on: server) ? .live(current) : .replaced
+        if link.isSameAgent(as: current, on: server) {
+            self = .live(current)
+        } else if current.kind == link.kind, link.name != nil, current.name != nil {
+            self = .renamed(current)
+        } else {
+            self = .replaced
+        }
     }
 }
 

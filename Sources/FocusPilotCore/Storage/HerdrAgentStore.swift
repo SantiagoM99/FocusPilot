@@ -47,12 +47,15 @@ enum HerdrAgentStore {
                 row.statusChangedAt = now
                 try row.update(db)
             }
+            // Answered in Herdr: the request no longer needs the owner. An
+            // unknown reading says nothing, so the request stays.
+            if agent.status != .blocked && agent.status != .unknown {
+                try ReviewItemRow
+                    .filter(Column("linkId") == row.id && Column("kind") == AgentTransition.Review.approval.rawValue
+                        && Column("reviewedAt") == nil)
+                    .deleteAll(db)
+            }
             guard let kind = AgentTransition.review(from: previous, to: agent.status) else { continue }
-            // A request the agent has moved past no longer needs an answer.
-            try ReviewItemRow
-                .filter(Column("linkId") == row.id && Column("kind") == AgentTransition.Review.approval.rawValue
-                    && Column("reviewedAt") == nil)
-                .deleteAll(db)
             var item = ReviewItemRow(id: nil, taskId: row.taskId, linkId: row.id, kind: kind.rawValue, occurredAt: now,
                                      agentLabel: row.label, workspaceLabel: row.workspaceLabel, summary: agent.title,
                                      outputText: nil, outputLineCount: nil, reviewedAt: nil)
@@ -60,6 +63,16 @@ enum HerdrAgentStore {
             queued.append(NewReviewItem(id: item.id!, paneID: row.paneId, server: server))
         }
         return queued
+    }
+
+    /// Follows the agent under its new name. Only the name may differ: the
+    /// pane and program must be the linked ones.
+    static func relink(_ linkID: Int64, to agent: HerdrAgent, in db: Database) throws {
+        guard var row = try AgentLinkRow.fetchOne(db, key: linkID), row.paneId == agent.paneID, row.agentKind == agent.kind
+        else { throw HerdrAgentLinkError.differentAgent }
+        row.agentName = agent.name
+        row.label = agent.name ?? agent.title ?? agent.kind
+        try row.update(db)
     }
 
     static func storeOutput(_ output: AgentOutputPreview, forReviewItem id: Int64, in db: Database) throws {
@@ -85,6 +98,10 @@ enum HerdrAgentStore {
     static func markReviewed(_ id: Int64, at now: Date, in db: Database) throws {
         try db.execute(sql: "UPDATE herdrReviewItem SET reviewedAt = ? WHERE id = ?", arguments: [now, id])
     }
+}
+
+public enum HerdrAgentLinkError: Error, Equatable {
+    case differentAgent
 }
 
 /// `herdrAgentLink` as stored.

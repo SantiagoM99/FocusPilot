@@ -57,6 +57,13 @@ struct HerdrAgentCLITests {
         #expect(runner.launches.last?.arguments == ["agent", "read", "w4:p2", "--source", "visible"])
     }
 
+    @Test func readingTheScreenIsCappedBeforeItIsHeldInMemory() async {
+        let runner = runner()
+        _ = await cli(runner).output(of: "w4:p2", on: server)
+        #expect(runner.launches.last?.outputLimit == HerdrCLI.screenOutputLimit)
+        #expect(runner.launches.dropLast().allSatisfy { $0.outputLimit == nil })
+    }
+
     @Test func focusesThePaneOnTheSameServerInstance() async {
         let runner = runner()
         #expect(await cli(runner).focus("w4:p2", on: server))
@@ -119,6 +126,11 @@ struct AgentOutputPreviewTests {
         #expect(preview.lines.count == AgentOutputPreview.maximumLines)
         #expect(preview.lines.last == "line 100")
         #expect(preview.totalLineCount == 100)
+    }
+
+    @Test func directionOverridesAndInvisibleFormatCharactersAreRemoved() {
+        // U+202E would show "txt.exe" reversed; U+200B and U+2066 are invisible.
+        #expect(AgentOutputPreview("open \u{202E}exe.txt\u{202C} now\u{200B}\u{2066}!").lines == ["open exe.txt now!"])
     }
 
     @Test func longLinesAreCut() {

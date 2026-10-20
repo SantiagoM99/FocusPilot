@@ -57,6 +57,29 @@ struct HerdrAgentTests {
         }
     }
 
+    @Test func longTitlesAndNamesAreCut() throws {
+        let json = agentListJSON
+            .replacingOccurrences(of: "\"Ablation table\"", with: "\"\(String(repeating: "t", count: 5000))\"")
+            .replacingOccurrences(of: "\"ablation\"", with: "\"\(String(repeating: "n", count: 500))\"")
+        let first = try #require(HerdrAgentList.parse(Data(json.utf8))?.first)
+        #expect(first.title?.count == HerdrAgentList.maximumTitleLength)
+        #expect(first.name?.count == HerdrAgentList.maximumNameLength)
+    }
+
+    @Test func titlesLoseDirectionAndInvisibleFormatCharacters() throws {
+        let json = agentListJSON.replacingOccurrences(of: "\"Ablation table\"", with: "\"Abla\\u202Etion\\u200B table\"")
+        #expect(try #require(HerdrAgentList.parse(Data(json.utf8))?.first).title == "Ablation table")
+    }
+
+    @Test func aTitleChangeAloneLeavesTheStatusViewEqual() {
+        var renamedTitle = agent(.working)
+        renamedTitle.title = "Something else"
+        #expect(HerdrAgents.connected(herdrServer, [agent(.working)]).ignoringTitles
+            == HerdrAgents.connected(herdrServer, [renamedTitle]).ignoringTitles)
+        #expect(HerdrAgents.connected(herdrServer, [agent(.working)]).ignoringTitles
+            != HerdrAgents.connected(herdrServer, [agent(.idle)]).ignoringTitles)
+    }
+
     @Test func idleAndDoneAreReadyOnlyWorkingAndBlockedAreBusy() {
         #expect(HerdrAgentStatus.idle.activity == .ready)
         #expect(HerdrAgentStatus.done.activity == .ready)

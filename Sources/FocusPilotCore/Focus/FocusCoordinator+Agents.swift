@@ -8,6 +8,8 @@ import Foundation
 extension FocusCoordinator {
     public enum OpenAgentResult: Equatable, Sendable {
         case opened
+        /// The agent in the pane has a new name; the owner can relink it.
+        case renamed(String)
         /// The pane holds a different agent now.
         case replaced
         /// The link is gone, the pane is gone, or Herdr restarted.
@@ -45,6 +47,17 @@ extension FocusCoordinator {
         try await repository.agentLinks()
     }
 
+    /// The owner's Relink after a rename: follows the agent under its new
+    /// name. Returns false, changing nothing, unless Herdr shows it renamed.
+    public func relinkAgent(_ linkID: Int64) async -> Bool {
+        guard let agents, let link = try? await repository.agentLinks().first(where: { $0.id == linkID }),
+              case .renamed(let current) = AgentLinkState(link, await agents.agents()),
+              (try? await repository.relinkAgent(linkID, to: current)) != nil
+        else { return false }
+        await broadcast()
+        return true
+    }
+
     public func reviewQueue() async throws -> [ReviewItem] {
         try await repository.reviewQueue()
     }
@@ -67,6 +80,7 @@ extension FocusCoordinator {
         await record(current)
         switch AgentLinkState(link, current) {
         case .live: return await agents.focus(link.paneID, on: server) ? .opened : .herdrUnavailable
+        case .renamed(let agent): return .renamed(agent.name ?? agent.kind)
         case .replaced: return .replaced
         case .notFound: return .notFound
         case .unknown: return .herdrUnavailable

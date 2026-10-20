@@ -124,6 +124,24 @@ struct HerdrAgentCoordinatorTests {
         #expect(herdr.calls == [.list])
     }
 
+    @Test func openAgentOnARenamedAgentAsksForRelinkAndDoesNotFocus() async throws {
+        let (task, link) = try await linkedTask()
+        herdr.set(.connected(herdrServer, [agent(.idle, name: "ablation-2")]))
+
+        #expect(await coordinator.openAgent(link.id) == .renamed("ablation-2"))
+        #expect(herdr.calls == [.list])
+
+        #expect(await coordinator.relinkAgent(link.id) == true)
+        #expect(try await repository.agentLinks(forTask: task).first?.name == "ablation-2")
+        #expect(herdr.calls == [.list, .list])
+    }
+
+    @Test func relinkDoesNothingUnlessTheAgentWasRenamed() async throws {
+        let (_, link) = try await linkedTask()
+        herdr.set(.connected(herdrServer, [agent(.idle, kind: "codex")]))
+        #expect(await coordinator.relinkAgent(link.id) == false)
+    }
+
     @Test func openAgentRefusesAfterAHerdrRestart() async throws {
         let (_, link) = try await linkedTask()
         herdr.set(.connected(restartedHerdrServer, [agent(.working)]))

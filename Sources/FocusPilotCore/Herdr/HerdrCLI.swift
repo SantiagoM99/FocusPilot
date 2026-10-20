@@ -9,6 +9,9 @@ public struct HerdrCLI: Sendable {
     /// The socket protocol this client was validated against (Herdr 0.9.0).
     static let supportedProtocol = 22
 
+    /// A pane's visible screen is a few kilobytes; more is not a screen.
+    static let screenOutputLimit = 64 * 1024
+
     static let binaryCandidates = [".local/bin/herdr", "/opt/homebrew/bin/herdr", "/usr/local/bin/herdr", ".cargo/bin/herdr"]
 
     private let home: URL
@@ -97,7 +100,9 @@ public struct HerdrCLI: Sendable {
 
     /// The command's output, or nil if it could not run or failed.
     private func run(_ command: HerdrCommand, with binary: URL) async -> Data? {
-        guard let output = try? await runner.run(executable: binary, arguments: command.arguments, environment: environment),
+        let limit = if case .agentRead = command { Self.screenOutputLimit } else { nil as Int? }
+        guard let output = try? await runner.run(executable: binary, arguments: command.arguments, environment: environment,
+                                                 outputLimit: limit),
               output.status == 0
         else { return nil }
         return output.standardOutput

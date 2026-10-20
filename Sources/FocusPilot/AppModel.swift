@@ -105,11 +105,11 @@ final class AppModel {
                 let connection = await coordinator.refreshHerdr()
                 let agents = await coordinator.refreshHerdrAgents()
                 guard let self else { return }
-                if connection != herdr || agents != herdrAgents {
-                    herdr = connection
-                    herdrAgents = agents
-                    await refresh()
-                }
+                // A new terminal title alone only redraws the inspector.
+                let needsReload = connection != herdr || agents?.ignoringTitles != herdrAgents?.ignoringTitles
+                herdr = connection
+                herdrAgents = agents
+                if needsReload { await refresh() }
                 try? await Task.sleep(for: schedule.delay(after: connection))
             }
         }
@@ -242,6 +242,14 @@ final class AppModel {
         await perform("Could not unlink the agent") { try await $0.unlinkAgent(linkID) }
     }
 
+    /// The owner's Relink after the agent was renamed in Herdr.
+    func relinkAgent(_ linkID: Int64) async {
+        guard let coordinator else { return }
+        agentNotice = await coordinator.relinkAgent(linkID) ? nil
+            : "The agent changed again in Herdr, so it wasn’t relinked. Check it and try again."
+        await refresh()
+    }
+
     func markReviewed(_ itemID: Int64) async {
         await perform("Could not mark the result reviewed") { try await $0.markReviewed(itemID) }
     }
@@ -253,6 +261,7 @@ final class AppModel {
         guard let coordinator else { return }
         agentNotice = switch await coordinator.openAgent(linkID) {
         case .opened: nil
+        case .renamed(let name): "This agent’s name changed in Herdr to “\(name)”. Relink it to keep following it."
         case .replaced: "That pane now runs a different agent. Unlink it, or link the new one."
         case .notFound: "The agent is no longer in Herdr. It may have closed, or Herdr restarted."
         case .herdrUnavailable: "Herdr isn’t available, so the agent couldn’t be opened."

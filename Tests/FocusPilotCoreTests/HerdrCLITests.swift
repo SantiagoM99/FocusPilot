@@ -9,6 +9,7 @@ final class RecordingRunner: HerdrProcessRunning, @unchecked Sendable {
         var executable: String
         var arguments: [String]
         var environment: [String: String]
+        var outputLimit: Int? = nil
     }
 
     private let lock = NSLock()
@@ -29,8 +30,12 @@ final class RecordingRunner: HerdrProcessRunning, @unchecked Sendable {
 
     var launches: [Launch] { lock.withLock { recorded } }
 
-    func run(executable: URL, arguments: [String], environment: [String: String]) async throws -> HerdrProcessOutput {
-        lock.withLock { recorded.append(Launch(executable: executable.path, arguments: arguments, environment: environment)) }
+    func run(executable: URL, arguments: [String], environment: [String: String],
+             outputLimit: Int?) async throws -> HerdrProcessOutput {
+        lock.withLock {
+            recorded.append(Launch(executable: executable.path, arguments: arguments, environment: environment,
+                                   outputLimit: outputLimit))
+        }
         return try (replies[arguments] ?? .success(HerdrProcessOutput(status: 2, standardOutput: Data()))).get()
     }
 }

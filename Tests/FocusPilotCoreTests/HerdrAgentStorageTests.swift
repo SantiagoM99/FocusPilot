@@ -107,6 +107,52 @@ struct HerdrAgentStorageTests {
         #expect(try await repository.reviewQueue().map(\.kind) == [.finished])
     }
 
+    @Test func anApprovalIsClearedOnceTheAgentLeavesBlocked() async throws {
+        // Approved in Herdr: the agent works again and nothing is left to answer.
+        let taskID = try await task()
+        _ = try await link(agent(.working), to: taskID)
+        _ = try await repository.recordAgents([agent(.blocked)], on: herdrServer)
+
+        _ = try await repository.recordAgents([agent(.working)], on: herdrServer)
+
+        #expect(try await repository.reviewQueue().isEmpty)
+    }
+
+    @Test func anUnknownReadingKeepsTheApproval() async throws {
+        let taskID = try await task()
+        _ = try await link(agent(.working), to: taskID)
+        _ = try await repository.recordAgents([agent(.blocked)], on: herdrServer)
+
+        _ = try await repository.recordAgents([agent(.unknown)], on: herdrServer)
+
+        #expect(try await repository.reviewQueue().map(\.kind) == [.approval])
+    }
+
+    @Test func aRenamedAgentIsFollowedAgainOnlyAfterRelink() async throws {
+        let taskID = try await task()
+        let link = try await link(agent(.working), to: taskID)
+
+        try await repository.relinkAgent(link.id, to: agent(.working, name: "ablation-2"))
+
+        let relinked = try #require(try await repository.agentLinks(forTask: taskID).first)
+        #expect(relinked.name == "ablation-2")
+        #expect(relinked.label == "ablation-2")
+        #expect(try await repository.recordAgents([agent(.idle, name: "ablation-2")], on: herdrServer).count == 1)
+    }
+
+    @Test func relinkRefusesAnotherPaneOrProgram() async throws {
+        let taskID = try await task()
+        let link = try await link(agent(.working), to: taskID)
+        await #expect(throws: (any Error).self) { try await repository.relinkAgent(link.id, to: agent(.idle, kind: "codex")) }
+        await #expect(throws: (any Error).self) { try await repository.relinkAgent(link.id, to: agent(.idle, pane: "w4:p9")) }
+    }
+
+    @Test func todayItemsCarryTheirProjectID() async throws {
+        let id = try await repository.addTask(NewTask(title: "Explain baseline results", projectName: "NLP report")).id!
+        let item = try #require(try await repository.todayTasks().first { $0.id == id })
+        #expect(item.projectID == (try await repository.projects().first { $0.title == "NLP report" }?.id))
+    }
+
     @Test func eachFinishedRunIsKept() async throws {
         let taskID = try await task()
         _ = try await link(agent(.working), to: taskID)
@@ -222,9 +268,15 @@ struct AgentLinkStateTests {
         #expect(AgentLinkState(link, .connected(herdrServer, [live])) == .live(live))
     }
 
-    @Test func anotherAgentInThePaneIsReplaced() {
+    @Test func anotherProgramOrAnUnnamedAgentInThePaneIsReplaced() {
         #expect(AgentLinkState(link, .connected(herdrServer, [agent(.idle, kind: "codex")])) == .replaced)
-        #expect(AgentLinkState(link, .connected(herdrServer, [agent(.idle, name: "other")])) == .replaced)
+        // Herdr clears a name when its agent exits, so no name means a new occupant.
+        #expect(AgentLinkState(link, .connected(herdrServer, [agent(.idle, name: nil)])) == .replaced)
+    }
+
+    @Test func theSameProgramUnderANewNameIsRenamed() {
+        let renamed = agent(.idle, name: "ablation-2")
+        #expect(AgentLinkState(link, .connected(herdrServer, [renamed])) == .renamed(renamed))
     }
 
     @Test func aMissingPaneOrARestartedServerIsNotFound() {
