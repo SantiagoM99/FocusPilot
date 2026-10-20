@@ -5,9 +5,11 @@ import Foundation
 extension FocusCoordinator {
     /// Saves the wrap-up for an ended `session`, marking its task done if
     /// asked. Wrap-ups follow the end of a session only (owner decision,
-    /// 2026-10-17), so one for the session still running or paused is refused.
+    /// 2026-10-17), so one for the session still running or paused is refused,
+    /// as is marking the task done while a later session on it is active.
     public func saveWrapUp(_ wrapUp: WrapUp, after ended: FocusSession, markingDone: Bool = false) async throws {
-        if let current = session, current.id == ended.id, !current.hasEnded {
+        if let current = session, !current.hasEnded,
+           current.id == ended.id || (markingDone && current.taskID == ended.taskID) {
             throw SessionError.sessionStillActive
         }
         try await repository.saveWrapUp(wrapUp, forTask: ended.taskID, session: ended.id, markingDone: markingDone)

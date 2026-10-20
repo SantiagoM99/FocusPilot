@@ -34,6 +34,8 @@ extension AppModel {
         guard let coordinator else { return startupError }
         do {
             try await coordinator.saveWrapUp(pending.draft.wrapUp, after: pending.prompt.session, markingDone: markingDone)
+        } catch FocusCoordinator.SessionError.sessionStillActive where markingDone {
+            return "A session on this task is still running. Save without marking it complete, or end that session first."
         } catch {
             return "Could not save the wrap-up: \(error.localizedDescription)"
         }
