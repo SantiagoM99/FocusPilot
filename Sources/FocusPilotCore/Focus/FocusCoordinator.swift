@@ -140,14 +140,19 @@ public actor FocusCoordinator {
 
     // MARK: Tasks from the focuspilot CLI
 
-    /// The owner's undo of a task added from Herdr.
+    /// The owner's undo of a task added from Herdr. The task a session is
+    /// running on is refused, wherever it sits in the list.
     public func undoHerdrAdd(_ taskID: Int64) async throws {
+        if let active = await snapshot().activeSession, active.taskID == taskID { throw HerdrTaskError.inRunningSession }
         try await repository.undoHerdrAdd(taskID)
     }
 
     /// Imports the adds queued while FocusPilot was closed. Returns how many
     /// were handed to the repository; already stored ones are not repeated.
     public func importInbox(_ inbox: TaskInbox) async throws -> Int {
-        try await inbox.drain { _ = try await repository.addFromHerdr($0) }
+        let repository = repository
+        return try await inbox.drain(isPermanent: TaskRepository.isPermanentAddFailure) {
+            _ = try await repository.addFromHerdr($0)
+        }.imported
     }
 }

@@ -23,6 +23,15 @@ public struct TodayItem: Equatable, Sendable, Identifiable {
     }
 }
 
+extension TodayItem {
+    /// Whether the UI offers Undo: a task from Herdr still waiting in Next or
+    /// Later, and not the one a session is running on. The repository and
+    /// coordinator refuse the rest anyway.
+    public func offersHerdrUndo(activeSessionTaskID: Int64?) -> Bool {
+        isFromHerdr && (status == .next || status == .later) && id != activeSessionTaskID
+    }
+}
+
 /// The shape GRDB decodes from a task joined with its optional project.
 struct TaskWithProject: Decodable, FetchableRecord {
     var task: TaskRecord

@@ -26,8 +26,12 @@ enum HerdrTaskStore {
     }
 
     static func undo(_ taskID: Int64, in db: Database) throws {
-        guard try TaskRecord.fetchOne(db, key: taskID)?.isFromHerdr == true else { throw HerdrTaskError.notFromHerdr }
-        try TaskRecord.deleteOne(db, key: taskID)
+        guard let task = try TaskRecord.fetchOne(db, key: taskID), task.isFromHerdr else { throw HerdrTaskError.notFromHerdr }
+        switch task.status {
+        case .now: throw HerdrTaskError.isNow
+        case .done: throw HerdrTaskError.isDone
+        case .next, .later: try TaskRecord.deleteOne(db, key: taskID)
+        }
     }
 
     static func scope(for caller: HerdrCaller?, in db: Database) throws -> HerdrTaskScope {

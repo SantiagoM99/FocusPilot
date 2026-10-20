@@ -23,7 +23,7 @@ Paste this section into an agent's instructions.
 | --- | --- |
 | `focuspilot add <text>` | Appends a task to the end of Next. The text is split like quick capture: a trailing deadline phrase ("by fri 23:59", "Oct 20", "tomorrow") becomes the deadline. |
 | `focuspilot tasks` | Prints Now (title, next action, deadline) and the open tasks of the workspace's linked project, in the owner's order. |
-| `--json` | Machine-readable output for either command. `add` reports `status` (`added`, `alreadyAdded` or `queued`), `title`, `project`, `deadline` and `hints`; `tasks` reports `running`, `now`, `project` and `tasks`. |
+| `--json` | Options go before the task text; `--` ends them, so `focuspilot add -- --json flag docs` adds the text as typed (capture trims dashes at the very start or end of a title). Machine-readable output for either command. `add` reports `status` (`added`, `alreadyAdded` or `queued`), `title`, `project`, `deadline` and `hints`; `tasks` reports `running`, `now`, `project` and `tasks`. |
 
 Exit status: `0` done (or queued), `1` refused or failed, `2` usage error, `3` FocusPilot is not running (`tasks` only).
 
