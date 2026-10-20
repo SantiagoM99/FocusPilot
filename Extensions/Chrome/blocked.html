@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blocked · FocusPilot</title>
+<link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+<main>
+  <section id="page">
+    <p class="status"><span class="dot" id="dot"></span><span id="status"></span></p>
+    <div class="heading">
+      <span class="eyebrow" id="eyebrow"></span>
+      <h1 id="title"></h1>
+      <p class="subtitle" id="subtitle"></p>
+      <p class="detail" id="detail"></p>
+    </div>
+    <div class="actions">
+      <button id="primary" type="button"></button>
+      <p class="hint" id="hint"></p>
+      <a href="#" id="exception">Request a timed exception…</a>
+    </div>
+  </section>
+  <section id="exception-panel" hidden>
+    <div class="card">
+      <h2>Timed exception</h2>
+      <p>Asking for a few minutes on this page arrives in a later FocusPilot update. For now, pause or end the session in FocusPilot.</p>
+      <div class="card-actions"><button id="close-exception" type="button" class="secondary">Close</button></div>
+    </div>
+  </section>
+</main>
+<footer><span id="footer-left"></span><span id="footer-right"></span></footer>
+<script src="policy.js"></script>
+<script src="blocked-view.js"></script>
+<script src="blocked.js"></script>
+</body>
+</html>

@@ -136,6 +136,15 @@ public struct CommandSocketClient: Sendable {
         self.path = path
     }
 
+    /// True when the app accepts connections, without sending a request.
+    public func isListening() -> Bool {
+        guard var address = UnixSocket.address(path) else { return false }
+        let connection = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard connection >= 0 else { return false }
+        defer { close(connection) }
+        return UnixSocket.withAddress(&address, { connect(connection, $0, $1) }) == 0
+    }
+
     public func send(_ request: CommandRequest) throws(Failure) -> CommandResponse {
         guard var address = UnixSocket.address(path) else { throw .pathTooLong }
         let connection = socket(AF_UNIX, SOCK_STREAM, 0)

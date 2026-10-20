@@ -85,6 +85,19 @@ struct ChromeHostTests {
         #expect(harness.sent("status").last?["appRunning"] as? Bool == true)
     }
 
+    // An app update refreshes the extension folder; the extension reloads
+    // itself when the build there differs from the one it runs.
+    @Test func theStatusNamesTheExtensionBuildOnDisk() throws {
+        let harness = try HostHarness()
+        try FileManager.default.createDirectory(at: harness.location.chromeExtensionDirectory, withIntermediateDirectories: true)
+        try Data(#"{"version":"1.0.0","version_name":"1.0.0 build 3f2a"}"#.utf8)
+            .write(to: harness.location.chromeExtensionDirectory.appending(path: "manifest.json"))
+
+        harness.hello()
+
+        #expect(harness.sent("status").last?["extensionBuild"] as? String == "1.0.0 build 3f2a")
+    }
+
     @Test func aNewerPolicyIsPushedOnceWhenTheAppPublishesIt() async throws {
         let harness = try HostHarness()
         harness.hello()

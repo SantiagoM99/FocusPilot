@@ -9,6 +9,8 @@ let package = Package(
         // Installed as Contents/Helpers/focuspilot; the product name differs
         // from the app's only by case, which collides on macOS file systems.
         .executable(name: "focuspilot-cli", targets: ["FocusPilotCLI"]),
+        // Chrome's native messaging host, Contents/Helpers/focuspilot-chrome-host.
+        .executable(name: "focuspilot-chrome-host", targets: ["FocusPilotChromeHost"]),
     ],
     dependencies: [
         // Pinned exactly: storage format and migrations depend on it.
@@ -36,9 +38,16 @@ let package = Package(
             name: "FocusPilotCLI",
             dependencies: ["FocusPilotCore"]
         ),
+        // Chrome starts it for the FocusPilot extension; it reads the
+        // published policy and records observations, never the databases.
+        .executableTarget(
+            name: "FocusPilotChromeHost",
+            dependencies: ["FocusPilotCore"]
+        ),
         .testTarget(
             name: "FocusPilotCoreTests",
-            dependencies: ["FocusPilotCore", .product(name: "GRDB", package: "GRDB.swift")]
+            // The Chrome host is built so a test can run it as Chrome does.
+            dependencies: ["FocusPilotCore", "FocusPilotChromeHost", .product(name: "GRDB", package: "GRDB.swift")]
         ),
     ]
 )

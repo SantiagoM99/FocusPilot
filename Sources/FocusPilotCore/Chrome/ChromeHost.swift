@@ -134,7 +134,18 @@ public final class ChromeHost {
         let running = environment.isAppRunning()
         guard force || running != sentAppRunning else { return }
         sentAppRunning = running
-        send(["type": "status", "appRunning": running])
+        var status: [String: Any] = ["type": "status", "appRunning": running]
+        status["extensionBuild"] = extensionBuildOnDisk()
+        send(status)
+    }
+
+    /// The `version_name` build-app.sh stamps into the extension folder's
+    /// manifest; the extension reloads itself when it runs another build.
+    private func extensionBuildOnDisk() -> String? {
+        let manifest = location.chromeExtensionDirectory.appending(path: "manifest.json")
+        guard let data = try? Data(contentsOf: manifest),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return object["version_name"] as? String
     }
 
     private func send(_ object: [String: Any]) {
