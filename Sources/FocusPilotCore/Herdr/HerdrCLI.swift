@@ -29,24 +29,70 @@ public struct HerdrCLI: Sendable {
     }
 
     public func connection() async -> HerdrConnection {
-        guard let binary = binary() else { return .disconnected(.binaryNotFound) }
-        // The default session's socket. Checked before running anything,
-        // because the CLI might start a server that is not running.
-        let socket = home.appending(path: ".config/herdr/herdr.sock")
-        guard let startedAt = socketCreationDate(socket) else { return .disconnected(.notRunning) }
-        let server = HerdrServer(sessionName: "default", socketPath: socket.path, startedAt: startedAt)
-
-        guard let status = await run(.status, with: binary) else { return .disconnected(.notRunning) }
-        switch HerdrStatus.parse(status) {
-        case .stopped: return .disconnected(.notRunning)
-        case .unsupported: return .disconnected(.unsupportedVersion)
-        case .compatible: break
+        let binary: URL, server: HerdrServer
+        switch await reach() {
+        case .failure(let reason): return .disconnected(reason)
+        case .success(let reached): (binary, server) = reached
         }
         guard let output = await run(.workspaceList, with: binary) else { return .disconnected(.notRunning) }
         guard let workspaces = HerdrWorkspaceList.parse(output) else {
             return .disconnected(.unreadableReply)
         }
         return .connected(server, workspaces)
+    }
+
+    public func agents() async -> HerdrAgents {
+        let binary: URL, server: HerdrServer
+        switch await reach() {
+        case .failure(let reason): return .disconnected(reason)
+        case .success(let reached): (binary, server) = reached
+        }
+        guard let output = await run(.agentList, with: binary) else { return .disconnected(.notRunning) }
+        guard let agents = HerdrAgentList.parse(output) else { return .disconnected(.unreadableReply) }
+        return .connected(server, agents)
+    }
+
+    /// The pane's visible screen as text, if `server` is still the running
+    /// instance. The text is untrusted and is only ever displayed.
+    public func output(of paneID: String, on server: HerdrServer) async -> String? {
+        guard let binary = await binary(reaching: server, for: paneID),
+              let data = await run(.agentRead(paneID: paneID), with: binary)
+        else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Runs `agent focus` on the pane, if `server` is still the running
+    /// instance. Only Open agent calls this, after the owner's click.
+    public func focus(_ paneID: String, on server: HerdrServer) async -> Bool {
+        guard let binary = await binary(reaching: server, for: paneID) else { return false }
+        return await run(.agentFocus(paneID: paneID), with: binary) != nil
+    }
+
+    /// The binary, once the pane ID has Herdr's shape and the running server
+    /// is the same instance that reported it: after a restart the same pane
+    /// ID can name another agent.
+    private func binary(reaching expected: HerdrServer, for paneID: String) async -> URL? {
+        guard HerdrPaneID.isValid(paneID), case .success(let (binary, server)) = await reach(), server == expected
+        else { return nil }
+        return binary
+    }
+
+    /// The binary and the running default-session server, once its status
+    /// says it is compatible.
+    private func reach() async -> Result<(URL, HerdrServer), HerdrUnavailable> {
+        guard let binary = binary() else { return .failure(.binaryNotFound) }
+        // The default session's socket. Checked before running anything,
+        // because the CLI might start a server that is not running.
+        let socket = home.appending(path: ".config/herdr/herdr.sock")
+        guard let startedAt = socketCreationDate(socket) else { return .failure(.notRunning) }
+        let server = HerdrServer(sessionName: "default", socketPath: socket.path, startedAt: startedAt)
+
+        guard let status = await run(.status, with: binary) else { return .failure(.notRunning) }
+        switch HerdrStatus.parse(status) {
+        case .stopped: return .failure(.notRunning)
+        case .unsupported: return .failure(.unsupportedVersion)
+        case .compatible: return .success((binary, server))
+        }
     }
 
     /// The command's output, or nil if it could not run or failed.
@@ -114,3 +160,13 @@ public protocol HerdrWorkspaceSource: Sendable {
 }
 
 extension HerdrCLI: HerdrWorkspaceSource {}
+
+/// Where the coordinator reads agents from, and the one way it changes what
+/// the owner sees in Herdr.
+public protocol HerdrAgentSource: Sendable {
+    func agents() async -> HerdrAgents
+    func output(of paneID: String, on server: HerdrServer) async -> String?
+    func focus(_ paneID: String, on server: HerdrServer) async -> Bool
+}
+
+extension HerdrCLI: HerdrAgentSource {}

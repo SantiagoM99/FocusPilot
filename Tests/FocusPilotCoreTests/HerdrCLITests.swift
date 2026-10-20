@@ -108,9 +108,6 @@ struct HerdrCLITests {
         for launch in runner.launches {
             #expect(readOnly.contains(Array(launch.arguments.prefix(2))), "\(launch.arguments) is not read-only")
         }
-        for command in HerdrCommand.allCases {
-            #expect(readOnly.contains(command.arguments), "\(command) is not read-only")
-        }
     }
 
     @Test func childGetsAScrubbedEnvironmentWithoutHerdrVariables() async {

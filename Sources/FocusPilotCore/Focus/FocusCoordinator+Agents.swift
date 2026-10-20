@@ -1,0 +1,86 @@
+import Foundation
+
+/// Herdr agents linked to tasks. Polling only reads Herdr. The one action
+/// that changes what the owner sees in Herdr is `openAgent`, which the app
+/// calls only for the owner's click on Open agent; nothing here restores a
+/// previous focus. Results go to the Review queue and never change Now or
+/// complete a task.
+extension FocusCoordinator {
+    public enum OpenAgentResult: Equatable, Sendable {
+        case opened
+        /// The pane holds a different agent now.
+        case replaced
+        /// The link is gone, the pane is gone, or Herdr restarted.
+        case notFound
+        case herdrUnavailable
+    }
+
+    /// Reads the linked agents' status and queues their results. Herdr is not
+    /// asked at all while no task has a linked agent; nil then.
+    public func refreshHerdrAgents() async -> HerdrAgents? {
+        guard let agents, (try? await repository.agentLinks().isEmpty) == false else { return nil }
+        let current = await agents.agents()
+        await record(current)
+        return current
+    }
+
+    /// Herdr's agents now, for choosing one to link. Nothing is recorded.
+    public func availableAgents() async -> HerdrAgents {
+        await agents?.agents() ?? .disconnected(.binaryNotFound)
+    }
+
+    public func linkAgent(_ agent: HerdrAgent, on server: HerdrServer, workspaceLabel: String?,
+                          toTask taskID: Int64) async throws -> TaskAgentLink {
+        let link = try await repository.linkAgent(agent, on: server, workspaceLabel: workspaceLabel, toTask: taskID)
+        await broadcast()
+        return link
+    }
+
+    public func unlinkAgent(_ linkID: Int64) async throws {
+        try await repository.unlinkAgent(linkID)
+        await broadcast()
+    }
+
+    public func agentLinks() async throws -> [TaskAgentLink] {
+        try await repository.agentLinks()
+    }
+
+    public func reviewQueue() async throws -> [ReviewItem] {
+        try await repository.reviewQueue()
+    }
+
+    public func markReviewed(_ itemID: Int64) async throws {
+        try await repository.markReviewed(itemID)
+    }
+
+    /// Focuses the linked agent's pane in Herdr, for the owner's click only.
+    ///
+    /// The target is revalidated right before: same server instance, same
+    /// pane, same agent. Its status is recorded first, because focusing marks
+    /// a finished agent as seen and Herdr then reports it as idle.
+    public func openAgent(_ linkID: Int64) async -> OpenAgentResult {
+        guard let agents, let link = try? await repository.agentLinks().first(where: { $0.id == linkID }) else {
+            return .notFound
+        }
+        let current = await agents.agents()
+        guard case .connected(let server, _) = current else { return .herdrUnavailable }
+        await record(current)
+        switch AgentLinkState(link, current) {
+        case .live: return await agents.focus(link.paneID, on: server) ? .opened : .herdrUnavailable
+        case .replaced: return .replaced
+        case .notFound: return .notFound
+        case .unknown: return .herdrUnavailable
+        }
+    }
+
+    /// Stores the agents' status and reads each new item's output once.
+    private func record(_ current: HerdrAgents) async {
+        guard let agents, case .connected(let server, let list) = current,
+              let queued = try? await repository.recordAgents(list, on: server)
+        else { return }
+        for item in queued {
+            guard let text = await agents.output(of: item.paneID, on: item.server) else { continue }
+            try? await repository.storeOutput(AgentOutputPreview(text), forReviewItem: item.id)
+        }
+    }
+}
