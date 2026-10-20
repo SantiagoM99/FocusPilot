@@ -4,9 +4,9 @@ import GRDB
 extension TaskRepository {
     /// Records what an engine transition asks to keep: the session, if it
     /// changed, and a new policy revision for each publish, all in one
-    /// write. Returns the revisions in publish order.
+    /// write, with the rule inputs those policies are compiled from.
     @discardableResult
-    public func record(_ transition: FocusTransition) async throws -> [Int] {
+    public func record(_ transition: FocusTransition) async throws -> RecordedTransition {
         try await ownerDatabase.write { db in
             var revisions: [Int] = []
             for effect in transition.effects {
@@ -14,16 +14,12 @@ extension TaskRepository {
                 case .persist(let session):
                     try SessionRow(session).save(db)
                 case .publishPolicy:
-                    try db.execute(sql: """
-                        INSERT INTO policyPublication (id, revision) VALUES (1, 1)
-                        ON CONFLICT(id) DO UPDATE SET revision = revision + 1
-                        """)
-                    revisions.append(try Int.fetchOne(db, sql: "SELECT revision FROM policyPublication WHERE id = 1")!)
+                    revisions.append(try Self.nextPolicyRevision(db))
                 case .notify:
                     break
                 }
             }
-            return revisions
+            return RecordedTransition(revisions: revisions, inputs: try Self.policyInputs(db))
         }
     }
 
@@ -34,4 +30,11 @@ extension TaskRepository {
             try SessionRow.order(Column.rowID.desc).fetchOne(db)?.session()
         }
     }
+}
+
+/// The revisions handed out for a transition's publishes, in order, and the
+/// rule inputs read in the same write.
+public struct RecordedTransition: Sendable {
+    public var revisions: [Int]
+    public var inputs: PolicyInputs
 }

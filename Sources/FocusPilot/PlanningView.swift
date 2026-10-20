@@ -2,14 +2,14 @@ import AppKit
 import FocusPilotCore
 import SwiftUI
 
-/// The planning window (design 01 and 15): a sidebar with Today and
-/// Projects, and the quick capture sheet. The task detail pane, Review
+/// The planning window (design 01, 07 and 15): a sidebar with Today,
+/// Projects and Settings, and the quick capture sheet. The task detail pane, Review
 /// queue and protection status arrive with their tickets.
 struct PlanningView: View {
     static let windowID = "planning"
 
     enum Page: Hashable {
-        case today, projects
+        case today, projects, settings
     }
 
     let model: AppModel
@@ -27,12 +27,13 @@ struct PlanningView: View {
             List(selection: $page) {
                 Label("Today", systemImage: "sun.max").tag(Page.today)
                 Label("Projects", systemImage: "folder").tag(Page.projects)
+                Label("Settings", systemImage: "gearshape").tag(Page.settings)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
             content
-                .navigationTitle(page == .projects ? "Projects" : "Today")
-                .navigationSubtitle(page == .projects ? ""
+                .navigationTitle(title)
+                .navigationSubtitle(page != .today ? ""
                     : Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
                 .toolbar {
                     Button("New Task", systemImage: "plus") { isCapturing = true }
@@ -49,6 +50,12 @@ struct PlanningView: View {
         }
         .environment(model)
         .task { await model.refresh() }
+        .onChange(of: model.requestedPage, initial: true) {
+            if let requested = model.requestedPage {
+                page = requested
+                model.requestedPage = nil
+            }
+        }
         // LSUIElement keeps the app out of the Dock, but while the planning
         // window is open the owner should be able to find it there and with
         // Command-Tab like any other window.
@@ -56,11 +63,21 @@ struct PlanningView: View {
         .onDisappear { NSApplication.shared.setActivationPolicy(.accessory) }
     }
 
+    private var title: String {
+        switch page {
+        case .projects: "Projects"
+        case .settings: "Settings"
+        case .today, nil: "Today"
+        }
+    }
+
     @ViewBuilder private var content: some View {
         if let startupError = model.startupError {
             ContentUnavailableView("Database unavailable", systemImage: "exclamationmark.triangle", description: Text(startupError))
         } else if page == .projects {
             ProjectsView(model: model)
+        } else if page == .settings {
+            SettingsPage(model: model)
         } else if model.today.isEmpty {
             ContentUnavailableView(
                 "No tasks yet",
