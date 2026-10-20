@@ -94,7 +94,7 @@ struct OwnerMigrationV8Tests {
     @Test func tasksSavedBeforeWrapUpsHaveNoneAndKeepTheirRevision() async throws {
         let location = StorageLocation(directory: try makeTemporaryDirectory())
         let oldDatabase = try DatabaseQueue(path: location.ownerDatabaseURL.path)
-        try OwnerSchema.migrator.migrate(oldDatabase, upTo: "owner-v6-herdr-tasks")
+        try OwnerSchema.migrator.migrate(oldDatabase, upTo: "owner-v7-rules")
         try await oldDatabase.write { db in
             try db.execute(sql: "INSERT INTO task (title, nextAction, revision) VALUES ('Explain baseline results', 'Open Overleaf', 3)")
         }
@@ -106,6 +106,6 @@ struct OwnerMigrationV8Tests {
         #expect(item.wrapUp == nil)
         #expect(item.nextAction == "Open Overleaf")
         #expect(try await repository.tasks().first?.revision == 3)
-        #expect(OwnerSchema.migrator.migrations.suffix(2) == ["owner-v6-herdr-tasks", "owner-v8-wrapup"])
+        #expect(OwnerSchema.migrator.migrations.suffix(2) == ["owner-v7-rules", "owner-v8-wrapup"])
     }
 }
