@@ -10,6 +10,8 @@ import SwiftUI
 /// when confirmation is needed, so the Task menu asks too.
 struct SessionControls: View {
     let model: AppModel
+    /// Off where the return cue is already on screen, as in the Now card.
+    var showsReturnCue = true
 
     var body: some View {
         if let session = model.snapshot.activeSession {
@@ -18,14 +20,20 @@ struct SessionControls: View {
             } else if model.isConfirmingEarlyEnd {
                 confirming
             } else {
-                HStack(spacing: 8) {
-                    pauseButton(session)
-                    Button { Task { await model.complete() } } label: {
-                        Label("Complete", systemImage: "checkmark.circle").frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 10) {
+                    // Resuming shows the return cue first (#20).
+                    if showsReturnCue, case .paused = session.phase, let wrapUp = model.task(session.taskID)?.wrapUp {
+                        ReturnCueView(wrapUp: wrapUp, isCompact: true)
                     }
-                    .buttonStyle(.borderedProminent)
+                    HStack(spacing: 8) {
+                        pauseButton(session)
+                        Button { Task { await model.complete() } } label: {
+                            Label("Complete", systemImage: "checkmark.circle").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .controlSize(.large)
                 }
-                .controlSize(.large)
             }
         }
     }

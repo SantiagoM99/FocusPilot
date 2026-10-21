@@ -11,9 +11,11 @@ public struct TodayItem: Equatable, Sendable, Identifiable {
     public var deadline: Deadline?
     /// Added with the focuspilot CLI from a Herdr pane; the owner can undo it.
     public var isFromHerdr: Bool
+    public var wrapUp: TaskWrapUp?
 
     public init(id: Int64, title: String, status: TaskStatus = .next, projectTitle: String? = nil,
-                projectID: Int64? = nil, nextAction: String? = nil, deadline: Deadline? = nil, isFromHerdr: Bool = false) {
+                projectID: Int64? = nil, nextAction: String? = nil, deadline: Deadline? = nil, isFromHerdr: Bool = false,
+                wrapUp: TaskWrapUp? = nil) {
         self.projectID = projectID
         self.id = id
         self.title = title
@@ -22,6 +24,7 @@ public struct TodayItem: Equatable, Sendable, Identifiable {
         self.nextAction = nextAction
         self.deadline = deadline
         self.isFromHerdr = isFromHerdr
+        self.wrapUp = wrapUp
     }
 }
 
@@ -39,9 +42,16 @@ struct TaskWithProject: Decodable, FetchableRecord {
     var task: TaskRecord
     var project: ProjectRecord?
 
-    var todayItem: TodayItem {
+    func todayItem(wrapUp: TaskWrapUp?) -> TodayItem {
         TodayItem(id: task.id!, title: task.title, status: task.status, projectTitle: project?.title,
                   projectID: task.projectId,
-                  nextAction: task.nextAction, deadline: task.deadline, isFromHerdr: task.isFromHerdr)
+                  nextAction: task.nextAction, deadline: task.deadline, isFromHerdr: task.isFromHerdr,
+                  wrapUp: wrapUp)
+    }
+
+    /// Today items with each task's latest wrap-up.
+    static func todayItems(_ rows: [TaskWithProject], _ db: Database) throws -> [TodayItem] {
+        let latest = try WrapUpRecord.latest(forTasks: rows.map { $0.task.id! }, db)
+        return rows.map { $0.todayItem(wrapUp: latest[$0.task.id!]) }
     }
 }

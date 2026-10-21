@@ -56,6 +56,7 @@ extension AppModel {
     @discardableResult
     func complete(confirmed: Bool = false) async -> Bool {
         var completion: SessionCompletion?
+        ownerCompletedAt = .now
         await run { completion = try await $0.complete(confirmed: confirmed) }
         isConfirmingEarlyEnd = completion == .needsConfirmation
         return isConfirmingEarlyEnd
