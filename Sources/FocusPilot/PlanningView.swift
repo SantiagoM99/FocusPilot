@@ -67,7 +67,8 @@ struct PlanningView: View {
 
     /// One sheet modifier, so a wrap-up and Start focus wanted at once show
     /// one after the other instead of one being dropped (see `PlanningSheet`).
-    /// Closing a sheet clears only what that sheet was showing.
+    /// Closing a sheet clears only what that sheet was showing. A wrap-up is
+    /// never dropped this way: only Skip and Save end it, so its draft stays.
     private var sheet: Binding<PlanningSheet?> {
         Binding(
             get: { PlanningSheet.showing(isCapturing: isCapturing, wrapUp: model.wrapUp, isStartingFocus: model.isStartingFocus) },
@@ -75,7 +76,7 @@ struct PlanningView: View {
                 guard newValue == nil else { return }
                 switch PlanningSheet.showing(isCapturing: isCapturing, wrapUp: model.wrapUp, isStartingFocus: model.isStartingFocus) {
                 case .capture: isCapturing = false
-                case .wrapUp: model.skipWrapUp()
+                case .wrapUp: break
                 case .startFocus: model.isStartingFocus = false
                 case nil: break
                 }
