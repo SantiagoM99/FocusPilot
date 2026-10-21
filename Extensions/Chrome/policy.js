@@ -57,11 +57,6 @@ var FocusPolicy = (() => {
     return now < Date.parse(session.end) || session.mode === "strict";
   }
 
-  function strictPastEnd(policy, now) {
-    const s = policy?.session;
-    return !!s && s.mode === "strict" && now >= Date.parse(s.end);
-  }
-
   function hostMatches(host, domain) {
     return host === domain || host.endsWith("." + domain);
   }
@@ -114,11 +109,14 @@ var FocusPolicy = (() => {
     return future.length ? Math.min(...future) : null;
   }
 
+  // Deliveries, not policies: `source` names the FocusPilot data that
+  // issued the revisions, which restart when the owner resets that data.
   function isNewer(incoming, current) {
-    return !current || incoming.revision > current.revision;
+    if (!current || incoming.source !== current.source) return true;
+    return incoming.policy.revision > current.policy.revision;
   }
 
-  return { localParts, scheduleContains, scheduleNextChange, sessionApplies, strictPastEnd, hostMatches, decide, blockedDomains, nextBoundary, isNewer };
+  return { localParts, scheduleContains, scheduleNextChange, sessionApplies, hostMatches, decide, blockedDomains, nextBoundary, isNewer };
 })();
 
 if (typeof module === "object") module.exports = FocusPolicy;

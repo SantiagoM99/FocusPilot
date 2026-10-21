@@ -60,7 +60,6 @@ test("session rules apply until a normal session's planned end", () => {
 test("a strict session keeps blocking past its end until the app says it ended", () => {
   const p = policy({ session: session("strict") });
   assert.equal(P.decide(p, "https://youtube.com/", at("2026-10-14T18:00:00Z")).blocked, true);
-  assert.equal(P.strictPastEnd(p, at("2026-10-14T18:00:00Z")), true);
 });
 
 test("a normal break lifts session rules until it ends", () => {
@@ -96,7 +95,14 @@ test("a schedule's next change can be days away", () => {
 });
 
 test("only newer revisions replace the stored policy", () => {
-  assert.equal(P.isNewer({ revision: 42 }, { revision: 41 }), true);
-  assert.equal(P.isNewer({ revision: 41 }, { revision: 41 }), false);
-  assert.equal(P.isNewer({ revision: 3 }, null), true);
+  const d = (revision, source = "A") => ({ source, policy: { revision } });
+  assert.equal(P.isNewer(d(42), d(41)), true);
+  assert.equal(P.isNewer(d(41), d(41)), false);
+  assert.equal(P.isNewer(d(40), d(41)), false);
+  assert.equal(P.isNewer(d(3), null), true);
+});
+
+// After the owner resets FocusPilot's data, revisions start again at 1.
+test("a policy from reset data replaces the old one whatever its revision", () => {
+  assert.equal(P.isNewer({ source: "B", policy: { revision: 1 } }, { source: "A", policy: { revision: 41 } }), true);
 });

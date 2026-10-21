@@ -19,10 +19,15 @@ public struct PolicyDelivery: Hashable, Codable, Sendable {
     public var policy: CompiledPolicy
     /// Present while session rules apply.
     public var focus: FocusContext?
+    /// Names the data folder that issued the revision, set by the mailbox.
+    /// Revisions restart when the owner resets FocusPilot's data, so the
+    /// extension takes a delivery from another source whatever its revision.
+    public var source: String?
 
-    public init(policy: CompiledPolicy, focus: FocusContext?) {
+    public init(policy: CompiledPolicy, focus: FocusContext?, source: String? = nil) {
         self.policy = policy
         self.focus = focus
+        self.source = source
     }
 }
 
@@ -43,11 +48,23 @@ public actor ChromePolicyMailbox: PolicyPublisher {
             if let current = try? Self.read(location), current.policy.revision > delivery.policy.revision { return }
             try FileManager.default.createDirectory(at: location.chromeDirectory, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
-            try PrivateFile.write(try CompiledPolicy.encoder().encode(delivery), to: location.chromePolicyURL)
+            var stamped = delivery
+            stamped.source = try source()
+            try PrivateFile.write(try CompiledPolicy.encoder().encode(stamped), to: location.chromePolicyURL)
         } catch {
             // Nothing to tell the owner here: the host keeps the last policy
             // and protection status reports the missing acknowledgement.
         }
+    }
+
+    /// Made once per data folder, so a reset folder gets a new one.
+    private func source() throws -> String {
+        let url = location.chromeDirectory.appending(path: "source")
+        if let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8),
+           UUID(uuidString: text) != nil { return text }
+        let made = UUID().uuidString
+        try PrivateFile.write(Data(made.utf8), to: url)
+        return made
     }
 
     public static func read(_ location: StorageLocation) throws -> PolicyDelivery? {

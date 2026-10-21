@@ -98,6 +98,24 @@ struct ChromeHostTests {
         #expect(harness.sent("status").last?["extensionBuild"] as? String == "1.0.0 build 3f2a")
     }
 
+    // The app copies a new build into the folder after it starts listening,
+    // so a host can say hello before the copy lands.
+    @Test func aNewBuildOnDiskIsReportedWhenItLands() throws {
+        let harness = try HostHarness()
+        let folder = harness.location.chromeExtensionDirectory
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let manifest = folder.appending(path: "manifest.json")
+        try Data(#"{"version_name":"1.0.0 build aaaa"}"#.utf8).write(to: manifest)
+        harness.hello()
+
+        harness.host.poll()
+        try Data(#"{"version_name":"1.0.0 build bbbb"}"#.utf8).write(to: manifest)
+        harness.host.poll()
+        harness.host.poll()
+
+        #expect(harness.sent("status").map { $0["extensionBuild"] as? String } == ["1.0.0 build aaaa", "1.0.0 build bbbb"])
+    }
+
     @Test func aNewerPolicyIsPushedOnceWhenTheAppPublishesIt() async throws {
         let harness = try HostHarness()
         harness.hello()
@@ -149,6 +167,32 @@ struct ChromeHostTests {
         harness.observe(5, "worker-start")
 
         #expect(try harness.record()?.missingObservations == 3)
+    }
+
+    // A restarted worker can send its new observation before resending older
+    // ones it never got acknowledged; those still count once they arrive.
+    @Test func anObservationArrivingAfterALaterOneIsStillRecorded() throws {
+        let harness = try HostHarness()
+        harness.observe(1, "worker-start")
+        harness.observe(3, "worker-start")
+
+        harness.observe(2, "policy-applied", ["revision": 9, "checksum": "abc"])
+        harness.observe(2, "policy-applied", ["revision": 9, "checksum": "abc"])
+
+        #expect(harness.sent("ack").map { $0["seq"] as? Int } == [1, 3, 2, 2])
+        #expect(try harness.record()?.appliedRevision == 9)
+        #expect(try harness.record()?.missingObservations == 0)
+        #expect(try harness.record()?.lastSeq == 3)
+    }
+
+    @Test func aLateBlockedPageIsCountedOnce() throws {
+        let harness = try HostHarness()
+        harness.observe(2, "worker-start")
+
+        harness.observe(1, "blocked-shown")
+        harness.observe(1, "blocked-shown")
+
+        #expect(try harness.record()?.blockedPagesShown == 1)
     }
 
     @Test func aPolicyAppliedObservationIsTheProfilesAcknowledgement() throws {

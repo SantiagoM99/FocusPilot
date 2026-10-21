@@ -23,7 +23,10 @@ struct ChromePolicyMailboxTests {
 
         await mailbox.publish(sent)
 
-        #expect(try ChromePolicyMailbox.read(location) == sent)
+        var read = try #require(try ChromePolicyMailbox.read(location))
+        #expect(read.source != nil)
+        read.source = nil
+        #expect(read == sent)
     }
 
     @Test func anOlderRevisionNeverReplacesANewerOne() async throws {
@@ -31,6 +34,22 @@ struct ChromePolicyMailboxTests {
         await mailbox.publish(delivery(revision: 4))
 
         #expect(try ChromePolicyMailbox.read(location)?.policy.revision == 5)
+    }
+
+    // Revisions restart when the owner resets FocusPilot's data; the source
+    // tells Chrome a lower revision then comes from new data, not an old copy.
+    @Test func deliveriesNameTheDataFolderThatIssuedThem() async throws {
+        await mailbox.publish(delivery(revision: 1))
+        let first = try #require(try ChromePolicyMailbox.read(location)?.source)
+        await mailbox.publish(delivery(revision: 2))
+        #expect(try ChromePolicyMailbox.read(location)?.source == first)
+
+        let reset = StorageLocation(directory: try makeTemporaryDirectory())
+        await ChromePolicyMailbox(location: reset).publish(delivery(revision: 1))
+
+        let other = try #require(try ChromePolicyMailbox.read(reset)?.source)
+        #expect(other != first)
+        #expect(UUID(uuidString: other) != nil)
     }
 
     @Test func nothingPublishedReadsAsNil() throws {

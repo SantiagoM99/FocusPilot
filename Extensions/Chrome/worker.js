@@ -39,12 +39,12 @@ function post(message) {
   try { port?.postMessage(message); } catch { /* the disconnect handler reconnects */ }
 }
 
-async function observe(kind, details = {}) {
-  post(await outbox.add(kind, details));
-}
+// Observations go out only through the sender, in order and after hello.
+const sender = FocusOutbox.sender(outbox, post);
 
-async function flush() {
-  for (const observation of await outbox.pending()) post(observation);
+async function observe(kind, details = {}) {
+  await outbox.add(kind, details);
+  await sender.send();
 }
 
 // ---- Policy and network rules ----
@@ -124,9 +124,9 @@ const policyQueue = FocusOutbox.serial();
 
 function handlePolicy(message) {
   return policyQueue(async () => {
-    const incoming = { policy: message.policy, focus: message.focus ?? null };
+    const incoming = { policy: message.policy, focus: message.focus ?? null, source: message.source ?? null };
     const stored = await currentDelivery();
-    if (!FocusPolicy.isNewer(incoming.policy, stored?.policy)) {
+    if (!FocusPolicy.isNewer(incoming, stored)) {
       if (incoming.policy.revision < stored.policy.revision) {
         await observe("policy-rejected-stale", { revision: incoming.policy.revision, current: stored.policy.revision });
       }
@@ -178,19 +178,21 @@ function connect(reason) {
   opened.onMessage.addListener(handleHost);
   opened.onDisconnect.addListener(() => {
     const error = chrome.runtime.lastError?.message ?? null;
-    if (port === opened) port = null;
+    if (port !== opened) return;
+    port = null;
+    sender.close();
     store.set({ appRunning: null, hostError: error });
     observe("host-disconnected", { error });
     reconnectTimer = setTimeout(() => connect("reconnect"), backoffMs);
     backoffMs = Math.min(backoffMs * 2, 60000);
   });
   store.set({ hostError: null });
-  hello(reason).then(flush);
+  hello(reason).then(() => { if (port === opened) sender.open(); });
 }
 
 // ---- Pages ----
 
-chrome.runtime.onMessage.addListener((message, sender, reply) => {
+chrome.runtime.onMessage.addListener((message, _from, reply) => {
   switch (message?.type) {
     case "blocked-shown":
       observe("blocked-shown", { domain: message.domain, view: message.view, by: message.by });

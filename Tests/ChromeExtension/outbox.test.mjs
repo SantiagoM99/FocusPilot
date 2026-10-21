@@ -65,3 +65,39 @@ test("a full outbox drops the oldest, which the host then reports as a gap", asy
 
   assert.deepEqual((await outbox.pending()).map((o) => o.seq), [2, 3]);
 });
+
+// A restarted worker used to post its new observation before resending older
+// unacknowledged ones, and before hello; the host then took the older ones
+// for resends of something it already had.
+test("a connection sends waiting observations after hello, in order, each once", async () => {
+  const outbox = FocusOutbox.create(memoryStorage(), profile, () => 0);
+  const posted = [];
+  const sender = FocusOutbox.sender(outbox, (o) => posted.push(o.seq));
+  await outbox.add("policy-applied");
+  await outbox.add("worker-start");
+  await sender.send();
+  assert.deepEqual(posted, []);
+
+  await sender.open();
+  await outbox.add("blocked-shown");
+  await Promise.all([sender.send(), sender.send()]);
+
+  assert.deepEqual(posted, [1, 2, 3]);
+});
+
+test("a new connection resends everything not yet acknowledged", async () => {
+  const outbox = FocusOutbox.create(memoryStorage(), profile, () => 0);
+  const posted = [];
+  const sender = FocusOutbox.sender(outbox, (o) => posted.push(o.seq));
+  await outbox.add("a");
+  await outbox.add("b");
+  await sender.open();
+  await outbox.acknowledge(1);
+
+  sender.close();
+  await outbox.add("c");
+  await sender.send();
+  await sender.open();
+
+  assert.deepEqual(posted, [1, 2, 2, 3]);
+});

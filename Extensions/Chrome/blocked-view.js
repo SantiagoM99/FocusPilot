@@ -1,5 +1,5 @@
 // What the blocked page says (design 05: A in a session, C outside one,
-// D for a strict session without the app). Pure, so node can test it;
+// D and D2 for a strict or normal session without the app). Pure, so node can test it;
 // blocked.js renders it.
 
 var FocusBlockedView = (() => {
@@ -38,9 +38,13 @@ var FocusBlockedView = (() => {
   }
 
   // "today at 18:00", "tomorrow at 08:00", "Mon at 08:00", in the Mac's zone.
+  function clock(instant, timeZone) {
+    return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(instant));
+  }
+
   function when(instant, now, timeZone) {
     const date = (t) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(t));
-    const time = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(instant));
+    const time = clock(instant, timeZone);
     if (date(instant) === date(now)) return `today at ${time}`;
     if (date(instant) === date(now + 86400000)) return `tomorrow at ${time}`;
     const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(new Date(instant));
@@ -73,7 +77,9 @@ var FocusBlockedView = (() => {
     }
 
     const domain = decision.domain;
-    if (offline && FocusPolicy.strictPastEnd(policy, now)) {
+    const session = policy?.session;
+    const offlineSession = offline && decision.reason === "session";
+    if (offlineSession && session.mode === "strict") {
       return {
         kind: "strict-offline", domain, status: { tone: "orange", text: "FocusPilot isn't running" },
         title: "Still blocked · strict session",
@@ -84,9 +90,20 @@ var FocusBlockedView = (() => {
         footer: [`Compiled policy rev. ${policy.revision} · cached in the extension · no planned end while strict`, "FocusPilot"],
       };
     }
+    if (offlineSession) {
+      const end = clock(Date.parse(session.end), timeZone);
+      return {
+        kind: "normal-offline", domain, status: { tone: "orange", text: "FocusPilot isn't running" },
+        title: `Still blocked until ${end}`,
+        subtitle: `This normal session keeps ${domain} blocked until its planned end, then the rule lifts even if FocusPilot stays closed.`,
+        primary: { label: "Open FocusPilot", action: "open-app" },
+        hint: "Reopen it to pause, complete, or request an exception.",
+        exceptionLink: false,
+        footer: [`Compiled policy rev. ${policy.revision} · session end ${end} cached in the extension`, "FocusPilot"],
+      };
+    }
     const offlineHint = offline ? "FocusPilot isn't running. Exceptions can only be requested while it runs." : null;
 
-    const session = policy?.session;
     if (FocusPolicy.sessionApplies(session, now) && delivery.focus) {
       const left = Date.parse(session.end) - now;
       const status = left > 0 ? `Focus session · ${countdown(left / 1000)} left` : "Strict session · past its planned end";

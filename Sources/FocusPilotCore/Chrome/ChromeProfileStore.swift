@@ -12,9 +12,13 @@ public struct ChromeProfileRecord: Codable, Equatable, Sendable {
     public var allSitesAccess = true
     /// The last observation recorded, in the extension's sequence.
     public var lastSeq = 0
-    /// Observations the sequence skipped; the extension keeps each one until
-    /// acknowledged, so this stays 0 unless its storage was lost.
-    public var missingObservations = 0
+    /// Observations the sequence skipped and that never arrived later; the
+    /// extension keeps each one until acknowledged, so this stays 0 unless
+    /// its storage was lost.
+    public var missingObservations: Int { skippedSeqs.count }
+    /// The skipped sequence numbers, oldest first, at most `skippedLimit`.
+    var skippedSeqs: [Int] = []
+    static let skippedLimit = 1000
     public var appliedRevision: Int?
     public var appliedChecksum: String?
     public var appliedAt: Date?
@@ -26,6 +30,16 @@ public struct ChromeProfileRecord: Codable, Equatable, Sendable {
     init(profileID: String, lastSeenAt: Date) {
         self.profileID = profileID
         self.lastSeenAt = lastSeenAt
+    }
+
+    mutating func noteReceived(_ seq: Int) {
+        if seq > lastSeq {
+            skippedSeqs += Array(max(lastSeq + 1, seq - Self.skippedLimit)..<seq)
+            skippedSeqs = Array(skippedSeqs.suffix(Self.skippedLimit))
+            lastSeq = seq
+        } else {
+            skippedSeqs.removeAll { $0 == seq }
+        }
     }
 }
 

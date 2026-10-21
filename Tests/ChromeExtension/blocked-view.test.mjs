@@ -77,12 +77,40 @@ test("a strict session past its end without the app says how to reopen it", () =
   assert.deepEqual(m.footer, ["Compiled policy rev. 41 · cached in the extension · no planned end while strict", "FocusPilot"]);
 });
 
-test("without the app, exceptions are not offered", () => {
+// Design 05 D applies to the whole strict session, not only past its end.
+test("a strict session before its end without the app is variant D", () => {
+  const m = view(delivery({ session: session("strict"), focus }), "https://youtube.com/", { appRunning: false });
+
+  assert.equal(m.kind, "strict-offline");
+  assert.equal(m.title, "Still blocked · strict session");
+});
+
+test("a normal session without the app says when the rule lifts (05 D2)", () => {
   const m = view(delivery({ session: session(), focus }), "https://youtube.com/", { appRunning: false });
 
+  assert.equal(m.kind, "normal-offline");
+  assert.deepEqual(m.status, { tone: "orange", text: "FocusPilot isn't running" });
+  assert.equal(m.title, "Still blocked until 10:51");
+  assert.equal(m.subtitle, "This normal session keeps youtube.com blocked until its planned end, then the rule lifts even if FocusPilot stays closed.");
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
+  assert.equal(m.hint, "Reopen it to pause, complete, or request an exception.");
   assert.equal(m.exceptionLink, false);
-  assert.equal(m.hint, "FocusPilot isn't running. Exceptions can only be requested while it runs.");
+  assert.deepEqual(m.footer, ["Compiled policy rev. 41 · session end 10:51 cached in the extension", "FocusPilot"]);
+});
+
+// The offline session variants speak about the session, so a site blocked
+// only by another rule keeps naming that rule.
+test("without the app, a site blocked only by an always-on rule still says so", () => {
+  const strictPast = { now: at("2026-10-14T16:30:00Z"), appRunning: false };
+  for (const extra of [strictPast, { appRunning: false }]) {
+    const m = view(delivery({ session: session("strict"), focus }), "https://facebook.com/", extra);
+
+    assert.equal(m.kind, "session");
+    assert.equal(m.footer[0], "facebook.com is blocked at all times");
+    assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
+    assert.equal(m.exceptionLink, false);
+    assert.equal(m.hint, "FocusPilot isn't running. Exceptions can only be requested while it runs.");
+  }
 });
 
 test("a page that is no longer blocked offers to go back", () => {

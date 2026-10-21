@@ -40,7 +40,39 @@ var FocusOutbox = (() => {
     return { add, acknowledge, pending };
   }
 
-  return { create, serial };
+  // Posts the outbox over one connection in sequence order, each observation
+  // once per connection, and only after `open` (called once hello is sent):
+  // the host treats anything below the last number it saw as a resend.
+  function sender(outbox, post) {
+    const queue = serial();
+    let isOpen = false;
+    let sentUpTo = 0;
+
+    function send() {
+      return queue(async () => {
+        if (!isOpen) return;
+        for (const observation of await outbox.pending()) {
+          if (observation.seq <= sentUpTo) continue;
+          post(observation);
+          sentUpTo = observation.seq;
+        }
+      });
+    }
+
+    function open() {
+      isOpen = true;
+      sentUpTo = 0;
+      return send();
+    }
+
+    function close() {
+      isOpen = false;
+    }
+
+    return { send, open, close };
+  }
+
+  return { create, serial, sender };
 })();
 
 if (typeof module === "object") module.exports = FocusOutbox;

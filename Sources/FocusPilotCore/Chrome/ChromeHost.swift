@@ -29,6 +29,7 @@ public final class ChromeHost {
     private let store: ChromeProfileStore
     private var sentRevision: Int?
     private var sentAppRunning: Bool?
+    private var sentBuild: String??
     private var profileID: String?
 
     public init(location: StorageLocation, environment: Environment) {
@@ -85,14 +86,15 @@ public final class ChromeHost {
         guard let id = message["profileId"] as? String, ChromeProfileStore.isValid(id),
               let seq = message["seq"] as? Int, seq > 0 else { return }
         var record = existingRecord(id)
-        if seq > record.lastSeq {
+        // Observations can arrive out of order, so one below the last seen is
+        // new when it filled a gap; anything else below is a resend.
+        if seq > record.lastSeq || record.skippedSeqs.contains(seq) {
             do {
                 try store.log(body, for: id)
             } catch {
                 return // Not recorded, so not acknowledged: the extension resends it.
             }
-            record.missingObservations += seq - record.lastSeq - 1
-            record.lastSeq = seq
+            record.noteReceived(seq)
             apply(message, to: &record)
             guard (try? store.save(record)) != nil else { return }
         }
@@ -130,12 +132,16 @@ public final class ChromeHost {
         send(object)
     }
 
+    /// Sent when the app starts or stops, and when an app update lands a new
+    /// extension build, which can happen after hello.
     private func sendStatus(force: Bool) {
         let running = environment.isAppRunning()
-        guard force || running != sentAppRunning else { return }
+        let build = extensionBuildOnDisk()
+        guard force || running != sentAppRunning || sentBuild != .some(build) else { return }
         sentAppRunning = running
+        sentBuild = .some(build)
         var status: [String: Any] = ["type": "status", "appRunning": running]
-        status["extensionBuild"] = extensionBuildOnDisk()
+        status["extensionBuild"] = build
         send(status)
     }
 
