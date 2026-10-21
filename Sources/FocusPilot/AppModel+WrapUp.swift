@@ -29,8 +29,9 @@ extension AppModel {
 
     /// Saves the pending wrap-up and closes the sheet. Returns why nothing
     /// was saved, or nil; on failure the sheet stays open with the text.
-    func saveWrapUp(markingDone: Bool) async -> String? {
+    func saveWrapUp() async -> String? {
         guard let pending = wrapUp else { return nil }
+        let markingDone = pending.draft.marksTaskDone
         guard let coordinator else { return startupError }
         do {
             try await coordinator.saveWrapUp(pending.draft.wrapUp, after: pending.prompt.session, markingDone: markingDone)

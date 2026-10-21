@@ -32,7 +32,7 @@ struct ReturnCueView: View {
     }
 
     private func detail(_ title: String, _ text: String) -> some View {
-        (Text(title + ": ").foregroundStyle(.secondary) + Text(text))
+        Text("\(Text(title + ": ").foregroundStyle(.secondary))\(text)")
             .font(.callout)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)

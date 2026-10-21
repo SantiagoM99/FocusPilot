@@ -71,18 +71,22 @@ struct PendingWrapUpTests {
         let id = UUID()
         var typing = PendingWrapUp.receiving(prompt(id), replacing: nil, task: task)
         typing.draft.outcome = "Drafted §4.2"
+        typing.draft.marksTaskDone = true
 
         let again = PendingWrapUp.receiving(prompt(id), replacing: typing, task: task)
 
         #expect(again.draft.outcome == "Drafted §4.2")
+        #expect(again.draft.marksTaskDone)
     }
 
     @Test func anotherSessionStartsFresh() {
         var typing = PendingWrapUp.receiving(prompt(UUID()), replacing: nil, task: task)
         typing.draft.outcome = "Drafted §4.2"
+        typing.draft.marksTaskDone = true
 
         let next = PendingWrapUp.receiving(prompt(UUID()), replacing: typing, task: task)
 
         #expect(next.draft.outcome == "")
+        #expect(!next.draft.marksTaskDone)
     }
 }

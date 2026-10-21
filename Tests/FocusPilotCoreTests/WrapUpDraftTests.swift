@@ -29,3 +29,12 @@ struct WrapUpDraftTests {
         #expect(draft.wrapUp == WrapUp(outcome: "Drafted §4.2", remainingWork: nil, returnCue: "Check Table 3"))
     }
 }
+
+extension WrapUpDraftTests {
+    @Test func markTaskCompleteStartsUntickedEvenForATaskWithAWrapUp() {
+        let task = TodayItem(id: 1, title: "Explain baseline results", nextAction: "Check Table 3")
+
+        #expect(!WrapUpDraft(task: task).marksTaskDone)
+        #expect(!WrapUpDraft().marksTaskDone)
+    }
+}

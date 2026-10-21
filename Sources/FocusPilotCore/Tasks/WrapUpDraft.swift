@@ -1,6 +1,7 @@
 import Foundation
 
-/// The wrap-up sheet's three fields while the owner edits them.
+/// The wrap-up sheet's three fields and its "Mark task complete" box while
+/// the owner edits them.
 ///
 /// It starts from what the task already says (the remaining work from the
 /// last wrap-up and the current next action), so an owner with nothing new
@@ -9,11 +10,14 @@ public struct WrapUpDraft: Equatable, Sendable {
     public var outcome = ""
     public var remainingWork = ""
     public var returnCue = ""
+    /// Always starts unticked: completing a task is the owner's explicit choice.
+    public var marksTaskDone = false
 
-    public init(outcome: String = "", remainingWork: String = "", returnCue: String = "") {
+    public init(outcome: String = "", remainingWork: String = "", returnCue: String = "", marksTaskDone: Bool = false) {
         self.outcome = outcome
         self.remainingWork = remainingWork
         self.returnCue = returnCue
+        self.marksTaskDone = marksTaskDone
     }
 
     public init(task: TodayItem) {

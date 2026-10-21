@@ -37,7 +37,7 @@ struct NowCard: View {
                         Text(nextAction)
                             .textSelection(.enabled)
                         if let remaining = item.wrapUp?.remainingWork {
-                            (Text("Remains: ").foregroundStyle(.secondary) + Text(remaining))
+                            Text("\(Text("Remains: ").foregroundStyle(.secondary))\(remaining)")
                                 .font(.callout)
                                 .padding(.top, 2)
                         }
