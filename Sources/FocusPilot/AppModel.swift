@@ -229,13 +229,15 @@ final class AppModel {
         if case .connected(let current, let workspaces)? = herdr, current == server {
             for workspace in workspaces { labels[workspace.id] = workspace.label }
         }
+        // The refresh runs before `perform` reloads the lists, so anything it
+        // queued shows at once.
         await perform("Could not link the agent") { coordinator in
             for agent in agents {
                 _ = try await coordinator.linkAgent(agent, on: server, workspaceLabel: labels[agent.workspaceID],
                                                     toTask: taskID)
             }
+            herdrAgents = await coordinator.refreshHerdrAgents()
         }
-        herdrAgents = await coordinator?.refreshHerdrAgents()
     }
 
     func unlinkAgent(_ linkID: Int64) async {

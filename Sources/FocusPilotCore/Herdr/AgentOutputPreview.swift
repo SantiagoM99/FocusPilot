@@ -31,12 +31,15 @@ public struct AgentOutputPreview: Equatable, Sendable {
 
     var storedText: String { lines.joined(separator: "\n") }
 
-    /// CSI sequences (colors, cursor moves, line clears) and OSC sequences
-    /// (window titles, links), which end with BEL or ESC \.
+    /// CSI sequences (colors, cursor moves, line clears); OSC, DCS, SOS, PM
+    /// and APC strings (window titles, links, device control) with their
+    /// bodies, which end with BEL or ESC \; charset switches such as ESC ( B;
+    /// and any other escape with its one final character.
     private static func strippingEscapes(_ text: String) -> String {
         let text: String = text.replacing(/\x{1B}\[[0-9;?]*[ -\/]*[@-~]/, with: "")
-            .replacing(/\x{1B}\][^\x{07}\x{1B}]*(\x{07}|\x{1B}\\)/, with: "")
-            .replacing(/\x{1B}[@-_]/, with: "")
+            .replacing(/\x{1B}[\]PX^_][^\x{07}\x{1B}]*(\x{07}|\x{1B}\\)/, with: "")
+            .replacing(/\x{1B}[ -\/]+[0-~]/, with: "")
+            .replacing(/\x{1B}[0-~]/, with: "")
         return text
     }
 

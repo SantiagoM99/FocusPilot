@@ -20,10 +20,12 @@ extension FocusCoordinator {
     /// Reads the linked agents' status and queues their results. Herdr is not
     /// asked at all while no task has a linked agent; nil then.
     public func refreshHerdrAgents() async -> HerdrAgents? {
-        guard let agents, (try? await repository.agentLinks().isEmpty) == false else { return nil }
-        let current = await agents.agents()
-        await record(current)
-        return current
+        await oneAgentReadingAtATime {
+            guard let agents = self.agents, (try? await self.repository.agentLinks().isEmpty) == false else { return nil }
+            let current = await agents.agents()
+            await self.record(current)
+            return current
+        }
     }
 
     /// Herdr's agents now, for choosing one to link. Nothing is recorded.
@@ -33,7 +35,12 @@ extension FocusCoordinator {
 
     public func linkAgent(_ agent: HerdrAgent, on server: HerdrServer, workspaceLabel: String?,
                           toTask taskID: Int64) async throws -> TaskAgentLink {
-        let link = try await repository.linkAgent(agent, on: server, workspaceLabel: workspaceLabel, toTask: taskID)
+        let link = try await oneAgentReadingAtATime {
+            let (link, queued) = try await self.repository.linkAgentQueuing(agent, on: server,
+                                                                            workspaceLabel: workspaceLabel, toTask: taskID)
+            if let queued { await self.storeOutput(of: queued) }
+            return link
+        }
         await broadcast()
         return link
     }
@@ -72,6 +79,10 @@ extension FocusCoordinator {
     /// pane, same agent. Its status is recorded first, because focusing marks
     /// a finished agent as seen and Herdr then reports it as idle.
     public func openAgent(_ linkID: Int64) async -> OpenAgentResult {
+        await oneAgentReadingAtATime { await self.focusAgent(linkID) }
+    }
+
+    private func focusAgent(_ linkID: Int64) async -> OpenAgentResult {
         guard let agents, let link = try? await repository.agentLinks().first(where: { $0.id == linkID }) else {
             return .notFound
         }
@@ -89,12 +100,33 @@ extension FocusCoordinator {
 
     /// Stores the agents' status and reads each new item's output once.
     private func record(_ current: HerdrAgents) async {
-        guard let agents, case .connected(let server, let list) = current,
+        guard case .connected(let server, let list) = current,
               let queued = try? await repository.recordAgents(list, on: server)
         else { return }
-        for item in queued {
-            guard let text = await agents.output(of: item.paneID, on: item.server) else { continue }
-            try? await repository.storeOutput(AgentOutputPreview(text), forReviewItem: item.id)
+        for item in queued { await storeOutput(of: item) }
+    }
+
+    private func storeOutput(of item: NewReviewItem) async {
+        guard let text = await agents?.output(of: item.paneID, on: item.server) else { return }
+        try? await repository.storeOutput(AgentOutputPreview(text), forReviewItem: item.id)
+    }
+
+    /// Runs `work` after every earlier reading of Herdr's agents has been
+    /// recorded. The coordinator is suspended while `herdr` runs, so without
+    /// this a poll that read "working" could record it after Open agent
+    /// recorded "done" and focused, and the next poll would count the same
+    /// run as finished a second time.
+    private func oneAgentReadingAtATime<T: Sendable>(_ work: @escaping @Sendable () async -> T) async -> T {
+        let earlier = agentReading
+        let this = Task { await earlier?.value; return await work() }
+        agentReading = Task { _ = await this.value }
+        return await this.value
+    }
+
+    private func oneAgentReadingAtATime<T: Sendable>(_ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        let outcome: Result<T, any Error> = await oneAgentReadingAtATime {
+            do { return .success(try await work()) } catch { return .failure(error) }
         }
+        return try outcome.get()
     }
 }

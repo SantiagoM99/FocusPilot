@@ -74,6 +74,16 @@ struct HerdrAgentCoordinatorTests {
         #expect(item.output?.lines == ["Ablation table ready: 5 rows.", "Seed 3 underperforms."])
     }
 
+    @Test func linkingAnAgentAlreadyWaitingQueuesItsApprovalWithItsScreen() async throws {
+        let task = try await repository.addTask(NewTask(title: "Explain baseline results")).id!
+        _ = try await coordinator.linkAgent(agent(.blocked), on: herdrServer, workspaceLabel: nil, toTask: task)
+
+        #expect(herdr.calls == [.read("w4:p2")])
+        let item = try #require(try await coordinator.reviewQueue().first)
+        #expect(item.kind == .approval)
+        #expect(item.output?.lines.first == "Ablation table ready: 5 rows.")
+    }
+
     @Test func pollingNeverFocusesWhateverHappens() async throws {
         _ = try await linkedTask()
         for status in [HerdrAgentStatus.blocked, .working, .done, .unknown, .idle, .working, .idle] {

@@ -133,6 +133,11 @@ struct AgentOutputPreviewTests {
         #expect(AgentOutputPreview("open \u{202E}exe.txt\u{202C} now\u{200B}\u{2066}!").lines == ["open exe.txt now!"])
     }
 
+    @Test func deviceControlStringsAndCharsetSwitchesAreRemoved() {
+        let raw = "\u{1B}P1;2|secret payload\u{1B}\\Done\u{1B}(B with \u{1B}_apc\u{1B}\\tests\u{1B}7"
+        #expect(AgentOutputPreview(raw).lines == ["Done with tests"])
+    }
+
     @Test func longLinesAreCut() {
         let preview = AgentOutputPreview(String(repeating: "x", count: 5000))
         #expect(preview.lines.first?.count == AgentOutputPreview.maximumLineLength)

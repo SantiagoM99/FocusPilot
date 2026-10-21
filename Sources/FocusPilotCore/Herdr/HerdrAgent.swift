@@ -75,10 +75,12 @@ enum HerdrPaneID {
 
 /// Parses `herdr agent list` output. The reply is untrusted: any field of
 /// the wrong type, or a pane ID of the wrong shape, rejects the whole reply.
-/// Names and titles are shown and stored, so they are made plain and cut.
+/// Every text field is shown or stored, so each is made plain and cut; a
+/// kind, workspace or tab with nothing visible left rejects the reply.
 enum HerdrAgentList {
     static let maximumTitleLength = 200
     static let maximumNameLength = 64
+    static let maximumIDLength = 64
 
     static func parse(_ data: Data) -> [HerdrAgent]? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -88,8 +90,10 @@ enum HerdrAgentList {
         var agents: [HerdrAgent] = []
         for item in items {
             guard let pane = item["pane_id"] as? String, HerdrPaneID.isValid(pane),
-                  let workspace = item["workspace_id"] as? String, let tab = item["tab_id"] as? String,
-                  let kind = item["agent"] as? String, let status = item["agent_status"] as? String,
+                  let workspace = (item["workspace_id"] as? String).flatMap({ cut($0, maximumIDLength) }),
+                  let tab = (item["tab_id"] as? String).flatMap({ cut($0, maximumIDLength) }),
+                  let kind = (item["agent"] as? String).flatMap({ cut($0, maximumNameLength) }),
+                  let status = item["agent_status"] as? String,
                   optional(item["name"], String.self), optional(item["terminal_title_stripped"], String.self)
             else { return nil }
             let title = (item["terminal_title_stripped"] as? String).flatMap { cut($0, maximumTitleLength) }

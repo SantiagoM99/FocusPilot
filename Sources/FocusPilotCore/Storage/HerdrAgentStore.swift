@@ -5,13 +5,16 @@ import GRDB
 /// caller's single write or read. Nothing here changes a task: an agent
 /// finishing never completes it and never touches Now.
 enum HerdrAgentStore {
+    /// Links the agent and, if it is already waiting at an approval, queues
+    /// that request: from here on only changes count, so it would never be
+    /// queued otherwise. Linking it again changes nothing.
     static func link(_ agent: HerdrAgent, on server: HerdrServer, workspaceLabel: String?, toTask taskID: Int64,
-                     at now: Date, in db: Database) throws -> TaskAgentLink {
+                     at now: Date, in db: Database) throws -> (TaskAgentLink, NewReviewItem?) {
         if let existing = try AgentLinkRow
             .filter(Column("taskId") == taskID && Column("socketPath") == server.socketPath
                 && Column("serverStartedAt") == server.startedAtMilliseconds && Column("paneId") == agent.paneID)
             .fetchOne(db) {
-            return existing.link
+            return (existing.link, nil)
         }
         var row = AgentLinkRow(id: nil, taskId: taskID, sessionName: server.sessionName, socketPath: server.socketPath,
                                serverStartedAt: server.startedAtMilliseconds, paneId: agent.paneID,
@@ -21,7 +24,9 @@ enum HerdrAgentStore {
                                lastStatus: AgentTransition.lastKnown(previous: nil, current: agent.status)?.rawValue,
                                statusChangedAt: now)
         try row.insert(db)
-        return row.link
+        let approval = AgentTransition.review(from: nil, to: agent.status) == .approval
+            ? try queue(.approval, for: row, summary: agent.title, at: now, in: db) : nil
+        return (row.link, approval)
     }
 
     static func links(forTask taskID: Int64?, in db: Database) throws -> [TaskAgentLink] {
@@ -31,15 +36,21 @@ enum HerdrAgentStore {
 
     /// Updates each linked agent's last known status from Herdr's list and
     /// queues what its change means. Agents in another server instance, or a
-    /// different agent in the same pane, are left alone.
+    /// different agent in the same pane, are left alone; an approval asked
+    /// from a pane that is gone, replaced or from before a restart of this
+    /// Herdr server can no longer be answered, so it is cleared.
     static func record(_ agents: [HerdrAgent], on server: HerdrServer, at now: Date,
                        in db: Database) throws -> [NewReviewItem] {
-        let rows = try AgentLinkRow
-            .filter(Column("socketPath") == server.socketPath && Column("serverStartedAt") == server.startedAtMilliseconds)
-            .fetchAll(db)
+        let rows = try AgentLinkRow.filter(Column("socketPath") == server.socketPath).fetchAll(db)
         var queued: [NewReviewItem] = []
         for var row in rows {
-            guard let agent = agents.first(where: { row.link.isSameAgent(as: $0, on: server) }) else { continue }
+            guard let agent = agents.first(where: { row.link.isSameAgent(as: $0, on: server) }) else {
+                switch AgentLinkState(row.link, .connected(server, agents)) {
+                case .replaced, .notFound: try clearApprovals(forLink: row.id!, in: db)
+                case .live, .renamed, .unknown: break
+                }
+                continue
+            }
             let previous = row.link.lastStatus
             let known = AgentTransition.lastKnown(previous: previous, current: agent.status)
             if known != previous {
@@ -50,19 +61,35 @@ enum HerdrAgentStore {
             // Answered in Herdr: the request no longer needs the owner. An
             // unknown reading says nothing, so the request stays.
             if agent.status != .blocked && agent.status != .unknown {
-                try ReviewItemRow
-                    .filter(Column("linkId") == row.id && Column("kind") == AgentTransition.Review.approval.rawValue
-                        && Column("reviewedAt") == nil)
-                    .deleteAll(db)
+                try clearApprovals(forLink: row.id!, in: db)
             }
             guard let kind = AgentTransition.review(from: previous, to: agent.status) else { continue }
-            var item = ReviewItemRow(id: nil, taskId: row.taskId, linkId: row.id, kind: kind.rawValue, occurredAt: now,
-                                     agentLabel: row.label, workspaceLabel: row.workspaceLabel, summary: agent.title,
-                                     outputText: nil, outputLineCount: nil, reviewedAt: nil)
-            try item.insert(db)
-            queued.append(NewReviewItem(id: item.id!, paneID: row.paneId, server: server))
+            try queued.append(queue(kind, for: row, summary: agent.title, at: now, in: db))
         }
         return queued
+    }
+
+    /// Stops watching the agent. Its results stay queued; an approval
+    /// request goes, since nothing would ever clear it.
+    static func unlink(_ linkID: Int64, in db: Database) throws {
+        try clearApprovals(forLink: linkID, in: db)
+        _ = try AgentLinkRow.deleteOne(db, key: linkID)
+    }
+
+    private static func queue(_ kind: AgentTransition.Review, for row: AgentLinkRow, summary: String?, at now: Date,
+                              in db: Database) throws -> NewReviewItem {
+        var item = ReviewItemRow(id: nil, taskId: row.taskId, linkId: row.id, kind: kind.rawValue, occurredAt: now,
+                                 agentLabel: row.label, workspaceLabel: row.workspaceLabel, summary: summary,
+                                 outputText: nil, outputLineCount: nil, reviewedAt: nil)
+        try item.insert(db)
+        return NewReviewItem(id: item.id!, paneID: row.paneId, server: row.link.server)
+    }
+
+    private static func clearApprovals(forLink linkID: Int64, in db: Database) throws {
+        try ReviewItemRow
+            .filter(Column("linkId") == linkID && Column("kind") == AgentTransition.Review.approval.rawValue
+                && Column("reviewedAt") == nil)
+            .deleteAll(db)
     }
 
     /// Follows the agent under its new name. Only the name may differ: the

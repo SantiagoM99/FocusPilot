@@ -71,6 +71,22 @@ struct HerdrAgentTests {
         #expect(try #require(HerdrAgentList.parse(Data(json.utf8))?.first).title == "Ablation table")
     }
 
+    @Test func kindWorkspaceAndTabAreMadePlainToo() throws {
+        let json = agentListJSON
+            .replacingOccurrences(of: "\"agent\":\"claude\",\"agent_session\"", with: "\"agent\":\"cla\\u202Eude\",\"agent_session\"")
+            .replacingOccurrences(of: "\"tab_id\":\"w4:t2\"", with: "\"tab_id\":\"w4:\\u200Bt2\"")
+            .replacingOccurrences(of: "\"workspace_id\":\"w4\"}", with: "\"workspace_id\":\"w\\u001B4\"}")
+        let first = try #require(HerdrAgentList.parse(Data(json.utf8))?.first)
+        #expect(first.kind == "claude")
+        #expect(first.tabID == "w4:t2")
+        #expect(first.workspaceID == "w4")
+    }
+
+    @Test func aKindThatIsOnlyInvisibleRejectsTheReply() {
+        let json = agentListJSON.replacingOccurrences(of: "\"agent\":\"codex\"", with: "\"agent\":\"\\u200B\"")
+        #expect(HerdrAgentList.parse(Data(json.utf8)) == nil)
+    }
+
     @Test func aTitleChangeAloneLeavesTheStatusViewEqual() {
         var renamedTitle = agent(.working)
         renamedTitle.title = "Something else"

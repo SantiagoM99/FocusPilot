@@ -7,15 +7,23 @@ extension TaskRepository {
     /// starting point. Linking it again returns the existing link.
     public func linkAgent(_ agent: HerdrAgent, on server: HerdrServer, workspaceLabel: String?,
                           toTask taskID: Int64) async throws -> TaskAgentLink {
+        try await linkAgentQueuing(agent, on: server, workspaceLabel: workspaceLabel, toTask: taskID).link
+    }
+
+    /// `linkAgent`, also returning the approval request queued if the agent
+    /// was already waiting at one.
+    func linkAgentQueuing(_ agent: HerdrAgent, on server: HerdrServer, workspaceLabel: String?,
+                          toTask taskID: Int64) async throws -> (link: TaskAgentLink, queued: NewReviewItem?) {
         let linkedAt = now()
         return try await ownerDatabase.write { db in
             try HerdrAgentStore.link(agent, on: server, workspaceLabel: workspaceLabel, toTask: taskID, at: linkedAt, in: db)
         }
     }
 
-    /// Stops watching the agent for this task. Queued items stay.
+    /// Stops watching the agent for this task. Queued results stay; an
+    /// unanswered approval request is removed.
     public func unlinkAgent(_ linkID: Int64) async throws {
-        _ = try await ownerDatabase.write { db in try AgentLinkRow.deleteOne(db, key: linkID) }
+        try await ownerDatabase.write { db in try HerdrAgentStore.unlink(linkID, in: db) }
     }
 
     /// The task's links, or every link when `taskID` is nil.
