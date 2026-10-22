@@ -17,6 +17,7 @@ public actor FocusCoordinator {
     }
 
     private let herdr: (any HerdrWorkspaceSource)?
+    let agents: (any HerdrAgentSource)?
 
     let repository: TaskRepository
     let publisher: PolicyPublisher
@@ -33,17 +34,21 @@ public actor FocusCoordinator {
     var earlyEnd: StrictWait<UUID>?
     /// The owner confirmed a rule change that weakens the strict session.
     var ruleWait: StrictWait<ConfirmedRuleEdit>?
+    /// The last queued read-and-record of Herdr's agents; see `oneAgentReadingAtATime`.
+    var agentReading: Task<Void, Never>?
     /// Grows with every change, so the app can drop a snapshot older than one it has.
     private var revision = 0
     private var subscribers: [UUID: AsyncStream<FocusSnapshot>.Continuation] = [:]
 
-    /// Without `herdr`, Herdr reads as not installed.
+    /// Without `herdr` and `agents`, Herdr reads as not installed.
     public init(repository: TaskRepository, herdr: (any HerdrWorkspaceSource)? = nil,
+                agents: (any HerdrAgentSource)? = nil,
                 publisher: PolicyPublisher = PolicyNotDelivered(),
                 notices: FocusNoticeSink = NoticesIgnored(), now: @escaping @Sendable () -> Date = Date.init,
                 uptime: @escaping @Sendable () -> Duration = FocusCoordinator.continuousUptime()) {
         self.repository = repository
         self.herdr = herdr
+        self.agents = agents
         self.publisher = publisher
         self.notices = notices
         self.now = now

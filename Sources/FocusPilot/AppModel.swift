@@ -18,6 +18,12 @@ final class AppModel {
     private(set) var commandLineError: String?
     /// What FocusPilot last saw of Herdr; nil until the first check.
     private(set) var herdr: HerdrConnection?
+    /// Herdr's agents as last polled; nil while no task has a linked agent.
+    private(set) var herdrAgents: HerdrAgents?
+    private(set) var agentLinks: [TaskAgentLink] = []
+    private(set) var reviewItems: [ReviewItem] = []
+    /// Why the last Open agent did nothing, shown where it was clicked.
+    var agentNotice: String?
     /// Set when a session command fails; shown by the session surfaces.
     var sessionError: String?
     /// Asks the planning window to show the Start focus sheet.
@@ -55,7 +61,8 @@ final class AppModel {
         do {
             let location = StorageLocation.applicationSupport()
             let repository = try TaskRepository(location: location)
-            coordinator = FocusCoordinator(repository: repository, herdr: HerdrCLI(), notices: UserNotices())
+            let herdr = HerdrCLI()
+            coordinator = FocusCoordinator(repository: repository, herdr: herdr, agents: herdr, notices: UserNotices())
             listenForCommands(location: location, service: CommandService(repository: repository))
         } catch {
             coordinator = nil
@@ -93,7 +100,8 @@ final class AppModel {
     }
 
     /// Reads Herdr on `HerdrPollSchedule`, which also turns new workspaces
-    /// into projects. While Herdr is unreachable it keeps retrying, less
+    /// into projects and, while tasks have linked agents, queues their
+    /// results. Polling only reads; it never focuses or prompts an agent. While Herdr is unreachable it keeps retrying, less
     /// often, without reporting errors. Lists reload only when Herdr's answer
     /// changes.
     private func watchHerdr() {
@@ -101,11 +109,13 @@ final class AppModel {
             var schedule = HerdrPollSchedule()
             while let coordinator = self?.coordinator {
                 let connection = await coordinator.refreshHerdr()
+                let agents = await coordinator.refreshHerdrAgents()
                 guard let self else { return }
-                if connection != herdr {
-                    herdr = connection
-                    await refresh()
-                }
+                // A new terminal title alone only redraws the inspector.
+                let needsReload = connection != herdr || agents?.ignoringTitles != herdrAgents?.ignoringTitles
+                herdr = connection
+                herdrAgents = agents
+                if needsReload { await refresh() }
                 try? await Task.sleep(for: schedule.delay(after: connection))
             }
         }
@@ -175,6 +185,8 @@ final class AppModel {
             if let shownProject {
                 projectItems = try await coordinator.projectTasks(shownProject)
             }
+            agentLinks = try await coordinator.agentLinks()
+            reviewItems = try await coordinator.reviewQueue()
             taskError = nil
         } catch {
             taskError = "Could not load tasks: \(error.localizedDescription)"
@@ -210,6 +222,60 @@ final class AppModel {
 
     func undoHerdrAdd(_ taskID: Int64) async {
         await perform("Could not undo the task") { try await $0.undoHerdrAdd(taskID) }
+    }
+
+    // MARK: Herdr agents on tasks
+
+    /// Herdr's agents right now, for the link sheet.
+    func availableAgents() async -> HerdrAgents {
+        await coordinator?.availableAgents() ?? .disconnected(.binaryNotFound)
+    }
+
+    func linkAgents(_ agents: [HerdrAgent], on server: HerdrServer, toTask taskID: Int64) async {
+        var labels: [String: String] = [:]
+        if case .connected(let current, let workspaces)? = herdr, current == server {
+            for workspace in workspaces { labels[workspace.id] = workspace.label }
+        }
+        // The refresh runs before `perform` reloads the lists, so anything it
+        // queued shows at once.
+        await perform("Could not link the agent") { coordinator in
+            for agent in agents {
+                _ = try await coordinator.linkAgent(agent, on: server, workspaceLabel: labels[agent.workspaceID],
+                                                    toTask: taskID)
+            }
+            herdrAgents = await coordinator.refreshHerdrAgents()
+        }
+    }
+
+    func unlinkAgent(_ linkID: Int64) async {
+        await perform("Could not unlink the agent") { try await $0.unlinkAgent(linkID) }
+    }
+
+    /// The owner's Relink after the agent was renamed in Herdr.
+    func relinkAgent(_ linkID: Int64) async {
+        guard let coordinator else { return }
+        agentNotice = await coordinator.relinkAgent(linkID) ? nil
+            : "The agent changed again in Herdr, so it wasn’t relinked. Check it and try again."
+        await refresh()
+    }
+
+    func markReviewed(_ itemID: Int64) async {
+        await perform("Could not mark the result reviewed") { try await $0.markReviewed(itemID) }
+    }
+
+    /// The owner clicked Open agent: focuses that agent's pane in Herdr.
+    /// This is the only path to a Herdr focus, and it never restores the
+    /// previous one afterwards.
+    func openAgent(_ linkID: Int64) async {
+        guard let coordinator else { return }
+        agentNotice = switch await coordinator.openAgent(linkID) {
+        case .opened: nil
+        case .renamed(let name): "This agent’s name changed in Herdr to “\(name)”. Relink it to keep following it."
+        case .replaced: "That pane now runs a different agent. Unlink it, or link the new one."
+        case .notFound: "The agent is no longer in Herdr. It may have closed, or Herdr restarted."
+        case .herdrUnavailable: "Herdr isn’t available, so the agent couldn’t be opened."
+        }
+        await refresh()
     }
 
     func unlinkProject(_ projectID: Int64) async {

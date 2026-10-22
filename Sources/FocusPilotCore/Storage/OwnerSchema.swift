@@ -156,6 +156,49 @@ enum OwnerSchema {
             }
             try db.create(index: "wrapUp_on_taskId", on: WrapUpRecord.databaseTableName, columns: ["taskId"])
         }
+        migrator.registerMigration("owner-v9-herdr-agents") { db in
+            // Agents the owner linked to a task. The pane ID means something
+            // only with its server instance, so both are stored together.
+            try db.create(table: AgentLinkRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("taskId", .integer).notNull()
+                    .references(TaskRecord.databaseTableName, onDelete: .cascade)
+                table.column("sessionName", .text).notNull()
+                table.column("socketPath", .text).notNull()
+                table.column("serverStartedAt", .integer).notNull()
+                table.column("paneId", .text).notNull()
+                table.column("workspaceId", .text).notNull()
+                table.column("tabId", .text).notNull()
+                table.column("agentName", .text)
+                table.column("agentKind", .text).notNull()
+                table.column("label", .text).notNull()
+                table.column("workspaceLabel", .text)
+                // Never 'unknown': an unknown reading keeps the last known status.
+                table.column("lastStatus", .text).check(sql: "lastStatus IN ('working', 'blocked', 'idle', 'done')")
+                table.column("statusChangedAt", .datetime).notNull()
+                table.uniqueKey(["taskId", "socketPath", "serverStartedAt", "paneId"])
+            }
+            try db.create(index: "herdrAgentLink_on_pane", on: AgentLinkRow.databaseTableName,
+                          columns: ["socketPath", "serverStartedAt", "paneId"])
+            // The Review queue. Items outlive an unlinked agent, keeping its
+            // label, and go with their task.
+            try db.create(table: ReviewItemRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("taskId", .integer).notNull()
+                    .references(TaskRecord.databaseTableName, onDelete: .cascade)
+                table.column("linkId", .integer).references(AgentLinkRow.databaseTableName, onDelete: .setNull)
+                table.column("kind", .text).notNull().check(sql: "kind IN ('finished', 'approval')")
+                table.column("occurredAt", .datetime).notNull()
+                table.column("agentLabel", .text).notNull()
+                table.column("workspaceLabel", .text)
+                table.column("summary", .text)
+                table.column("outputText", .text)
+                table.column("outputLineCount", .integer)
+                table.column("reviewedAt", .datetime)
+            }
+            try db.create(index: "herdrReviewItem_on_linkId", on: ReviewItemRow.databaseTableName, columns: ["linkId"])
+            try db.create(index: "herdrReviewItem_on_taskId", on: ReviewItemRow.databaseTableName, columns: ["taskId"])
+        }
         return migrator
     }
 

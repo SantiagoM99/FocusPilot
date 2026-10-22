@@ -106,6 +106,6 @@ struct OwnerMigrationV8Tests {
         #expect(item.wrapUp == nil)
         #expect(item.nextAction == "Open Overleaf")
         #expect(try await repository.tasks().first?.revision == 3)
-        #expect(OwnerSchema.migrator.migrations.suffix(2) == ["owner-v7-rules", "owner-v8-wrapup"])
+        #expect(OwnerSchema.migrator.migrations.suffix(3) == ["owner-v7-rules", "owner-v8-wrapup", "owner-v9-herdr-agents"])
     }
 }

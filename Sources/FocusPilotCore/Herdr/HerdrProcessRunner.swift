@@ -11,7 +11,15 @@ public struct HerdrProcessOutput: Sendable {
 }
 
 public protocol HerdrProcessRunning: Sendable {
-    func run(executable: URL, arguments: [String], environment: [String: String]) async throws -> HerdrProcessOutput
+    /// `outputLimit`, when given, replaces the runner's own cap for this run.
+    func run(executable: URL, arguments: [String], environment: [String: String],
+             outputLimit: Int?) async throws -> HerdrProcessOutput
+}
+
+extension HerdrProcessRunning {
+    public func run(executable: URL, arguments: [String], environment: [String: String]) async throws -> HerdrProcessOutput {
+        try await run(executable: executable, arguments: arguments, environment: environment, outputLimit: nil)
+    }
 }
 
 /// Runs a child process with exactly the given environment, giving up after
@@ -28,7 +36,8 @@ public struct HerdrProcessRunner: HerdrProcessRunning {
     /// The child was stopped by a signal, normally the timeout's.
     public struct TimedOut: Error {}
 
-    public func run(executable: URL, arguments: [String], environment: [String: String]) async throws -> HerdrProcessOutput {
+    public func run(executable: URL, arguments: [String], environment: [String: String],
+                    outputLimit: Int?) async throws -> HerdrProcessOutput {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -51,7 +60,7 @@ public struct HerdrProcessRunner: HerdrProcessRunning {
         }
         defer { watchdog.cancel() }
 
-        let limit = outputLimit
+        let limit = outputLimit ?? self.outputLimit
         let data = try await Task.detached {
             var data = Data()
             while let chunk = try output.fileHandleForReading.read(upToCount: 64 * 1024), !chunk.isEmpty {

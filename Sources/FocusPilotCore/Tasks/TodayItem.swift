@@ -6,6 +6,7 @@ public struct TodayItem: Equatable, Sendable, Identifiable {
     public var title: String
     public var status: TaskStatus
     public var projectTitle: String?
+    public var projectID: Int64?
     public var nextAction: String?
     public var deadline: Deadline?
     /// Added with the focuspilot CLI from a Herdr pane; the owner can undo it.
@@ -13,8 +14,9 @@ public struct TodayItem: Equatable, Sendable, Identifiable {
     public var wrapUp: TaskWrapUp?
 
     public init(id: Int64, title: String, status: TaskStatus = .next, projectTitle: String? = nil,
-                nextAction: String? = nil, deadline: Deadline? = nil, isFromHerdr: Bool = false,
+                projectID: Int64? = nil, nextAction: String? = nil, deadline: Deadline? = nil, isFromHerdr: Bool = false,
                 wrapUp: TaskWrapUp? = nil) {
+        self.projectID = projectID
         self.id = id
         self.title = title
         self.status = status
@@ -42,6 +44,7 @@ struct TaskWithProject: Decodable, FetchableRecord {
 
     func todayItem(wrapUp: TaskWrapUp?) -> TodayItem {
         TodayItem(id: task.id!, title: task.title, status: task.status, projectTitle: project?.title,
+                  projectID: task.projectId,
                   nextAction: task.nextAction, deadline: task.deadline, isFromHerdr: task.isFromHerdr,
                   wrapUp: wrapUp)
     }
