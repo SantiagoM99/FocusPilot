@@ -92,7 +92,9 @@ extension AppModel {
         reconcileTask?.cancel()
         guard let deadline else { return }
         reconcileTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow)))
+            // A deadline already past means the last reconcile did not clear
+            // it (it failed); wait a second rather than retry in a busy loop.
+            try? await Task.sleep(for: .seconds(deadline > .now ? deadline.timeIntervalSinceNow : 1))
             guard !Task.isCancelled else { return }
             await self?.run { try await $0.reconcile() }
         }

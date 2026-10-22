@@ -28,23 +28,25 @@ final class AppBlocker {
         let center = NSWorkspace.shared.notificationCenter
         Task { [weak self] in
             for await note in center.notifications(named: NSWorkspace.didActivateApplicationNotification) {
-                self?.evaluate(Self.app(in: note), activated: true)
+                self?.evaluate(Self.app(in: note), ownerSwitched: true)
             }
         }
         // Launches that do not come to the front, so the app is hidden
         // before the owner sees it. The system skips background apps.
         Task { [weak self] in
             for await note in center.notifications(named: NSWorkspace.didLaunchApplicationNotification) {
-                self?.evaluate(Self.app(in: note), activated: false)
+                self?.evaluate(Self.app(in: note), ownerSwitched: false)
             }
         }
         policyChanged()
     }
 
-    /// The policy or session changed: the front app may now be blocked or allowed.
+    /// The policy or session changed: the front app may now be blocked.
+    /// This only hides; it is not the owner switching apps, so it neither
+    /// closes the panel nor changes where Return to task goes.
     func policyChanged() {
         guard isStarted else { return }
-        evaluate(NSWorkspace.shared.frontmostApplication, activated: true)
+        evaluate(NSWorkspace.shared.frontmostApplication, ownerSwitched: false)
         recheck?.cancel()
         guard let next = AppBlocking.nextChange(in: model.snapshot.policy, after: .now) else { return }
         recheck = Task { [weak self] in
@@ -54,17 +56,22 @@ final class AppBlocker {
         }
     }
 
-    private func evaluate(_ app: NSRunningApplication?, activated: Bool) {
+    /// `ownerSwitched` is true only for an activation notification: the
+    /// owner (or the system, right after a hide) brought `app` forward.
+    private func evaluate(_ app: NSRunningApplication?, ownerSwitched: Bool) {
         guard let app, let bundleID = app.bundleIdentifier, app != NSRunningApplication.current else { return }
         let verdict = AppBlocking.verdict(for: bundleID, policy: model.snapshot.policy,
                                           ownBundleID: Bundle.main.bundleIdentifier, at: .now)
         guard case .hide(let reason) = verdict else {
-            if activated {
+            if ownerSwitched {
                 lastAllowedFront = app
                 panel.ownerActivated(app)
             }
             return
         }
+        // An app allowed a moment ago (its schedule opened, its exception
+        // ran out) is no longer somewhere to return to.
+        if lastAllowedFront == app { lastAllowedFront = nil }
         hide(app)
         panel.show(BlockedApp(app: app, reason: reason))
     }
@@ -102,11 +109,18 @@ final class AppBlocker {
     }
 
     /// Cooperative activation (macOS 14 and later): FocusPilot yields to
-    /// the target and asks it to come forward on FocusPilot's behalf.
+    /// the target and asks it to come forward on FocusPilot's behalf. The
+    /// panel never activates FocusPilot, so the system may refuse; then
+    /// LaunchServices opens the running app, as the Dock would.
     private static func bringForward(_ app: NSRunningApplication) {
         NSApplication.shared.yieldActivation(to: app)
-        if !app.activate(from: .current, options: []) {
-            app.activate()
+        _ = app.activate(from: .current, options: [])
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !app.isActive, !app.isTerminated, let url = app.bundleURL else { return }
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
         }
     }
 

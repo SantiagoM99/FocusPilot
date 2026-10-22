@@ -11,6 +11,9 @@ extension AppModel {
         do {
             let outcome = try await coordinator.requestException(scope, duration: duration, reason: reason, confirmed: confirmed)
             exceptionError = nil
+            // Before the app comes forward, so its activation is judged
+            // against the policy that carries the exception.
+            show(await coordinator.snapshot())
             return outcome
         } catch ExceptionError.reasonRequired {
             exceptionError = "Say why you need it for the task."

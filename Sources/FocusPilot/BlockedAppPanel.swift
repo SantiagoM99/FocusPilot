@@ -6,10 +6,11 @@ import SwiftUI
 /// why the app was hidden and offers Return to task and a timed exception.
 ///
 /// It never activates FocusPilot: it is non-activating, and becomes key only
-/// when the owner clicks the reason field. It closes on Return to task, on a
-/// granted exception, on Close or Escape, and when the owner brings another
-/// app forward. Activations within `settleTime` of showing are ignored: they
-/// are the system bringing the next app forward after the hide.
+/// when the owner clicks the reason field, so keystrokes (Escape, Return)
+/// reach it only after that. It closes on Return to task, on a granted
+/// exception, on Close, and when the owner brings another app forward.
+/// Activations within `settleTime` of showing are ignored: they are the
+/// system bringing the next app forward after the hide.
 @MainActor
 final class BlockedAppPanelController {
     static let settleTime: TimeInterval = 1

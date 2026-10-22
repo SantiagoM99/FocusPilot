@@ -7,6 +7,37 @@ public enum ExceptionScope: Hashable, Codable, Sendable {
     case app(bundleID: String)
     case site(domain: String)
     case page(url: String)
+
+    // Spelled out for the extensions, which switch on "kind":
+    // {"kind":"app","bundleID":…}, {"kind":"site","domain":…}, {"kind":"page","url":…}.
+    private enum CodingKeys: String, CodingKey {
+        case kind, bundleID, domain, url
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        switch try container.decode(String.self, forKey: .kind) {
+        case "app": self = .app(bundleID: try container.decode(String.self, forKey: .bundleID))
+        case "site": self = .site(domain: try container.decode(String.self, forKey: .domain))
+        case "page": self = .page(url: try container.decode(String.self, forKey: .url))
+        case let kind: throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "Unknown scope \(kind)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .app(let bundleID):
+            try container.encode("app", forKey: .kind)
+            try container.encode(bundleID, forKey: .bundleID)
+        case .site(let domain):
+            try container.encode("site", forKey: .kind)
+            try container.encode(domain, forKey: .domain)
+        case .page(let url):
+            try container.encode("page", forKey: .kind)
+            try container.encode(url, forKey: .url)
+        }
+    }
 }
 
 /// An exception as the policy carries it: its scope and absolute expiry,
