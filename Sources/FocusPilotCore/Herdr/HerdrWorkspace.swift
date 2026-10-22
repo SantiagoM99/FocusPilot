@@ -74,7 +74,7 @@ public enum HerdrConnection: Equatable, Sendable {
     case disconnected(HerdrUnavailable)
 }
 
-public enum HerdrUnavailable: Equatable, Sendable {
+public enum HerdrUnavailable: Error, Equatable, Sendable {
     /// No herdr executable at any of the known install paths.
     case binaryNotFound
     /// No server socket, or the CLI could not reach the server.
