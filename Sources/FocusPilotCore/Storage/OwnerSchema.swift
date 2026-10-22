@@ -141,6 +141,21 @@ enum OwnerSchema {
                 try row.insert(db)
             }
         }
+        migrator.registerMigration("owner-v8-wrapup") { db in
+            // Every wrap-up is kept (owner decision, 2026-10-17); the task's
+            // next action is updated in the same write, and the latest row
+            // is its return cue. Existing tasks simply have no rows.
+            try db.create(table: WrapUpRecord.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("taskId", .integer).notNull().references(TaskRecord.databaseTableName, onDelete: .cascade)
+                table.column("sessionId", .text).notNull().references(SessionRow.databaseTableName)
+                table.column("savedAt", .datetime).notNull()
+                table.column("outcome", .text)
+                table.column("remainingWork", .text)
+                table.column("returnCue", .text)
+            }
+            try db.create(index: "wrapUp_on_taskId", on: WrapUpRecord.databaseTableName, columns: ["taskId"])
+        }
         return migrator
     }
 

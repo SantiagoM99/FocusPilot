@@ -42,11 +42,13 @@ struct PlanningView: View {
         }
         .frame(minWidth: 760, minHeight: 420)
         .focusedSceneValue(\.quickCapture, { isCapturing = true })
-        .sheet(isPresented: $isCapturing) {
-            QuickCaptureSheet(model: model)
-        }
-        .sheet(isPresented: Bindable(model).isStartingFocus) {
-            StartFocusSheet(model: model)
+        .sheet(item: sheet) { sheet in
+            switch sheet {
+            case .capture: QuickCaptureSheet(model: model)
+            case .startFocus: StartFocusSheet(model: model)
+            case .wrapUp:
+                if let pending = model.wrapUp { WrapUpSheet(model: model, prompt: pending.prompt) }
+            }
         }
         .environment(model)
         .task { await model.refresh() }
@@ -61,6 +63,25 @@ struct PlanningView: View {
         // Command-Tab like any other window.
         .onAppear { NSApplication.shared.setActivationPolicy(.regular) }
         .onDisappear { NSApplication.shared.setActivationPolicy(.accessory) }
+    }
+
+    /// One sheet modifier, so a wrap-up and Start focus wanted at once show
+    /// one after the other instead of one being dropped (see `PlanningSheet`).
+    /// Closing a sheet clears only what that sheet was showing. A wrap-up is
+    /// never dropped this way: only Skip and Save end it, so its draft stays.
+    private var sheet: Binding<PlanningSheet?> {
+        Binding(
+            get: { PlanningSheet.showing(isCapturing: isCapturing, wrapUp: model.wrapUp, isStartingFocus: model.isStartingFocus) },
+            set: { newValue in
+                guard newValue == nil else { return }
+                switch PlanningSheet.showing(isCapturing: isCapturing, wrapUp: model.wrapUp, isStartingFocus: model.isStartingFocus) {
+                case .capture: isCapturing = false
+                case .wrapUp: break
+                case .startFocus: model.isStartingFocus = false
+                case nil: break
+                }
+            }
+        )
     }
 
     private var title: String {

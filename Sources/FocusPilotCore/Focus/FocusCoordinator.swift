@@ -12,6 +12,8 @@ import Foundation
 public actor FocusCoordinator {
     public enum SessionError: Error, Equatable {
         case noCurrentTask
+        /// A wrap-up was asked for a session that is still running or paused.
+        case sessionStillActive
     }
 
     private let herdr: (any HerdrWorkspaceSource)?

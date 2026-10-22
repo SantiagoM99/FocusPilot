@@ -35,6 +35,12 @@ final class AppModel {
     var ruleEditToConfirm: RuleEdit?
     /// Asks the planning window to show a page, e.g. Settings from ⌘,.
     var requestedPage: PlanningView.Page?
+    /// The wrap-up waiting for the owner; see `AppModel+WrapUp.swift`.
+    var wrapUp: PendingWrapUp?
+    /// Grows each time the planning window should come forward; `MenuBarIcon` opens it.
+    var planningWindowRequests = 0
+    /// When the owner last pressed Complete; their wrap-up may bring the window forward.
+    @ObservationIgnored var ownerCompletedAt: Date?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
@@ -148,6 +154,7 @@ final class AppModel {
     func show(_ latest: FocusSnapshot) {
         now = .now
         guard latest.revision >= snapshot.revision else { return }
+        noticeWrapUp(from: snapshot.session, to: latest.session)
         snapshot = latest
         if latest.activeSession == nil || latest.earlyEndAvailableAt != nil {
             isConfirmingEarlyEnd = false
