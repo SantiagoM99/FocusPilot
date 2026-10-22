@@ -79,6 +79,7 @@ extension FocusCoordinator {
         if session?.hasEnded != false {
             earlyEnd = nil
             ruleWait = nil
+            exceptionWait = nil
         }
         for effect in transition.effects {
             switch effect {

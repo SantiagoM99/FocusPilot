@@ -6,6 +6,9 @@ import GRDB
 public struct PolicyInputs: Equatable, Sendable {
     public var rules: [BlockRuleSet]
     public var allowed: [AllowedActivity]
+    /// Exceptions unexpired at the repository's clock when read; the
+    /// coordinator drops any that expired before it publishes.
+    public var exceptions: [TimedException] = []
 }
 
 /// A saved rule or allowed-list edit: the policy revision it was given and
@@ -17,7 +20,18 @@ public struct PolicyChange: Equatable, Sendable {
 
 extension TaskRepository {
     public func policyInputs() async throws -> PolicyInputs {
-        try await ownerDatabase.read { db in try Self.policyInputs(db) }
+        let now = now()
+        return try await ownerDatabase.read { db in try Self.policyInputs(db, at: now) }
+    }
+
+    /// Stores a granted exception and hands out the policy revision that carries it.
+    @discardableResult
+    public func grant(_ exception: TimedException) async throws -> PolicyChange {
+        try await policyChange { db in
+            var row = try ExceptionRow(exception)
+            row.id = nil
+            try row.insert(db)
+        }
     }
 
     /// Inserts or updates a rule set, bumping its revision on update. Sites
@@ -88,9 +102,10 @@ extension TaskRepository {
     /// Runs `edit`, then hands out the next revision and reads the inputs,
     /// all in one write (decision 0003).
     private func policyChange(_ edit: @escaping @Sendable (Database) throws -> Void) async throws -> PolicyChange {
-        try await ownerDatabase.write { db in
+        let now = now()
+        return try await ownerDatabase.write { db in
             try edit(db)
-            return PolicyChange(revision: try Self.nextPolicyRevision(db), inputs: try Self.policyInputs(db))
+            return PolicyChange(revision: try Self.nextPolicyRevision(db), inputs: try Self.policyInputs(db, at: now))
         }
     }
 
@@ -102,8 +117,12 @@ extension TaskRepository {
         return try Int.fetchOne(db, sql: "SELECT revision FROM policyPublication WHERE id = 1")!
     }
 
-    static func policyInputs(_ db: Database) throws -> PolicyInputs {
-        PolicyInputs(rules: try rules(db), allowed: try allowed(db))
+    static func policyInputs(_ db: Database, at now: Date) throws -> PolicyInputs {
+        PolicyInputs(rules: try rules(db), allowed: try allowed(db), exceptions: try exceptions(db, unexpiredAt: now))
+    }
+
+    private static func exceptions(_ db: Database, unexpiredAt now: Date) throws -> [TimedException] {
+        try ExceptionRow.filter(Column("expiresAt") > now).order(Column("id")).fetchAll(db).map { try $0.exception() }
     }
 
     private static func rules(_ db: Database) throws -> [BlockRuleSet] {

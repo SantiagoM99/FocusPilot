@@ -7,7 +7,8 @@ extension TaskRepository {
     /// write, with the rule inputs those policies are compiled from.
     @discardableResult
     public func record(_ transition: FocusTransition) async throws -> RecordedTransition {
-        try await ownerDatabase.write { db in
+        let now = now()
+        return try await ownerDatabase.write { db in
             var revisions: [Int] = []
             for effect in transition.effects {
                 switch effect {
@@ -19,7 +20,7 @@ extension TaskRepository {
                     break
                 }
             }
-            return RecordedTransition(revisions: revisions, inputs: try Self.policyInputs(db))
+            return RecordedTransition(revisions: revisions, inputs: try Self.policyInputs(db, at: now))
         }
     }
 

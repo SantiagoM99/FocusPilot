@@ -34,6 +34,8 @@ public actor FocusCoordinator {
     var earlyEnd: StrictWait<UUID>?
     /// The owner confirmed a rule change that weakens the strict session.
     var ruleWait: StrictWait<ConfirmedRuleEdit>?
+    /// The owner confirmed an exception request during a strict session.
+    var exceptionWait: StrictWait<ExceptionRequest>?
     /// The last queued read-and-record of Herdr's agents; see `oneAgentReadingAtATime`.
     var agentReading: Task<Void, Never>?
     /// Grows with every change, so the app can drop a snapshot older than one it has.
@@ -64,7 +66,7 @@ public actor FocusCoordinator {
     public func snapshot() async -> FocusSnapshot {
         FocusSnapshot(currentTaskTitle: try? await repository.nowTask()?.title, session: session,
                       earlyEndAvailableAt: earlyEndAvailableAt(), policy: policy,
-                      pendingRuleEdit: pendingRuleEdit(),
+                      pendingRuleEdit: pendingRuleEdit(), pendingException: pendingException(),
                       revision: revision)
     }
 
