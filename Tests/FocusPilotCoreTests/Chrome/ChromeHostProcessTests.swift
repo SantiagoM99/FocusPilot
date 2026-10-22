@@ -7,6 +7,12 @@ import Testing
 /// open, exit when it closes.
 @Suite("Chrome host executable")
 struct ChromeHostProcessTests {
+    init() {
+        // A host that exits while a test still writes to its stdin must
+        // fail that write, not kill the test runner.
+        signal(SIGPIPE, SIG_IGN)
+    }
+
     private var executable: URL {
         // Built next to the test bundle.
         let products = Bundle(for: HostHarness.self).bundleURL.deletingLastPathComponent()
@@ -46,6 +52,21 @@ struct ChromeHostProcessTests {
 
         try input.fileHandleForWriting.close()
         process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+    }
+
+    // Chrome can close its end of the port before the host answers.
+    @Test(.timeLimit(.minutes(1))) func aClosedPortDoesNotKillTheHost() throws {
+        let (process, input, output) = try launch(origin: ChromeExtension.origin, data: try makeTemporaryDirectory())
+        try output.fileHandleForReading.close()
+        let hello = try JSONSerialization.data(withJSONObject: ["type": "hello", "profileId": HostHarness.profile])
+        try input.fileHandleForWriting.write(contentsOf: NativeMessageFrame.encode(hello))
+        Thread.sleep(forTimeInterval: 0.5)
+
+        try input.fileHandleForWriting.close()
+        process.waitUntilExit()
+
+        #expect(process.terminationReason == .exit)
         #expect(process.terminationStatus == 0)
     }
 

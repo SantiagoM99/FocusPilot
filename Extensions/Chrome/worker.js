@@ -125,6 +125,10 @@ const policyQueue = FocusOutbox.serial();
 function handlePolicy(message) {
   return policyQueue(async () => {
     const incoming = { policy: message.policy, focus: message.focus ?? null, source: message.source ?? null };
+    if (!FocusPolicy.supports(incoming)) {
+      await observe("policy-rejected-schema", { schemaVersion: incoming.policy?.schemaVersion ?? null });
+      return;
+    }
     const stored = await currentDelivery();
     if (!FocusPolicy.isNewer(incoming, stored)) {
       if (incoming.policy.revision < stored.policy.revision) {
@@ -134,7 +138,7 @@ function handlePolicy(message) {
     }
     await store.set({ delivery: incoming });
     await reconcile("policy");
-    await observe("policy-applied", { revision: incoming.policy.revision, checksum: incoming.policy.checksum });
+    await observe("policy-applied", { revision: incoming.policy.revision, checksum: incoming.policy.checksum, source: incoming.source });
   });
 }
 

@@ -24,6 +24,10 @@ test("the app's policy blocks what its rules say, when they say", () => {
   assert.deepEqual(P.blockedDomains(policy, during), ["instagram.com", "youtube.com"]);
 });
 
+test("the extension reads the schema the app writes", () => {
+  assert.equal(P.supports(delivery), true);
+});
+
 test("the app's delivery carries what the blocked page and the worker need", () => {
   const m = FocusBlockedView.model({ delivery, url: "https://youtube.com/", now: at("2026-10-14T15:30:00Z"), appRunning: true, timeZone: "America/Bogota" });
 

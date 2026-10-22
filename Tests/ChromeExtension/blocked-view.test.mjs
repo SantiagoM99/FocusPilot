@@ -119,6 +119,28 @@ test("a page that is no longer blocked offers to go back", () => {
   assert.equal(m.kind, "unblocked");
   assert.equal(m.title, "youtube.com isn't blocked now");
   assert.deepEqual(m.primary, { label: "Go back to youtube.com", action: "go-back" });
+  assert.equal(m.backURL, "https://youtube.com/watch?v=1");
+});
+
+// Anyone can link to blocked.html, so ?from= must not send the owner to an
+// arbitrary site: only back to a domain the rules name, or a new tab.
+test("going back only returns to a site the rules name", () => {
+  const later = { now: at("2026-10-14T16:00:00Z") };
+  const d = delivery({ session: session(), focus });
+  const back = (url) => view(d, url, later).backURL;
+
+  assert.equal(back("https://m.youtube.com/watch?v=1"), "https://m.youtube.com/watch?v=1");
+  const evening = { now: at("2026-10-15T01:00:00Z") }; // Wed 20:00 in Bogotá, after the schedule
+  assert.equal(view(d, "http://instagram.com/", evening).backURL, "http://instagram.com/");
+  assert.equal(back("https://evil.example/"), null);
+  assert.equal(back("https://notyoutube.com/"), null);
+  assert.equal(back("https://youtube.com.evil.example/"), null);
+  assert.equal(back("javascript:alert(1)"), null);
+  assert.equal(back("data:text/html,hi"), null);
+  assert.equal(back("chrome://settings/"), null);
+  assert.equal(back("not a url"), null);
+  assert.equal(view(null, "https://youtube.com/", later).backURL, null, "no policy names nothing");
+  assert.deepEqual(view(d, "https://evil.example/", later).primary, { label: "Open a new tab", action: "go-back" });
 });
 
 test("durations read like the rest of FocusPilot", () => {

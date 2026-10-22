@@ -44,7 +44,8 @@ function render() {
 
 $("primary").addEventListener("click", async () => {
   if (current.primary.action === "go-back") {
-    location.replace(from);
+    if (current.backURL) location.replace(current.backURL);
+    else chrome.tabs.update({ url: "chrome://newtab/" }).catch(() => {});
     return;
   }
   const answer = await chrome.runtime.sendMessage({ type: "open-app" }).catch(() => null);

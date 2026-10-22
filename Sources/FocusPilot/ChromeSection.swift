@@ -14,7 +14,7 @@ struct ChromeSection: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(model.chromeProfiles.enumerated()), id: \.element.id) { index, profile in
                     if index > 0 { Divider() }
-                    ChromeProfileRow(profile: profile)
+                    ChromeProfileRow(profile: profile) { model.forgetChromeProfile(profile.profileID) }
                 }
                 if model.chromeProfiles.isEmpty {
                     LoadExtensionSteps(setup: model.chromeSetup)
@@ -34,6 +34,11 @@ struct ChromeSection: View {
 
 private struct ChromeProfileRow: View {
     let profile: ChromeProfileStatus
+    let forget: () -> Void
+
+    private var isDisconnected: Bool {
+        if case .disconnected = profile.state { true } else { false }
+    }
 
     private var color: Color {
         switch profile.state {
@@ -52,6 +57,12 @@ private struct ChromeProfileRow: View {
                 Text(details).font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
+            // A connected profile's host would write the record right back.
+            if isDisconnected {
+                Button("Forget", action: forget)
+                    .controlSize(.small)
+                    .help("Remove this profile from the list. It comes back if it connects again.")
+            }
         }
         .padding(10)
     }

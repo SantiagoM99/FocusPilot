@@ -28,6 +28,7 @@ public final class ChromeHost {
     private let environment: Environment
     private let store: ChromeProfileStore
     private var sentRevision: Int?
+    private var sentSource: String?
     private var sentAppRunning: Bool?
     private var sentBuild: String??
     private var profileID: String?
@@ -104,8 +105,12 @@ public final class ChromeHost {
     private func apply(_ message: [String: Any], to record: inout ChromeProfileRecord) {
         switch message["kind"] as? String {
         case "policy-applied":
-            guard let revision = message["revision"] as? Int, revision >= record.appliedRevision ?? 0 else { return }
+            // Revisions restart with a new owner database (its source).
+            let source = message["source"] as? String
+            guard let revision = message["revision"] as? Int,
+                  source != record.appliedSource || revision >= record.appliedRevision ?? 0 else { return }
             record.appliedRevision = revision
+            record.appliedSource = source
             record.appliedChecksum = message["checksum"] as? String
             record.appliedAt = environment.now()
         case "blocked-shown":
@@ -123,12 +128,13 @@ public final class ChromeHost {
 
     private func sendPolicy(force: Bool) {
         guard let delivery = try? ChromePolicyMailbox.read(location),
-              force || delivery.policy.revision != sentRevision,
+              force || delivery.policy.revision != sentRevision || delivery.source != sentSource,
               let encoded = try? CompiledPolicy.encoder().encode(delivery),
               var object = try? JSONSerialization.jsonObject(with: encoded) as? [String: Any]
         else { return }
         object["type"] = "policy"
         sentRevision = delivery.policy.revision
+        sentSource = delivery.source
         send(object)
     }
 

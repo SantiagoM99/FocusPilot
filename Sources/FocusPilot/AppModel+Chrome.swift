@@ -21,6 +21,7 @@ extension AppModel {
             let setup = Self.install(location: location, host: host, bundled: bundled)
             await MainActor.run { self?.chromeSetup = setup }
         }
+        chromeLocation = location
         Task { [weak self] in
             while let self {
                 refreshChromeProfiles(location: location)
@@ -30,8 +31,17 @@ extension AppModel {
     }
 
     func refreshChromeProfiles(location: StorageLocation) {
-        let profiles = (try? ChromeProfiles.statuses(location: location, currentRevision: snapshot.policy?.revision)) ?? []
+        let source = (try? ChromePolicyMailbox.read(location))?.source
+        let profiles = (try? ChromeProfiles.statuses(location: location, currentRevision: snapshot.policy?.revision,
+                                                     currentSource: source)) ?? []
         if profiles != chromeProfiles { chromeProfiles = profiles }
+    }
+
+    /// Removes a disconnected profile from Settings, e.g. one deleted in Chrome.
+    func forgetChromeProfile(_ profileID: String) {
+        guard let location = chromeLocation else { return }
+        try? ChromeProfiles.forget(profileID, location: location)
+        refreshChromeProfiles(location: location)
     }
 
     nonisolated private static func install(location: StorageLocation, host: URL, bundled: URL) -> ChromeSetup {

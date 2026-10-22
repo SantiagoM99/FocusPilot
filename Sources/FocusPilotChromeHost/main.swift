@@ -55,6 +55,9 @@ timer.schedule(deadline: .now() + 1, repeating: 1)
 timer.setEventHandler { MainActor.assumeIsolated { process.poll() } }
 timer.resume()
 
+// Chrome can close the port before an answer is written; the write then
+// fails (and is dropped) instead of killing the host.
+signal(SIGPIPE, SIG_IGN)
 signal(SIGTERM, SIG_IGN)
 let terminate = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
 terminate.setEventHandler { MainActor.assumeIsolated { process.finish() } }

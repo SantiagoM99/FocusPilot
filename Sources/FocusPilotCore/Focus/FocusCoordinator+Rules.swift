@@ -129,7 +129,8 @@ extension FocusCoordinator {
         if compiled.revision > policy?.revision ?? 0 {
             policy = compiled
         }
-        await publisher.publish(PolicyDelivery(policy: compiled, focus: compiled.session == nil ? nil : await focusContext()))
+        await publisher.publish(PolicyDelivery(policy: compiled, focus: compiled.session == nil ? nil : await focusContext(),
+                                               source: repository.policySource))
     }
 
     /// The session's task for the blocked page, with the Now task's next

@@ -51,6 +51,7 @@ final class AppModel {
     var chromeProfiles: [ChromeProfileStatus] = []
     /// Where the owner loads the extension, and any setup problem.
     var chromeSetup: ChromeSetup?
+    @ObservationIgnored var chromeLocation: StorageLocation?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)

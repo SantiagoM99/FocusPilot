@@ -19,9 +19,10 @@ public struct PolicyDelivery: Hashable, Codable, Sendable {
     public var policy: CompiledPolicy
     /// Present while session rules apply.
     public var focus: FocusContext?
-    /// Names the data folder that issued the revision, set by the mailbox.
-    /// Revisions restart when the owner resets FocusPilot's data, so the
-    /// extension takes a delivery from another source whatever its revision.
+    /// Names the owner database that issued the revision (see
+    /// `TaskRepository.policySource`); the mailbox names its data folder when
+    /// it is missing. Revisions restart when that database is replaced, so a
+    /// delivery from another source counts as newer whatever its revision.
     public var source: String?
 
     public init(policy: CompiledPolicy, focus: FocusContext?, source: String? = nil) {
@@ -43,13 +44,14 @@ public actor ChromePolicyMailbox: PolicyPublisher {
 
     public func publish(_ delivery: PolicyDelivery) async {
         do {
-            // The coordinator can publish an interleaved older revision;
-            // the file only moves forward.
-            if let current = try? Self.read(location), current.policy.revision > delivery.policy.revision { return }
             try FileManager.default.createDirectory(at: location.chromeDirectory, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
             var stamped = delivery
-            stamped.source = try source()
+            stamped.source = try delivery.source ?? folderSource()
+            // The coordinator can publish an interleaved older revision; from
+            // one source the file only moves forward.
+            if let current = try? Self.read(location), current.source == stamped.source,
+               current.policy.revision > delivery.policy.revision { return }
             try PrivateFile.write(try CompiledPolicy.encoder().encode(stamped), to: location.chromePolicyURL)
         } catch {
             // Nothing to tell the owner here: the host keeps the last policy
@@ -58,7 +60,7 @@ public actor ChromePolicyMailbox: PolicyPublisher {
     }
 
     /// Made once per data folder, so a reset folder gets a new one.
-    private func source() throws -> String {
+    private func folderSource() throws -> String {
         let url = location.chromeDirectory.appending(path: "source")
         if let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8),
            UUID(uuidString: text) != nil { return text }

@@ -12,10 +12,10 @@ struct ChromePolicyMailboxTests {
         mailbox = ChromePolicyMailbox(location: location)
     }
 
-    private func delivery(revision: Int, focus: FocusContext? = nil) -> PolicyDelivery {
+    private func delivery(revision: Int, focus: FocusContext? = nil, source: String? = nil) -> PolicyDelivery {
         let rules = PolicyCompiler.compile(rules: [BlockRuleSet(id: 1, targets: [.site(domain: "youtube.com")], activation: .always)],
                                            allowed: [], session: nil)
-        return PolicyDelivery(policy: CompiledPolicy(revision: revision, effectiveAt: wednesdayMorningInBogota, rules: rules), focus: focus)
+        return PolicyDelivery(policy: CompiledPolicy(revision: revision, effectiveAt: wednesdayMorningInBogota, rules: rules), focus: focus, source: source)
     }
 
     @Test func thePublishedPolicyIsWhatTheHostReads() async throws {
@@ -52,6 +52,18 @@ struct ChromePolicyMailboxTests {
         #expect(UUID(uuidString: other) != nil)
     }
 
+    // The owner database names its revisions; a deleted database or an older
+    // backup restarts them while the Chrome folder keeps the last policy.
+    @Test func aDeliveryFromAnotherDatabaseReplacesAHigherRevision() async throws {
+        await mailbox.publish(delivery(revision: 50, source: "A"))
+        await mailbox.publish(delivery(revision: 3, source: "B"))
+        await mailbox.publish(delivery(revision: 2, source: "B"))
+
+        let read = try #require(try ChromePolicyMailbox.read(location))
+        #expect(read.source == "B")
+        #expect(read.policy.revision == 3)
+    }
+
     @Test func nothingPublishedReadsAsNil() throws {
         #expect(try ChromePolicyMailbox.read(location) == nil)
     }
@@ -73,6 +85,19 @@ struct ChromeFocusContextTests {
 
         let delivered = try #require(await fixture.publisher.deliveries.last)
         #expect(delivered.focus?.title == "Explain baseline results")
+    }
+
+    // Opening the owner database names a new source, so a restored backup's
+    // lower revisions still reach Chrome.
+    @Test func deliveriesNameTheOwnerDatabaseThatIssuedThem() async throws {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+        let source = try #require(await fixture.publisher.deliveries.last?.source)
+
+        let reopened = try TaskRepository(location: fixture.location)
+
+        #expect(UUID(uuidString: source) != nil)
+        #expect(reopened.policySource != source)
     }
 
     @Test func withoutSessionRulesThereIsNoTask() async throws {

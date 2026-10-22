@@ -106,3 +106,15 @@ test("only newer revisions replace the stored policy", () => {
 test("a policy from reset data replaces the old one whatever its revision", () => {
   assert.equal(P.isNewer({ source: "B", policy: { revision: 1 } }, { source: "A", policy: { revision: 41 } }), true);
 });
+
+// A newer app can write a policy this extension can't read; it keeps the
+// last good one instead.
+test("only policies in a schema this extension knows are taken", () => {
+  const d = (schemaVersion) => ({ source: "A", policy: { schemaVersion, revision: 9 } });
+  assert.equal(P.supports(d(1)), true);
+  assert.equal(P.supports(d(2)), false);
+  assert.equal(P.supports(d(undefined)), false);
+  assert.equal(P.supports(d("1")), false);
+  assert.equal(P.supports({ source: "A" }), false);
+  assert.equal(P.supports(null), false);
+});

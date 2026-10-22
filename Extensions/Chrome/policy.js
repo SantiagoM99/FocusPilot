@@ -116,7 +116,40 @@ var FocusPolicy = (() => {
     return incoming.policy.revision > current.policy.revision;
   }
 
-  return { localParts, scheduleContains, scheduleNextChange, sessionApplies, hostMatches, decide, blockedDomains, nextBoundary, isNewer };
+  // CompiledPolicy.currentSchemaVersion in the app. A policy in another
+  // schema is refused and the last good one stays.
+  const SCHEMA_VERSION = 1;
+
+  function supports(delivery) {
+    return delivery?.policy?.schemaVersion === SCHEMA_VERSION;
+  }
+
+  // Every domain any rule names, whether or not it blocks now.
+  function namedDomains(policy) {
+    return [
+      ...(policy?.always?.domains ?? []),
+      ...(policy?.scheduled ?? []).flatMap((block) => block.targets.domains),
+      ...(policy?.session?.targets.domains ?? []),
+    ];
+  }
+
+  // The http(s) page the blocked page may send the owner back to: only a
+  // site the rules name, since anyone can link to blocked.html with any ?from=.
+  function returnURL(policy, url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+      const host = parsed.hostname.replace(/\.$/, "");
+      return namedDomains(policy).some((d) => hostMatches(host, d)) ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return {
+    localParts, scheduleContains, scheduleNextChange, sessionApplies, hostMatches, decide, blockedDomains, nextBoundary,
+    isNewer, supports, returnURL,
+  };
 })();
 
 if (typeof module === "object") module.exports = FocusPolicy;

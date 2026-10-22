@@ -54,11 +54,11 @@ final class HostHarness {
                  "observedAt": "2026-10-14T15:00:00Z"].merging(extra) { a, _ in a })
     }
 
-    func publish(revision: Int) async {
+    func publish(revision: Int, source: String? = nil) async {
         let rules = PolicyCompiler.compile(rules: [BlockRuleSet(id: 1, targets: [.site(domain: "youtube.com")], activation: .always)],
                                            allowed: [], session: nil)
         await ChromePolicyMailbox(location: location).publish(
-            PolicyDelivery(policy: CompiledPolicy(revision: revision, effectiveAt: clock.now, rules: rules), focus: nil))
+            PolicyDelivery(policy: CompiledPolicy(revision: revision, effectiveAt: clock.now, rules: rules), focus: nil, source: source))
     }
 
     func record() throws -> ChromeProfileRecord? {
@@ -125,6 +125,19 @@ struct ChromeHostTests {
         harness.host.poll()
 
         #expect(harness.sent("policy").count == 1)
+    }
+
+    @Test func aPolicyFromAnotherDatabaseIsPushedWhateverItsRevision() async throws {
+        let harness = try HostHarness()
+        await harness.publish(revision: 50, source: "A")
+        harness.hello()
+        await harness.publish(revision: 3, source: "B")
+
+        harness.host.poll()
+
+        let sent = harness.sent("policy").map { ($0["source"] as? String, ($0["policy"] as? [String: Any])?["revision"] as? Int) }
+        #expect(sent.map(\.0) == ["A", "B"])
+        #expect(sent.map(\.1) == [50, 3])
     }
 
     @Test func theAppStartingOrStoppingIsReported() throws {
@@ -204,6 +217,18 @@ struct ChromeHostTests {
         #expect(try harness.record()?.appliedChecksum == "abc")
     }
 
+    @Test func anAcknowledgementFromAnotherDatabaseReplacesAHigherRevision() throws {
+        let harness = try HostHarness()
+        harness.observe(1, "policy-applied", ["revision": 50, "checksum": "old", "source": "A"])
+
+        harness.observe(2, "policy-applied", ["revision": 3, "checksum": "new", "source": "B"])
+        harness.observe(3, "policy-applied", ["revision": 2, "checksum": "stale", "source": "B"])
+
+        #expect(try harness.record()?.appliedRevision == 3)
+        #expect(try harness.record()?.appliedSource == "B")
+        #expect(try harness.record()?.appliedChecksum == "new")
+    }
+
     @Test func helloRecordsIncognitoAndSiteAccess() throws {
         let harness = try HostHarness()
 
@@ -277,6 +302,52 @@ struct ChromeProfileStatusTests {
         let statuses = try ChromeProfiles.statuses(location: harness.location, currentRevision: 9, isRunning: { _ in true })
 
         #expect(statuses.first?.state == .syncing(acknowledged: 8))
+    }
+
+    @Test func anAcknowledgementFromAnotherDatabaseIsStillWaiting() throws {
+        let harness = try HostHarness()
+        harness.hello()
+        harness.observe(1, "policy-applied", ["revision": 50, "checksum": "abc", "source": "A"])
+
+        let statuses = try ChromeProfiles.statuses(location: harness.location, currentRevision: 3, currentSource: "B",
+                                                   isRunning: { _ in true })
+
+        #expect(statuses.first?.state == .waiting)
+    }
+
+    // One unreadable file must not hide every other profile in Settings.
+    @Test func aCorruptRecordIsSkipped() throws {
+        let harness = try HostHarness()
+        harness.hello()
+        let corrupt = harness.location.chromeProfilesDirectory.appending(path: "4F5CE721-0000-4000-8000-000000000009.json")
+        try Data("{not json".utf8).write(to: corrupt)
+
+        let statuses = try ChromeProfiles.statuses(location: harness.location, currentRevision: nil, isRunning: { _ in true })
+
+        #expect(statuses.map(\.profileID) == [HostHarness.profile])
+    }
+
+    @Test func theOwnerCanForgetADisconnectedProfile() throws {
+        let harness = try HostHarness()
+        harness.hello()
+        harness.observe(1, "worker-start")
+        harness.host.stop()
+
+        try ChromeProfiles.forget(HostHarness.profile, location: harness.location, isRunning: { _ in false })
+
+        #expect(try harness.record() == nil)
+        let left = try FileManager.default.contentsOfDirectory(atPath: harness.location.chromeProfilesDirectory.path)
+        #expect(left.isEmpty)
+    }
+
+    @Test func aConnectedProfileIsNotForgotten() throws {
+        let harness = try HostHarness()
+        harness.hello()
+
+        #expect(throws: ChromeProfiles.ForgetError.connected) {
+            try ChromeProfiles.forget(HostHarness.profile, location: harness.location, isRunning: { _ in true })
+        }
+        #expect(try harness.record() != nil)
     }
 
     @Test func statusTextSaysWhatTheOwnerNeedsToKnow() {

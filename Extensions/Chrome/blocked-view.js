@@ -69,9 +69,11 @@ var FocusBlockedView = (() => {
 
     if (!decision.blocked) {
       const host = hostOf(url);
+      const backURL = FocusPolicy.returnURL(policy, url);
       return {
         kind: "unblocked", status: { tone: "gray", text: "Not blocked" }, title: `${host} isn't blocked now`,
-        subtitle: "The rule that blocked it no longer applies.", primary: { label: `Go back to ${host}`, action: "go-back" },
+        subtitle: "The rule that blocked it no longer applies.",
+        primary: { label: backURL ? `Go back to ${host}` : "Open a new tab", action: "go-back" }, backURL,
         exceptionLink: false, footer: ["", "FocusPilot"],
       };
     }

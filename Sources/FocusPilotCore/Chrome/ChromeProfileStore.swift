@@ -20,6 +20,8 @@ public struct ChromeProfileRecord: Codable, Equatable, Sendable {
     var skippedSeqs: [Int] = []
     static let skippedLimit = 1000
     public var appliedRevision: Int?
+    /// The owner database that issued `appliedRevision`.
+    public var appliedSource: String?
     public var appliedChecksum: String?
     public var appliedAt: Date?
     public var blockedPagesShown = 0
@@ -65,9 +67,19 @@ struct ChromeProfileStore {
         return try ChromePolicyMailbox.decoder.decode(ChromeProfileRecord.self, from: data)
     }
 
-    func records() throws -> [ChromeProfileRecord] {
+    /// Every readable record; an unreadable one is skipped, so it can't hide the others.
+    func records() -> [ChromeProfileRecord] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        return try names.filter { $0.hasSuffix(".json") }.compactMap { try record(String($0.dropLast(5))) }
+        return names.filter { $0.hasSuffix(".json") }.compactMap { try? record(String($0.dropLast(5))) }
+    }
+
+    /// Deletes the profile's record and logs.
+    func remove(_ profileID: String) throws {
+        guard Self.isValid(profileID) else { return }
+        for suffix in [".json", ".log.jsonl", ".log.1.jsonl"] {
+            let file = url(profileID, suffix)
+            if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
+        }
     }
 
     func save(_ record: ChromeProfileRecord) throws {
