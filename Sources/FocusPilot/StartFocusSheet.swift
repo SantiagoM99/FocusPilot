@@ -2,8 +2,7 @@ import FocusPilotCore
 import SwiftUI
 
 /// Starts a session on the Now task (design 11): duration, mode, and the
-/// planned end, and the pre-flight Apps row. Browser rows arrive with #13,
-/// #16 and #17.
+/// planned end, and the pre-flight Browsers and Apps rows (#17).
 struct StartFocusSheet: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -71,6 +70,10 @@ struct StartFocusSheet: View {
                     .labelsHidden()
                 }
                 GridRow {
+                    label("Browsers")
+                    BrowserStatusLine(status: model.browserProtection)
+                }
+                GridRow {
                     label("Apps")
                     Text(AppProtectionText.preflight(rules: model.ruleSets, at: .now))
                         .foregroundStyle(.secondary)
@@ -92,7 +95,8 @@ struct StartFocusSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("Start focus", action: start)
+                // Design 11: starting with partial protection is a deliberate choice.
+                Button(model.browserProtection.level == .protected ? "Start focus" : "Start anyway", action: start)
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.nowTask == nil || isStarting)
             }

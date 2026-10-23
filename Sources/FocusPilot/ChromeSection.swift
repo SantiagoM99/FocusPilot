@@ -104,3 +104,33 @@ private struct LoadExtensionSteps: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+/// Settings › Blocking › Other browsers (design 07, #17): Safari relies on
+/// the owner's own blocker (decision 0003, 2026-10-20); the rest have no
+/// FocusPilot extension.
+struct OtherBrowsersSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader("Other browsers", note: "FocusPilot can't confirm what they block")
+            VStack(alignment: .leading, spacing: 0) {
+                row("Safari", "External blocker · not verified by FocusPilot")
+                Divider()
+                row("Firefox, Arc and others", "Not supported · shown as not protected when in front during a session")
+            }
+            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+        }
+    }
+
+    private func row(_ title: String, _ detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Circle().strokeBorder(.secondary, lineWidth: 1).frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(10)
+    }
+}
