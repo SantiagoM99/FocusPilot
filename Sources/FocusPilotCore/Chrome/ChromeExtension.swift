@@ -7,6 +7,8 @@ public enum ChromeExtension {
     public static let id = "chmamkccdgghcchjaedemhkkiebdfabd"
     public static var origin: String { "chrome-extension://\(id)/" }
     public static let hostName = "com.santiagom99.focuspilot"
+    /// Stable Chrome, the only channel the host manifest is installed for.
+    public static let chromeBundleID = "com.google.Chrome"
 }
 
 extension StorageLocation {

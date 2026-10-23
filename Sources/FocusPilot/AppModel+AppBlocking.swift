@@ -29,6 +29,6 @@ extension AppModel {
 
     /// The Apps line of protection status (design 01, 03, 04).
     var appProtection: AppProtectionText {
-        AppProtectionText(rules: ruleSets, policy: snapshot.policy, at: now)
+        AppProtectionText(rules: ruleSets, policy: snapshot.policy, at: now, isRunning: appBlocker.isRunning)
     }
 }

@@ -1,5 +1,5 @@
+import AppKit
 import FocusPilotCore
-import Foundation
 
 /// What Settings says about setting up Chrome.
 struct ChromeSetup: Equatable {
@@ -22,6 +22,9 @@ extension AppModel {
             await MainActor.run { self?.chromeSetup = setup }
         }
         chromeLocation = location
+        // The policy Chrome may still hold from before this launch is no evidence.
+        protectionEvidence = ProtectionEvidence(currentRevision: (try? ChromePolicyMailbox.read(location))?.policy.revision)
+        followFrontBrowser()
         Task { [weak self] in
             while let self {
                 refreshChromeProfiles(location: location)
@@ -35,6 +38,9 @@ extension AppModel {
         let profiles = (try? ChromeProfiles.statuses(location: location, currentRevision: snapshot.policy?.revision,
                                                      currentSource: source)) ?? []
         if profiles != chromeProfiles { chromeProfiles = profiles }
+        protectionEvidence.update(profiles)
+        let running = !NSRunningApplication.runningApplications(withBundleIdentifier: ChromeExtension.chromeBundleID).isEmpty
+        if running != chromeRunning { chromeRunning = running }
     }
 
     /// Removes a disconnected profile from Settings, e.g. one deleted in Chrome.

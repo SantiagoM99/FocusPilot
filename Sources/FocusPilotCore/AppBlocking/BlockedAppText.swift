@@ -71,9 +71,18 @@ public struct BlockedAppText: Sendable {
 /// 0003, 2026-10-14): app hiding works only while FocusPilot runs.
 public struct AppProtectionText: Sendable {
     public var summary: String
-    public let detail = "Only while FocusPilot is running"
+    public var detail = "Only while FocusPilot is running"
+    /// Apps are hidden right now; false when none is, or hiding isn't running.
+    public var isProtected: Bool
+    /// After "Apps ·" in the sidebar footer (design 01), with the prefix.
+    public var short: String {
+        if isProtected { "Apps · protected while running" } else if summary.hasPrefix("Apps not protected") {
+            "Apps · not protected"
+        } else { "Apps · none hidden now" }
+    }
 
-    public init(rules: [BlockRuleSet], policy: CompiledPolicy?, at now: Date) {
+    /// `isRunning`: whether `AppBlocker` watches app launches right now (#17).
+    public init(rules: [BlockRuleSet], policy: CompiledPolicy?, at now: Date, isRunning: Bool = true) {
         let apps = Self.apps(in: rules)
         let hidden = apps.filter { AppBlocking.verdict(for: $0.bundleID, policy: policy, at: now) != .allow }
         var unexcepted = policy
@@ -81,7 +90,10 @@ public struct AppProtectionText: Sendable {
         let excepted = apps.filter {
             !hidden.contains($0) && AppBlocking.verdict(for: $0.bundleID, policy: unexcepted, at: now) != .allow
         }
-        summary = if !hidden.isEmpty {
+        isProtected = isRunning && !hidden.isEmpty
+        summary = if !hidden.isEmpty && !isRunning {
+            "Apps not protected · " + hidden.map(\.name).joined(separator: ", ")
+        } else if !hidden.isEmpty {
             "Apps protected · " + hidden.map(\.name).joined(separator: ", ")
         } else if !excepted.isEmpty {
             "No apps hidden now · " + excepted.map(\.name).joined(separator: ", ") + (excepted.count == 1 ? " has an exception" : " have exceptions")
@@ -90,6 +102,7 @@ public struct AppProtectionText: Sendable {
         } else {
             "No apps blocked"
         }
+        if !isRunning && !hidden.isEmpty { detail = "App blocking isn't running" }
     }
 
     /// The pre-flight Apps row (design 11): apps a session starting now
