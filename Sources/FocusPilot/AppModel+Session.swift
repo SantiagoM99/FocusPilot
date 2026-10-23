@@ -37,6 +37,8 @@ extension AppModel {
         }
         Task { [weak self] in
             for await _ in NSWorkspace.shared.notificationCenter.notifications(named: NSWorkspace.didWakeNotification) {
+                // Before reconciling, which publishes the revision Chrome must confirm.
+                self?.markProtectionStale()
                 await self?.run { try await $0.reconcile() }
             }
         }

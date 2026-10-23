@@ -24,6 +24,9 @@ final class AppBlocker {
         self.model = model
     }
 
+    /// Whether it watches app launches; only then are apps protected.
+    var isRunning: Bool { isStarted }
+
     func start() {
         guard !isStarted else { return }
         isStarted = true
