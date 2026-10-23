@@ -28,6 +28,11 @@ struct MenuBarIcon: View {
             openWindow(id: PlanningView.windowID)
             NSApplication.shared.activate()
         }
+        // Reopening the app, e.g. "Return to task" on Chrome's blocked page.
+        .onReceive(NotificationCenter.default.publisher(for: .showPlanningWindow)) { _ in
+            openWindow(id: PlanningView.windowID)
+            NSApplication.shared.activate()
+        }
         .task {
             await model.refresh()
             if await model.claimPlanningWindowAtLaunch() {

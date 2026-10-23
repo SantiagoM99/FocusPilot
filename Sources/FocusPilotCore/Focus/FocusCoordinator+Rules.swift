@@ -129,6 +129,15 @@ extension FocusCoordinator {
         if compiled.revision > policy?.revision ?? 0 {
             policy = compiled
         }
-        await publisher.publish(compiled)
+        await publisher.publish(PolicyDelivery(policy: compiled, focus: compiled.session == nil ? nil : await focusContext(),
+                                               source: repository.policySource))
+    }
+
+    /// The session's task for the blocked page, with the Now task's next
+    /// step and project when it is still the same task.
+    private func focusContext() async -> FocusContext? {
+        guard let session else { return nil }
+        let task = (try? await repository.nowTask()).flatMap { $0?.id == session.taskID ? $0 : nil }
+        return FocusContext(title: session.action, nextAction: task?.nextAction, projectTitle: task?.projectTitle)
     }
 }

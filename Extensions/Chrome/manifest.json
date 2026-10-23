@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "FocusPilot",
+  "version": "1.0.0",
+  "version_name": "1.0.0 (development)",
+  "description": "Blocks the sites in your FocusPilot rules, during focus sessions and on schedules.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxpN70HyO4VUqUPjyLRR5rGZk02z8Pq4I6nd5qBWwzgcVtF6U4Kf377UVc9DOS6wjYnmCuJ2YSfpkrgh1m5NipzhUc4ol/EzIeHyMnB7r6Tz++qhD1euvZtU4/LSIkTGKDMc3EyKXIx6sm1vZaiQsIqZ4zcgzA3pgtb2h5FPrT65JqHnRQNXSmNWKI3E3B8zK21SUaYeWphNgoVImI3HkJYnBXfOFxtTRg5li3EnpBjhHej+EsMifgExy/WYDRys/+bqBJdP99lTgV0Ph5eAvYZvLNO4tIG3Pzeq2qPrqwHefyTHL7UqzYQFJgYUA2khpniTFVVsM2S81nb3mtXAOHwIDAQAB",
+  "minimum_chrome_version": "120",
+  "incognito": "spanning",
+  "background": {
+    "service_worker": "worker.js"
+  },
+  "permissions": [
+    "nativeMessaging",
+    "declarativeNetRequest",
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "policy.js",
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "blocked.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "FocusPilot"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
+}

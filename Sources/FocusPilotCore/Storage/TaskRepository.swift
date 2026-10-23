@@ -16,6 +16,10 @@ public actor TaskRepository {
     let ownerDatabase: DatabasePool
     private let cacheDatabase: DatabasePool
     let now: @Sendable () -> Date
+    /// Names the policy revisions this opening of the owner database hands
+    /// out. A deleted database or a restored backup restarts them lower, so
+    /// Chrome takes a delivery from a new source whatever its revision.
+    public nonisolated let policySource = UUID().uuidString
 
     /// Opens (creating if needed) both databases in `location` and brings each
     /// up to date with its own migrations. `now` stamps created and updated

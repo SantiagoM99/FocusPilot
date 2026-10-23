@@ -47,6 +47,11 @@ final class AppModel {
     var planningWindowRequests = 0
     /// When the owner last pressed Complete; their wrap-up may bring the window forward.
     @ObservationIgnored var ownerCompletedAt: Date?
+    /// Chrome profiles running the FocusPilot extension, newest first.
+    var chromeProfiles: [ChromeProfileStatus] = []
+    /// Where the owner loads the extension, and any setup problem.
+    var chromeSetup: ChromeSetup?
+    @ObservationIgnored var chromeLocation: StorageLocation?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
@@ -62,8 +67,10 @@ final class AppModel {
             let location = StorageLocation.applicationSupport()
             let repository = try TaskRepository(location: location)
             let herdr = HerdrCLI()
-            coordinator = FocusCoordinator(repository: repository, herdr: herdr, agents: herdr, notices: UserNotices())
+            coordinator = FocusCoordinator(repository: repository, herdr: herdr, agents: herdr,
+                                           publisher: ChromePolicyMailbox(location: location), notices: UserNotices())
             listenForCommands(location: location, service: CommandService(repository: repository))
+            setUpChrome(location: location)
         } catch {
             coordinator = nil
             startupError = "Could not open the database: \(error.localizedDescription)"

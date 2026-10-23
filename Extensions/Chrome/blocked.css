@@ -1,0 +1,45 @@
+/* Design 05 (Blocked page). Tokens follow the design reference's light and dark sets. */
+:root {
+  --content: #FFFFFF; --win: #ECECEC; --label: rgba(0,0,0,.85); --label2: rgba(0,0,0,.52); --label3: rgba(0,0,0,.28);
+  --sep: rgba(0,0,0,.1); --accent: #007AFF; --orange: #FF9500; --gray: #8E8E93; --btn: #FFFFFF; --btnb: rgba(0,0,0,.14);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --content: #1E1E1E; --win: #323232; --label: rgba(255,255,255,.86); --label2: rgba(255,255,255,.56); --label3: rgba(255,255,255,.28);
+    --sep: rgba(255,255,255,.12); --accent: #0A84FF; --orange: #FF9F0A; --gray: #98989D; --btn: #5C5C5F; --btnb: rgba(255,255,255,.1);
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column; background: var(--content); color: var(--label);
+  font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+#page { max-width: 560px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; }
+.status { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: var(--label2); font-variant-numeric: tabular-nums; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray); }
+.dot.accent { background: var(--accent); }
+.dot.orange { background: var(--orange); }
+.heading { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-size: 12px; color: var(--label2); }
+h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.subtitle, .detail { margin: 0; font-size: 13px; color: var(--label2); }
+.actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 4px; }
+button {
+  height: 32px; padding: 0 20px; border-radius: 8px; border: 0; background: var(--accent); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 500; cursor: default;
+}
+button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 2px; }
+button.secondary { height: 24px; padding: 0 12px; border-radius: 6px; background: var(--btn); color: var(--label); box-shadow: 0 0 0 .5px var(--btnb); font-weight: 400; }
+.hint { margin: 0; max-width: 360px; font-size: 12px; color: var(--label2); }
+a { font-size: 12px; color: var(--label2); text-decoration: underline; text-underline-offset: 2px; }
+#exception-panel { display: flex; justify-content: center; }
+#exception-panel[hidden], [hidden] { display: none !important; }
+.card { width: 420px; max-width: 100%; border-radius: 10px; background: var(--win); box-shadow: 0 0 0 .5px var(--sep); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.card h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.card p { margin: 0; font-size: 12px; color: var(--label2); }
+.card-actions { display: flex; justify-content: flex-end; }
+footer { padding: 10px 16px; border-top: .5px solid var(--sep); font-size: 11px; color: var(--label3); display: flex; justify-content: space-between; gap: 16px; }

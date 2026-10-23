@@ -37,6 +37,16 @@ final class CommandSocketTests {
         #expect(try CommandSocketClient(path: path).send(.tasks(nil)) == .tasks(scope))
     }
 
+    // The Chrome host tells the blocked page whether FocusPilot is running.
+    @Test func listeningSaysWhetherTheAppIsRunning() async throws {
+        #expect(!CommandSocketClient(path: path).isListening())
+        let server = server()
+        try server.start()
+        defer { server.stop() }
+
+        #expect(CommandSocketClient(path: path).isListening())
+    }
+
     @Test func theHandlerReceivesTheRequestIntact() async throws {
         let received = Received()
         let server = CommandSocketServer(path: path) { request in
