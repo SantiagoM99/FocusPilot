@@ -40,6 +40,14 @@ public enum AppBlocking {
         return .allow
     }
 
+    /// Of the running apps' bundle IDs, in order, those to hide now: used
+    /// when a session starts, so apps already open are hidden too, not
+    /// only the one in front.
+    public static func appsToHide(running: [String], policy: CompiledPolicy?, ownBundleID: String? = nil,
+                                  at now: Date) -> [String] {
+        running.filter { verdict(for: $0, policy: policy, ownBundleID: ownBundleID, at: now) != .allow }
+    }
+
     /// The first instant after `now` at which a verdict may change on its
     /// own: an app exception expiring, a normal break ending, a normal
     /// session reaching its planned end, or a schedule naming apps opening

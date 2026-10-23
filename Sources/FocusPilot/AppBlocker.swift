@@ -16,6 +16,8 @@ final class AppBlocker {
     /// The last app the owner had in front that was not hidden; Return to task goes back to it.
     private var lastAllowedFront: NSRunningApplication?
     private var recheck: Task<Void, Never>?
+    /// The session last seen, to notice one starting.
+    private var sessionID: UUID?
     private var isStarted = false
 
     init(model: AppModel) {
@@ -46,6 +48,9 @@ final class AppBlocker {
     /// closes the panel nor changes where Return to task goes.
     func policyChanged() {
         guard isStarted else { return }
+        let active = model.snapshot.activeSession?.id
+        if let active, active != sessionID { hideRunningBlockedApps() }
+        sessionID = active
         evaluate(NSWorkspace.shared.frontmostApplication, ownerSwitched: false)
         recheck?.cancel()
         guard let next = AppBlocking.nextChange(in: model.snapshot.policy, after: .now) else { return }
@@ -74,6 +79,20 @@ final class AppBlocker {
         if lastAllowedFront == app { lastAllowedFront = nil }
         hide(app)
         panel.show(BlockedApp(app: app, reason: reason))
+    }
+
+    /// A session just started: hide every blocked app already open, not
+    /// only the one in front, which `evaluate` then shows the panel for.
+    private func hideRunningBlockedApps() {
+        let running = NSWorkspace.shared.runningApplications.filter {
+            $0.activationPolicy == .regular && !$0.isHidden && $0 != NSRunningApplication.current
+        }
+        let toHide = Set(AppBlocking.appsToHide(running: running.compactMap(\.bundleIdentifier), policy: model.snapshot.policy,
+                                                ownBundleID: Bundle.main.bundleIdentifier, at: .now))
+        for app in running where toHide.contains(app.bundleIdentifier ?? "") && !app.isActive {
+            if lastAllowedFront == app { lastAllowedFront = nil }
+            hide(app)
+        }
     }
 
     /// `hide()` can report false while the hide is still on its way, and an

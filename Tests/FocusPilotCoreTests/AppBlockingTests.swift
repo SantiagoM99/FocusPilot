@@ -148,3 +148,25 @@ struct AppBlockingNextChangeTests {
         #expect(AppBlocking.nextChange(in: nil, after: now) == nil)
     }
 }
+
+@Suite("Apps already running when a session starts")
+struct AppsToHideTests {
+    private let now = wednesdayMorningInBogota
+
+    @Test func everyRunningBlockedAppIsHiddenNotOnlyTheFrontOne() {
+        let compiled = policy([BlockRuleSet(targets: [instagram], activation: .always),
+                               BlockRuleSet(targets: [.app(bundleID: "com.tiktok", name: "TikTok")], activation: .sessionOnly)],
+                              session: SessionPolicy(sessionID: UUID(), mode: .normal, end: now.addingTimeInterval(1500)))
+        let running = ["com.apple.finder", "com.tiktok", "com.apple.TextEdit", "com.focuspilot.app", instagramID]
+
+        #expect(AppBlocking.appsToHide(running: running, policy: compiled, ownBundleID: "com.focuspilot.app", at: now)
+            == ["com.tiktok", instagramID])
+    }
+
+    @Test func appsWithAnExceptionStay() {
+        let compiled = policy([BlockRuleSet(targets: [instagram], activation: .always)],
+                              exceptions: [PolicyException(scope: .app(bundleID: instagramID), expiresAt: now.addingTimeInterval(300))])
+
+        #expect(AppBlocking.appsToHide(running: [instagramID], policy: compiled, at: now).isEmpty)
+    }
+}

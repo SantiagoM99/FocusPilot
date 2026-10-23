@@ -64,7 +64,7 @@ struct StartFocusSheet: View {
                     Picker("Mode", selection: $mode) {
                         modeOption("Normal", "Blocks until the planned end. If FocusPilot quits, browser rules lift at the planned end and app blocking stops right away.")
                             .tag(SessionMode.normal)
-                        modeOption("Strict", "Ending early or allowing a blocked app needs confirmation and a wait. If FocusPilot quits, browser rules stay until it runs again; app blocking stops.")
+                        modeOption("Strict", "Cancels timed exceptions already running. Ending early or a new exception needs confirmation and a wait. If FocusPilot quits, browser rules stay until it runs again; app blocking stops.")
                             .tag(SessionMode.strict)
                     }
                     .pickerStyle(.radioGroup)

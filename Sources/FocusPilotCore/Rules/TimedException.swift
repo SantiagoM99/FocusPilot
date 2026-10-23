@@ -73,6 +73,10 @@ public struct TimedException: Hashable, Sendable {
         self.reason = reason
     }
 
+    /// The only durations granted, as offered on the blocked page and the
+    /// blocked-app panel (design 05 and 10): 5, 10 and 20 minutes.
+    public static let durations: [TimeInterval] = [5 * 60, 10 * 60, 20 * 60]
+
     var policyException: PolicyException {
         PolicyException(scope: scope, expiresAt: expiresAt)
     }
@@ -80,7 +84,8 @@ public struct TimedException: Hashable, Sendable {
 
 /// Why an exception request was refused.
 public enum ExceptionError: Error, Equatable {
-    case nonPositiveDuration
+    /// Not one of `TimedException.durations`.
+    case unsupportedDuration
     /// A strict session asks why the exception is needed.
     case reasonRequired
 }

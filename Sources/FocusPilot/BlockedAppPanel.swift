@@ -96,7 +96,7 @@ private final class KeyablePanel: NSPanel {
 final class BlockedAppPanelState {
     var blocked: BlockedApp?
     var isRequestingException = false
-    var duration = BlockedAppText.durations[1]
+    var duration = TimedException.durations[1]
     var reason = ""
     /// A strict session asked the owner to confirm the wait.
     var isConfirming = false
@@ -104,7 +104,7 @@ final class BlockedAppPanelState {
 
     func reset() {
         isRequestingException = false
-        duration = BlockedAppText.durations[1]
+        duration = TimedException.durations[1]
         reason = ""
         isConfirming = false
         error = nil
@@ -216,7 +216,7 @@ struct BlockedAppPanelView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Picker("Duration", selection: $state.duration) {
-                ForEach(BlockedAppText.durations, id: \.self) { duration in
+                ForEach(TimedException.durations, id: \.self) { duration in
                     Text("\(Int(duration / 60)) min").tag(duration)
                 }
             }

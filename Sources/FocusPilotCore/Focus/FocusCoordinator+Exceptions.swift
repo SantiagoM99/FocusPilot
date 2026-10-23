@@ -12,7 +12,7 @@ import Foundation
 extension FocusCoordinator {
     public func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String? = nil,
                                  confirmed: Bool = false) async throws -> ExceptionOutcome {
-        guard duration > 0 else { throw ExceptionError.nonPositiveDuration }
+        guard TimedException.durations.contains(duration) else { throw ExceptionError.unsupportedDuration }
         let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         guard let active = session, !active.hasEnded, active.mode == .strict else {
             return try await grant(scope, duration: duration, reason: reason)

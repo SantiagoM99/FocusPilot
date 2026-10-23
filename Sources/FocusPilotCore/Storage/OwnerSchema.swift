@@ -201,7 +201,9 @@ enum OwnerSchema {
         }
         migrator.registerMigration("owner-v10-exceptions") { db in
             // Timed exceptions for apps now, sites and pages with #14. Rows
-            // are kept after expiry; policies carry only unexpired ones.
+            // are kept after expiry; policies carry only unexpired ones that
+            // were not cancelled (a strict start cancels earlier ones,
+            // decision 0003, 2026-10-22).
             try db.create(table: ExceptionRow.databaseTableName) { table in
                 table.autoIncrementedPrimaryKey("id")
                 table.column("scope", .text).notNull()
@@ -209,6 +211,7 @@ enum OwnerSchema {
                 table.column("expiresAt", .datetime).notNull()
                 table.column("sessionId", .text)
                 table.column("reason", .text)
+                table.column("cancelledAt", .datetime)
             }
             try db.create(index: "timedException_on_expiresAt", on: ExceptionRow.databaseTableName, columns: ["expiresAt"])
         }

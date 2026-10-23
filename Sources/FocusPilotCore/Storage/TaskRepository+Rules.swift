@@ -122,7 +122,8 @@ extension TaskRepository {
     }
 
     private static func exceptions(_ db: Database, unexpiredAt now: Date) throws -> [TimedException] {
-        try ExceptionRow.filter(Column("expiresAt") > now).order(Column("id")).fetchAll(db).map { try $0.exception() }
+        try ExceptionRow.filter(Column("expiresAt") > now && Column("cancelledAt") == nil)
+            .order(Column("id")).fetchAll(db).map { try $0.exception() }
     }
 
     private static func rules(_ db: Database) throws -> [BlockRuleSet] {
@@ -131,5 +132,14 @@ extension TaskRepository {
 
     private static func allowed(_ db: Database) throws -> [AllowedActivity] {
         try AllowedRow.order(Column("id")).fetchAll(db).map { try $0.entry() }
+    }
+}
+
+extension TaskRepository {
+    /// Cancels every exception granted up to `instant` that is still
+    /// running, keeping the rows.
+    static func cancelExceptions(grantedBy instant: Date, _ db: Database) throws {
+        try ExceptionRow.filter(Column("cancelledAt") == nil && Column("expiresAt") > instant && Column("grantedAt") <= instant)
+            .updateAll(db, Column("cancelledAt").set(to: instant))
     }
 }

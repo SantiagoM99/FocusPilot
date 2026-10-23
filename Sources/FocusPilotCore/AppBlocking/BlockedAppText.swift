@@ -43,8 +43,6 @@ public struct BlockedAppText: Sendable {
         return now >= availableAt ? "Allow now" : "Allow in " + MenuBarStatus.format(remaining: availableAt.timeIntervalSince(now))
     }
 
-    /// The durations offered, as on the blocked page (design 05): 5, 10 and 20 minutes.
-    public static let durations: [TimeInterval] = [5 * 60, 10 * 60, 20 * 60]
 
     /// "3 h 17 min", "45 min".
     static func duration(_ interval: TimeInterval) -> String {

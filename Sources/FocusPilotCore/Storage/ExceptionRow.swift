@@ -11,6 +11,7 @@ struct ExceptionRow: Codable, FetchableRecord, MutablePersistableRecord {
     var expiresAt: Date
     var sessionId: String?
     var reason: String?
+    var cancelledAt: Date?
 
     init(_ exception: TimedException) throws {
         id = exception.id
@@ -19,6 +20,7 @@ struct ExceptionRow: Codable, FetchableRecord, MutablePersistableRecord {
         expiresAt = exception.expiresAt
         sessionId = exception.sessionID?.uuidString
         reason = exception.reason
+        cancelledAt = nil
     }
 
     func exception() throws -> TimedException {
