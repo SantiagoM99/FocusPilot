@@ -63,6 +63,20 @@ struct FocusSessionCoordinatorTests {
         #expect(await fixture.publisher.published.map(\.revision) == [1, 2])
     }
 
+    // #15: the mode is chosen at start and stored with the session.
+    @Test(arguments: [SessionMode.normal, .strict])
+    func relaunchingMidSessionKeepsTheModeChosenAtStart(mode: SessionMode) async throws {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: mode)
+        fixture.advance(minutes: 10)
+
+        let relaunched = try fixture.relaunched()
+        try await relaunched.launch()
+
+        #expect(await relaunched.snapshot().activeSession?.mode == mode)
+        #expect(await fixture.publisher.published.last?.session?.mode == mode)
+    }
+
     @Test func relaunchingAfterThePlannedEndRecordsTheEndAndTellsTheOwner() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)

@@ -99,12 +99,12 @@ var FocusBlockedView = (() => {
         title: `Still blocked until ${end}`,
         subtitle: `This normal session keeps ${domain} blocked until its planned end, then the rule lifts even if FocusPilot stays closed.`,
         primary: { label: "Open FocusPilot", action: "open-app" },
-        hint: "Reopen it to pause, complete, or request an exception.",
+        hint: "Open it from Applications or Spotlight to pause, complete, or request an exception.",
         exceptionLink: false,
         footer: [`Compiled policy rev. ${policy.revision} · session end ${end} cached in the extension`, "FocusPilot"],
       };
     }
-    const offlineHint = offline ? "FocusPilot isn't running. Exceptions can only be requested while it runs." : null;
+    const offlineHint = offline ? "FocusPilot isn't running. Open it from Applications or Spotlight to request an exception." : null;
 
     if (FocusPolicy.sessionApplies(session, now) && delivery.focus) {
       const left = Date.parse(session.end) - now;
