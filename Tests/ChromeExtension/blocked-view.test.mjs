@@ -93,7 +93,7 @@ test("a normal session without the app says when the rule lifts (05 D2)", () => 
   assert.equal(m.title, "Still blocked until 10:51");
   assert.equal(m.subtitle, "This normal session keeps youtube.com blocked until its planned end, then the rule lifts even if FocusPilot stays closed.");
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
-  assert.equal(m.hint, "Reopen it to pause, complete, or request an exception.");
+  assert.equal(m.hint, "Open it from Applications or Spotlight to pause, complete, or request an exception.");
   assert.equal(m.exceptionLink, false);
   assert.deepEqual(m.footer, ["Compiled policy rev. 41 · session end 10:51 cached in the extension", "FocusPilot"]);
 });
@@ -109,7 +109,7 @@ test("without the app, a site blocked only by an always-on rule still says so", 
     assert.equal(m.footer[0], "facebook.com is blocked at all times");
     assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
     assert.equal(m.exceptionLink, false);
-    assert.equal(m.hint, "FocusPilot isn't running. Exceptions can only be requested while it runs.");
+    assert.equal(m.hint, "FocusPilot isn't running. Open it from Applications or Spotlight to request an exception.");
   }
 });
 
