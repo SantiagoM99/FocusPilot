@@ -87,6 +87,8 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-17: During a strict session, weakening a block rule (deleting it, loosening its activation or schedule, or allowing a blocked target) needs the same confirmation and 60-second wait as ending early; adding or tightening rules is immediate.
 - 2026-10-17: The wrap-up sheet appears only when a session ends, not on pauses. Every wrap-up is kept as history per task; the latest one drives the next action and the return cue.
 - 2026-10-20: Chrome first. Without a paid Apple developer account, Safari disables the unsigned FocusPilot extension whenever Safari quits, so FocusPilot enforces blocking through Chrome first (#16). #13 (FocusPilot's own Safari extension) is deferred. For now Safari is covered by an owner-chosen third-party blocker from the Mac App Store, shown in protection status as "external blocker, not verified". If that blocker exposes Shortcuts actions, FocusPilot may start and stop it with sessions (to be validated). Spike S3 passed in both browsers (#3).
+- 2026-10-22: Chrome incognito: the owner turns on "Allow in Incognito" for the FocusPilot extension once; when it is off, protection status shows incognito as unprotected. FocusPilot does not disable incognito mode.
+- 2026-10-22: Starting a strict session cancels exceptions granted before it (for apps and sites); an exception inside a strict session needs a reason, confirmation and the 60-second wait.
 
 ## Sources
 
