@@ -12,7 +12,7 @@ struct TaskRepositoryTests {
         let cache = try DatabaseInspection(fileAt: location.cacheDatabaseURL)
 
         #expect(owner.tables == ["task", "project", "herdrLink", "herdrSeenWorkspace", "herdrSeenServer", "focusSession", "policyPublication",
-                                "blockRuleSet", "allowedActivity", "wrapUp", "herdrAgentLink", "herdrReviewItem"])
+                                "blockRuleSet", "allowedActivity", "wrapUp", "herdrAgentLink", "herdrReviewItem", "timedException"])
         #expect(cache.tables == ["cacheEntry"])
     }
 

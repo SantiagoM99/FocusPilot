@@ -41,6 +41,8 @@ final class AppModel {
     var ruleEditToConfirm: RuleEdit?
     /// Asks the planning window to show a page, e.g. Settings from ⌘,.
     var requestedPage: PlanningView.Page?
+    /// Why the last exception request was refused.
+    var exceptionError: String?
     /// The wrap-up waiting for the owner; see `AppModel+WrapUp.swift`.
     var wrapUp: PendingWrapUp?
     /// Grows each time the planning window should come forward; `MenuBarIcon` opens it.
@@ -55,6 +57,7 @@ final class AppModel {
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
+    @ObservationIgnored lazy var appBlocker = AppBlocker(model: self)
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
     let menuBarPreferences = MenuBarPreferences()
     private let firstLaunch = FirstLaunchWelcome()

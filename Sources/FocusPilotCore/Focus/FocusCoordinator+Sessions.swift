@@ -73,12 +73,17 @@ extension FocusCoordinator {
     private func handle(_ event: FocusEvent) async throws {
         let at = now()
         let transition = try FocusEngine.handle(event, session: session, at: at)
-        let recorded = try await repository.record(transition)
+        // Starting a strict session cancels exceptions granted before it,
+        // for apps and sites (decision 0003, 2026-10-22).
+        var cancelsExceptions = false
+        if case .start(let request) = event, request.mode == .strict { cancelsExceptions = true }
+        let recorded = try await repository.record(transition, cancellingExceptionsAt: cancelsExceptions ? at : nil)
         var revisions = recorded.revisions.makeIterator()
         session = transition.session
         if session?.hasEnded != false {
             earlyEnd = nil
             ruleWait = nil
+            exceptionWait = nil
         }
         for effect in transition.effects {
             switch effect {

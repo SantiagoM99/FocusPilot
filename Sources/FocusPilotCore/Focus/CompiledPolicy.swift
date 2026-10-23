@@ -68,6 +68,8 @@ public struct PolicyRules: Hashable, Sendable {
     public var scheduled: [ScheduledBlock]
     public var session: SessionBlock?
     public var allowed: AllowedTargets
+    /// Timed exceptions that had not expired when the policy was compiled.
+    public var exceptions: [PolicyException]
     /// SHA-256 of the rules above, hex. Equal rules give equal checksums.
     public var checksum: String
 }
@@ -89,6 +91,9 @@ public struct CompiledPolicy: Hashable, Codable, Sendable {
     /// `nil` means no session rules apply.
     public var session: SessionBlock?
     public var allowed: AllowedTargets
+    /// Each with its absolute expiry; an expired one no longer applies even
+    /// before a newer policy drops it.
+    public var exceptions: [PolicyException]
 
     public init(revision: Int, effectiveAt: Date, rules: PolicyRules) {
         self.revision = revision
@@ -98,6 +103,7 @@ public struct CompiledPolicy: Hashable, Codable, Sendable {
         scheduled = rules.scheduled
         session = rules.session
         allowed = rules.allowed
+        exceptions = rules.exceptions
     }
 
     /// The JSON the extensions read: sorted keys, UTC ISO 8601 instants.

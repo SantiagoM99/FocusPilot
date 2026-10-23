@@ -5,7 +5,8 @@ import Foundation
 /// rules extensions enforce. Pure: the same inputs in any order give the
 /// same rules and checksum.
 public enum PolicyCompiler {
-    public static func compile(rules: [BlockRuleSet], allowed: [AllowedActivity], session: SessionPolicy?) -> PolicyRules {
+    public static func compile(rules: [BlockRuleSet], allowed: [AllowedActivity], session: SessionPolicy?,
+                               exceptions: [PolicyException] = []) -> PolicyRules {
         var always: [ActivityTarget] = [], sessionOnly: [ActivityTarget] = []
         var scheduled: [WeeklySchedule: [ActivityTarget]] = [:]
         for rule in rules {
@@ -23,10 +24,11 @@ public enum PolicyCompiler {
             always: PolicyTargets(always),
             scheduled: blocks,
             session: session.map { SessionBlock($0, targets: PolicyTargets(sessionOnly)) },
-            allowed: AllowedTargets(domains: allowedTargets.domains, apps: allowedTargets.apps, tools: tools.sorted())
+            allowed: AllowedTargets(domains: allowedTargets.domains, apps: allowedTargets.apps, tools: tools.sorted()),
+            exceptions: exceptions.sorted { sortKey($0) < sortKey($1) }
         )
         return PolicyRules(always: content.always, scheduled: content.scheduled, session: content.session,
-                           allowed: content.allowed, checksum: checksum(content))
+                           allowed: content.allowed, exceptions: content.exceptions, checksum: checksum(content))
     }
 
     private struct Content: Encodable {
@@ -34,6 +36,7 @@ public enum PolicyCompiler {
         var scheduled: [ScheduledBlock]
         var session: SessionBlock?
         var allowed: AllowedTargets
+        var exceptions: [PolicyException]
     }
 
     private static func checksum(_ content: Content) -> String {
@@ -43,6 +46,14 @@ public enum PolicyCompiler {
 
     /// Orders schedule blocks by their encoded schedule, which is stable.
     private static func sortKey(_ block: ScheduledBlock) -> String {
-        (try? CompiledPolicy.encoder().encode(block.schedule)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+        encoded(block.schedule)
+    }
+
+    private static func sortKey(_ exception: PolicyException) -> String {
+        encoded(exception)
+    }
+
+    private static func encoded(_ value: some Encodable) -> String {
+        (try? CompiledPolicy.encoder().encode(value)).map { String(decoding: $0, as: UTF8.self) } ?? ""
     }
 }

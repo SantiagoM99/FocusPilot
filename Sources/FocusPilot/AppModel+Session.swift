@@ -20,11 +20,19 @@ extension AppModel {
             } catch {
                 self?.sessionError = "Could not restore the session: \(error.localizedDescription)"
             }
+            self?.appBlocker.start()
+            var policyRevision: Int?
             for await snapshot in await coordinator.snapshots() {
                 guard let self else { return }
                 show(snapshot)
                 scheduleReconcile(at: snapshot.nextDeadline)
                 focusPanel.update()
+                // Rules name the apps the Apps line shows; every rule edit publishes a policy.
+                if snapshot.policy?.revision != policyRevision {
+                    policyRevision = snapshot.policy?.revision
+                    await loadRules()
+                }
+                appBlocker.policyChanged()
             }
         }
         Task { [weak self] in
@@ -84,7 +92,9 @@ extension AppModel {
         reconcileTask?.cancel()
         guard let deadline else { return }
         reconcileTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow)))
+            // A deadline already past means the last reconcile did not clear
+            // it (it failed); wait a second rather than retry in a busy loop.
+            try? await Task.sleep(for: .seconds(deadline > .now ? deadline.timeIntervalSinceNow : 1))
             guard !Task.isCancelled else { return }
             await self?.run { try await $0.reconcile() }
         }

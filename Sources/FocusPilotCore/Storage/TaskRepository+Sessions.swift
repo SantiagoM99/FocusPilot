@@ -4,10 +4,14 @@ import GRDB
 extension TaskRepository {
     /// Records what an engine transition asks to keep: the session, if it
     /// changed, and a new policy revision for each publish, all in one
-    /// write, with the rule inputs those policies are compiled from.
+    /// write, with the rule inputs those policies are compiled from. With
+    /// `cancellingExceptionsAt`, exceptions granted up to then are cancelled
+    /// in the same write (a strict session starting).
     @discardableResult
-    public func record(_ transition: FocusTransition) async throws -> RecordedTransition {
-        try await ownerDatabase.write { db in
+    public func record(_ transition: FocusTransition, cancellingExceptionsAt cancel: Date? = nil) async throws -> RecordedTransition {
+        let now = now()
+        return try await ownerDatabase.write { db in
+            if let cancel { try Self.cancelExceptions(grantedBy: cancel, db) }
             var revisions: [Int] = []
             for effect in transition.effects {
                 switch effect {
@@ -19,7 +23,7 @@ extension TaskRepository {
                     break
                 }
             }
-            return RecordedTransition(revisions: revisions, inputs: try Self.policyInputs(db))
+            return RecordedTransition(revisions: revisions, inputs: try Self.policyInputs(db, at: now))
         }
     }
 

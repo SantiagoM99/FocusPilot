@@ -146,11 +146,28 @@ struct RuleErrorTextTests {
 
 @Suite("App rule status")
 struct AppRuleStatusTests {
-    @Test func appOnlyRulesSayHidingIsNotBuiltYet() {
-        let apps = BlockRuleSet(targets: [.app(bundleID: "com.burbn.instagram", name: "Instagram")], activation: .always)
-        let mixed = BlockRuleSet(targets: [.app(bundleID: "com.burbn.instagram", name: "Instagram"), .site(domain: "instagram.com")], activation: .always)
+    private let instagram = ActivityTarget.app(bundleID: "com.burbn.instagram", name: "Instagram")
 
-        #expect(RuleText.status(apps, at: wednesdayMorningInBogota, sessionRulesApply: false) == "Not hidden yet (#25)")
+    @Test func appRulesThatApplySayTheAppIsHiddenWhenOpened() {
+        let apps = BlockRuleSet(targets: [instagram], activation: .always)
+        let mixed = BlockRuleSet(targets: [instagram, .site(domain: "instagram.com")], activation: .always)
+
+        #expect(RuleText.status(apps, at: wednesdayMorningInBogota, sessionRulesApply: false) == "Hidden when opened")
         #expect(RuleText.status(mixed, at: wednesdayMorningInBogota, sessionRulesApply: false) == "Blocked now")
+    }
+
+    @Test func appRulesThatDoNotApplyNowSayWhenTheyWill() {
+        let session = BlockRuleSet(targets: [instagram], activation: .sessionOnly)
+
+        #expect(RuleText.status(session, at: wednesdayMorningInBogota, sessionRulesApply: false) == "During focus sessions")
+        #expect(RuleText.status(session, at: wednesdayMorningInBogota, sessionRulesApply: true) == "Hidden when opened")
+    }
+
+    @Test func anAppExceptionShowsItsTimeLeft() {
+        let apps = BlockRuleSet(targets: [instagram], activation: .always)
+        let exception = PolicyException(scope: .app(bundleID: "com.burbn.instagram"), expiresAt: wednesdayMorningInBogota.addingTimeInterval(8 * 60 - 1))
+
+        #expect(RuleText.status(apps, at: wednesdayMorningInBogota, sessionRulesApply: false, exceptions: [exception]) == "Exception · 8 min left")
+        #expect(RuleText.status(apps, at: exception.expiresAt, sessionRulesApply: false, exceptions: [exception]) == "Hidden when opened")
     }
 }

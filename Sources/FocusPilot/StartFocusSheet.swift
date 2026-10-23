@@ -2,7 +2,8 @@ import FocusPilotCore
 import SwiftUI
 
 /// Starts a session on the Now task (design 11): duration, mode, and the
-/// planned end. Rules and the pre-flight check arrive with #12, #13 and #17.
+/// planned end, and the pre-flight Apps row. Browser rows arrive with #13,
+/// #16 and #17.
 struct StartFocusSheet: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -61,13 +62,19 @@ struct StartFocusSheet: View {
                 GridRow {
                     label("Mode")
                     Picker("Mode", selection: $mode) {
-                        modeOption("Normal", "Ends at the planned end. If FocusPilot quits, rules still lift at the planned end.")
+                        modeOption("Normal", "Blocks until the planned end. If FocusPilot quits, browser rules lift at the planned end and app blocking stops right away.")
                             .tag(SessionMode.normal)
-                        modeOption("Strict", "Ending early needs confirmation and a wait. If FocusPilot quits, rules stay until it runs again.")
+                        modeOption("Strict", "Cancels timed exceptions already running. Ending early or a new exception needs confirmation and a wait. If FocusPilot quits, browser rules stay until it runs again; app blocking stops.")
                             .tag(SessionMode.strict)
                     }
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
+                }
+                GridRow {
+                    label("Apps")
+                    Text(AppProtectionText.preflight(rules: model.ruleSets, at: .now))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 

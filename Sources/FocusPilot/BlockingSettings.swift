@@ -86,7 +86,8 @@ struct RuleTable: View {
             }
             .width(140)
             TableColumn("Status") { (row: RuleRow) in
-                Text(RuleText.status(row.rule, at: model.now, sessionRulesApply: model.snapshot.sessionRulesApply))
+                Text(RuleText.status(row.rule, at: model.now, sessionRulesApply: model.snapshot.sessionRulesApply,
+                                     exceptions: model.snapshot.policy?.exceptions ?? []))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

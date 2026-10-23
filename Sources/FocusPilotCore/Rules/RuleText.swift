@@ -17,11 +17,23 @@ public enum RuleText {
         "\(days(schedule.days)) \(schedule.start)–\(schedule.end)"
     }
 
-    /// A rule set's status. Rules with only apps say they are not hidden
-    /// yet, since hiding apps arrives with #25.
-    public static func status(_ rule: BlockRuleSet, at now: Date, sessionRulesApply: Bool) -> String {
-        let onlyApps = rule.targets.allSatisfy { if case .app = $0 { true } else { false } }
-        return onlyApps && !rule.targets.isEmpty ? "Not hidden yet (#25)" : status(rule.activation, at: now, sessionRulesApply: sessionRulesApply)
+    /// A rule set's status. Rules with only apps say they hide them while
+    /// the rule applies, or show an app exception's time left.
+    public static func status(_ rule: BlockRuleSet, at now: Date, sessionRulesApply: Bool,
+                              exceptions: [PolicyException] = []) -> String {
+        let apps = rule.targets.compactMap { if case .app(let bundleID, _) = $0 { bundleID.lowercased() } else { nil } }
+        guard !apps.isEmpty, apps.count == rule.targets.count else {
+            return status(rule.activation, at: now, sessionRulesApply: sessionRulesApply)
+        }
+        if let expiry = exceptions.filter({ exception in apps.contains { exception.exempts(app: $0, at: now) } }).map(\.expiresAt).max() {
+            return "Exception · \(BlockedAppText.duration(expiry.timeIntervalSince(now))) left"
+        }
+        let applies = switch rule.activation {
+        case .always: true
+        case .sessionOnly: sessionRulesApply
+        case .schedule(let schedule): schedule.contains(now)
+        }
+        return applies ? "Hidden when opened" : status(rule.activation, at: now, sessionRulesApply: sessionRulesApply)
     }
 
     /// "Blocked now", "During focus sessions", "Ends 18:00", "Starts Mon 08:00".

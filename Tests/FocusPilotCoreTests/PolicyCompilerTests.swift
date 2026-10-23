@@ -100,7 +100,8 @@ struct PolicyCompilerTests {
 
     // The extensions read this JSON; changing its shape needs a schema bump.
     @Test func jsonShapeForTheExtensions() throws {
-        let compiled = PolicyCompiler.compile(rules: rules, allowed: [allowed[0]], session: session)
+        let exception = PolicyException(scope: .app(bundleID: "com.burbn.instagram"), expiresAt: instant("2026-10-14T10:10:00-05:00"))
+        let compiled = PolicyCompiler.compile(rules: rules, allowed: [allowed[0]], session: session, exceptions: [exception])
         let policy = CompiledPolicy(revision: 41, effectiveAt: instant("2026-10-14T10:00:00-05:00"), rules: compiled)
 
         let json = String(decoding: try policy.json(), as: UTF8.self)
@@ -108,12 +109,38 @@ struct PolicyCompilerTests {
         #expect(json == """
             {"allowed":{"apps":[],"domains":["overleaf.com"],"tools":[]},\
             "always":{"apps":["com.burbn.instagram"],"domains":["instagram.com"]},\
-            "checksum":"\(compiled.checksum)","effectiveAt":"2026-10-14T15:00:00Z","revision":41,\
+            "checksum":"\(compiled.checksum)","effectiveAt":"2026-10-14T15:00:00Z",\
+            "exceptions":[{"expiresAt":"2026-10-14T15:10:00Z","scope":{"bundleID":"com.burbn.instagram","kind":"app"}}],"revision":41,\
             "scheduled":[{"schedule":{"days":["mon","tue"],"end":"23:00","start":"19:00","timeZone":"America/Bogota"},\
             "targets":{"apps":[],"domains":["tiktok.com"]}}],\
             "schemaVersion":1,\
             "session":{"end":"2026-10-14T15:50:00Z","mode":"strict","sessionID":"00000000-0000-0000-0000-000000000001",\
             "targets":{"apps":[],"domains":["youtube.com"]}}}
             """)
+    }
+
+    @Test func exceptionsChangeTheChecksumButNotTheirOrder() {
+        let a = PolicyException(scope: .app(bundleID: "com.burbn.instagram"), expiresAt: wednesdayMorningInBogota)
+        let b = PolicyException(scope: .site(domain: "youtube.com"), expiresAt: wednesdayMorningInBogota)
+        let base = PolicyCompiler.compile(rules: rules, allowed: allowed, session: nil)
+
+        let one = PolicyCompiler.compile(rules: rules, allowed: allowed, session: nil, exceptions: [a, b])
+        let other = PolicyCompiler.compile(rules: rules, allowed: allowed, session: nil, exceptions: [b, a])
+
+        #expect(one.checksum != base.checksum)
+        #expect(one.checksum == other.checksum)
+        #expect(one.exceptions == other.exceptions)
+    }
+
+    // The extensions switch on "kind"; each kind has one named field.
+    @Test func exceptionScopesNameTheirKind() throws {
+        let scopes: [ExceptionScope] = [.app(bundleID: "com.burbn.instagram"), .site(domain: "youtube.com"),
+                                        .page(url: "https://www.youtube.com/watch?v=3kqW9M")]
+
+        let json = try scopes.map { String(decoding: try CompiledPolicy.encoder().encode($0), as: UTF8.self) }
+
+        #expect(json == [#"{"bundleID":"com.burbn.instagram","kind":"app"}"#, #"{"domain":"youtube.com","kind":"site"}"#,
+                         #"{"kind":"page","url":"https://www.youtube.com/watch?v=3kqW9M"}"#])
+        #expect(try scopes.map { try JSONDecoder().decode(ExceptionScope.self, from: try JSONEncoder().encode($0)) } == scopes)
     }
 }

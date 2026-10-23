@@ -19,18 +19,21 @@ public struct FocusSnapshot: Equatable, Sendable {
     public var policy: CompiledPolicy?
     /// A rule change waiting out its strict-session delay.
     public var pendingRuleEdit: PendingRuleEdit?
+    /// A strict-session exception waiting out its delay.
+    public var pendingException: PendingException?
     /// Higher for later coordinator states; the app keeps the newest.
     public var revision: Int
 
     public init(currentTaskTitle: String? = nil, session: FocusSession? = nil, isObserveOnly: Bool = false,
                 earlyEndAvailableAt: Date? = nil, policy: CompiledPolicy? = nil,
-                pendingRuleEdit: PendingRuleEdit? = nil, revision: Int = 0) {
+                pendingRuleEdit: PendingRuleEdit? = nil, pendingException: PendingException? = nil, revision: Int = 0) {
         self.currentTaskTitle = currentTaskTitle
         self.session = session
         self.isObserveOnly = isObserveOnly
         self.earlyEndAvailableAt = earlyEndAvailableAt
         self.policy = policy
         self.pendingRuleEdit = pendingRuleEdit
+        self.pendingException = pendingException
         self.revision = revision
     }
 
@@ -48,9 +51,9 @@ public struct FocusSnapshot: Equatable, Sendable {
     }
 
     /// When the coordinator must next be asked to reconcile, such as the
-    /// planned end or the end of a break.
+    /// planned end, the end of a break or an exception expiring.
     public var nextDeadline: Date? {
-        activeSession?.nextDeadline
+        ([activeSession?.nextDeadline] + (policy?.exceptions.map(\.expiresAt) ?? [])).compactMap { $0 }.min()
     }
 
     /// The state line shown inside the menu and the planning window.
