@@ -46,7 +46,10 @@ flowchart TB
     REPO -.->|Export cursor| TRACE
 ```
 
-The shared container and dotted paths are proposals pending the Safari and Chrome transport spikes ([decision 0003](decisions/0003-architecture-review-corrections.md)).
+The dotted paths were tested in the transport spikes; see the [validation plan](VALIDATION_PLAN.md).
+
+- Chrome (S2, built in #44): the native host reads a policy file the app writes and records acknowledged observations for the app to import.
+- Safari (S1): a shared folder in `~/Library/Application Support`, reached through the extension's home-relative temporary exception, replaced the App Group. The Safari path is deferred ([decision 0003](decisions/0003-architecture-review-corrections.md), 2026-10-20: Chrome first; #13).
 
 ## Components
 
@@ -73,7 +76,7 @@ The Safari extension handler and the Chrome native host are separate processes a
 2. Helpers read the snapshot and append browser observations and acknowledgements to an observation inbox; they never write authoritative tables.
 3. The app imports and deduplicates the inbox (by browser/profile identity and sequence) on launch, wake and reconnect.
 
-Whether an App Group container provides this for a Developer ID–signed app and its sandboxed Safari extension is a spike question, not an assumption.
+Spike S1 (#1) answered the App Group question for an ad-hoc build. A `group.` App Group made macOS 15+ prompt "access data from other apps" on every container access. A folder in `~/Library/Application Support`, reached through the extension's home-relative temporary exception, needed no prompt. A `<TeamID>.` group under Developer ID is expected not to prompt but is untested, because there is no developer membership. The Chrome native host is not sandboxed: it reads the app's policy file directly (S2, #44).
 
 ## Enforcement ownership
 
@@ -96,18 +99,38 @@ Documented Chrome lifecycle, to design around rather than discover:
 
 - Service workers stop after 30 seconds idle; an open `connectNative()` port keeps the worker alive (Chrome 105+). Reconnect in `onDisconnect`.
 - `chrome.alarms` fire at most every 30 seconds and may be delayed; missed alarms fire after wake. Persistence across browser restart is documented from Chrome 150 only, so also reconcile on `onStartup`.
+- Measured in S2 (#2, Chrome 155, awake):
+  - The port kept the worker alive through 12.6 minutes with no traffic.
+  - Reconnect after the host exited took 1.2 s.
+  - Rule changes at exception expiry and session end were 0–2 ms late.
+  - With the host gone and the worker stopped, an alarm started a new worker that removed the rule 195 ms late.
+  - Sleep/wake and browser quit/relaunch were not measured and remain assumptions.
 
-Candidate for already loaded pages and buffered media: a content script on blocked domains holds the exception expiry and blanks or redirects the page when it passes, independent of worker suspension. On policy activation, matching open tabs are redirected. Requires host permissions; Safari behavior must be validated.
+Already loaded pages and buffered media (validated in S3, #3, in both browsers):
 
-Chrome runs one extension instance and native host per profile, so acknowledgements are tracked per profile. Incognito/private windows require explicit extension permission; report their state rather than assuming coverage. Absolute expiry instants rely on the system clock; changing it is a known bypass consistent with no tamper-resistance claim.
+- The background redirect of open tabs is the guarantee. It runs on every policy evaluation: session start, expiry alarm, push and wake.
+- A content script on blocked sites is the fast path. It holds the exception expiry in a page timer, watches same-document (SPA) URL changes, pauses media and replaces the page.
+- In Chrome the content script acts first and the worker redirects any tab still there after 1.5 s. Open tabs reached the blocked page in 64–94 ms at session start. A playing video was paused 3 ms after expiry, with the blocked page at +67 ms. SPA navigation was caught within 1 ms (Navigation API).
+- After an extension update, the old content script is orphaned and only the backup acts (1.57 s), so the extension re-injects into open tabs on install (#44).
+- In Safari, hidden tabs get no page timers, so only the background path acts there (+278–397 ms). DNR `redirect` to an extension page fails open, so Safari uses `block` plus `tabs.update`. Safari tab ids change, so tabs are found with `tabs.query` each time.
+- Both need host permissions for the blocked sites.
+
+Still unsupported or unvalidated:
+
+- embeds on other sites;
+- picture-in-picture and casting;
+- withdrawn site access;
+- content-script timers across sleep.
+
+Chrome runs one extension instance and native host per profile, so acknowledgements are tracked per profile. Incognito/private windows require explicit extension permission; report their state rather than assuming coverage. Decision 0003 (2026-10-22): the owner turns on "Allow in Incognito" once, and FocusPilot does not disable incognito mode. Blocking in an incognito window on a real navigation still needs validation; the spikes only checked that the access state is detectable. Absolute expiry instants rely on the system clock; changing it is a known bypass consistent with no tamper-resistance claim.
 
 ## Browser transport feasibility
 
-Safari packages its web extension with a containing macOS app and supports native messaging. The implementation must prove how the sandboxed extension handler exchanges state with the running app, including when the UI is closed. An App Group mailbox/shared store is a candidate, not a validated transport.
+Safari packages its web extension with a containing macOS app and supports native messaging. S1 (#1) showed the extension enforcing on its own with the app closed, and the shared-folder store working without prompts. An app→Safari push can be lost silently while Safari has the extension unloaded, so a periodic sync is required. Without a paid developer account, Safari turns the unsigned extension off whenever Safari quits. FocusPilot's own Safari extension is therefore deferred (decision 0003, 2026-10-20; #13), and Safari sleep/wake is not validated.
 
-Chrome requires its own native messaging host registration or another authenticated local bridge. Prefer proving native messaging first; do not expose an unauthenticated loopback server. Treat Safari and Chrome packaging/lifecycle as different adapters.
+Chrome uses a native messaging host registered for the current user, which S2 (#2) validated. Chrome itself refuses origins not in `allowed_origins`, without starting the host. A moved or repointed host is picked up without restarting Chrome. #44 ships the host in the app bundle and rewrites the manifest at every launch. Do not expose an unauthenticated loopback server. Treat Safari and Chrome packaging/lifecycle as different adapters. Chrome is enforced first (decision 0003, 2026-10-20).
 
-Policy protocol: schema version, revision, session ID, session end, effective time, exception expiry, rule checksum, and acknowledgement. Browser observations carry browser/profile identity, sequence and observed-at timestamp. Reject out-of-order data. Show protected, syncing, degraded or unknown; a missing acknowledgement means protection is incomplete.
+Policy protocol: schema version, revision, session ID, session end, effective time, exception expiry, rule checksum, and acknowledgement. Browser observations carry browser/profile identity, sequence and observed-at timestamp. Reject out-of-order data. An extension keeps each observation until the host acknowledges its sequence number: in S2, an outbox flushed to a port that then failed was lost without an error. The app counts sequence gaps as lost reports. Show protected, syncing, degraded or unknown; a missing acknowledgement means protection is incomplete.
 
 ## Background and enforcement
 
@@ -115,7 +138,7 @@ Closing the planning window should keep the app available through the menu bar. 
 
 Use absolute expiry instants for persisted exceptions, and monotonic elapsed time for foreground duration accounting. Reconcile on wake, browser reconnect, and launch. Extension background workers cannot be assumed continuously running. Explore browser alarms/native refresh and a conservative fallback; prove expiry and recovery in a spike.
 
-Installed browser rules should not depend on a model being online. Blocking an already-open SPA, private browsing permission, exception expiry while native app is quit, and suspended workers need explicit validation. DNR network rules do not themselves close an already loaded page or stop buffered media. Report measured expiry overrun rather than promise exact closure. Browser extensions can be disabled; first release does not claim tamper resistance.
+Installed browser rules should not depend on a model being online. The spikes validated these cases: blocking an already-open SPA (S3), exception expiry while the native app is quit (S1 for Safari, S2 for Chrome), and recovery after a suspended worker (S2). Still needing validation: private browsing on a real navigation, and sleep/wake (Safari deferred with #13). DNR network rules do not themselves close an already loaded page or stop buffered media. Report measured expiry overrun rather than promise exact closure. Browser extensions can be disabled; first release does not claim tamper resistance.
 
 ## iPhone distraction signal
 
@@ -172,6 +195,11 @@ LangSmith export is separately optional. The local ledger governs budget admissi
 - [LangSmith OpenTelemetry tracing](https://docs.langchain.com/langsmith/trace-with-opentelemetry)
 - [Chrome service worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle)
 - [chrome.alarms](https://developer.chrome.com/docs/extensions/reference/api/alarms)
+- [Chrome native messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging)
+- [Chrome content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)
+- [Navigation API](https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API)
+- [Running a Safari web extension (unsigned setting resets when Safari quits)](https://developer.apple.com/documentation/safariservices/running-your-safari-web-extension)
+- [App Groups entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.application-groups)
 - [SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice)
 - [NSRunningApplication.hide()](https://developer.apple.com/documentation/appkit/nsrunningapplication/hide())
 - [NSWorkspace.didActivateApplicationNotification](https://developer.apple.com/documentation/appkit/nsworkspace/didactivateapplicationnotification)

@@ -25,7 +25,7 @@ FocusPilot helps its owner choose a concrete next action, work across Herdr and 
 
 ## Current constraints
 
-Mac-only. SwiftUI and AppKit for the app. Safari is primary; Chrome also needs focus rules. Herdr is a source of task execution state. Tasks and deadlines are managed in the app initially. Data is local by default; a remote model would receive explicitly selected context. Files remain within the owner's folder structure.
+Mac-only. SwiftUI and AppKit for the app. Chrome is enforced first (decision 0003, 2026-10-20); FocusPilot's own Safari extension is deferred (#13), and Safari is covered for now by an owner-chosen third-party blocker shown as not verified. Herdr is a source of task execution state. Tasks and deadlines are managed in the app initially. Data is local by default; a remote model would receive explicitly selected context. Files remain within the owner's folder structure.
 
 ## Next step
 

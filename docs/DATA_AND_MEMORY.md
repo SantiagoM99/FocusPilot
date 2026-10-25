@@ -80,7 +80,7 @@ GRDB.swift (owner decision, 2026-10-13). Its documented features match the desig
 - Full-text search supports the FTS5 memory retrieval above.
 - `ValueObservation` lets SwiftUI observe snapshots as data changes.
 - Migrations evolve the schema across releases.
-- A "Sharing a Database" guide covers App Group containers, app extensions, sandboxing and multi-process coordination; whether that suffices for the Safari helper remains part of the cross-process spike.
+- A "Sharing a Database" guide covers App Group containers, app extensions, sandboxing and multi-process coordination; Spike S1 found that an ad-hoc `group.` App Group prompts on every access, while a shared folder in `~/Library/Application Support` reached through the extension's home-relative temporary exception does not. A `<TeamID>.` group under Developer ID is untested (see the [validation plan](VALIDATION_PLAN.md)).
 
 Requirements per its README: Swift 6.1+, Xcode 16.3+, macOS 10.15+. Pin a released version when implementation starts. Authoritative tables and derived/cache tables use separate migrations so caches can be dropped and rebuilt without touching owner data.
 

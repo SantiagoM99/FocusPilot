@@ -29,4 +29,4 @@ Do not impose src/results/resources directories universally. A writing assignmen
 - Use structured process arguments; do not build shell commands from task titles.
 - Do not focus a workspace automatically unless the launch flow explicitly requests it.
 
-File access, bookmarks, Herdr process launch, and distribution sandbox restrictions must be proven in a platform spike before promising seamless provisioning.
+Herdr process launch from an unsandboxed app was proven in S4 (#4). File access, bookmarks (S5, #5), several attached Herdr clients and App Sandbox restrictions must be proven before promising seamless provisioning; a sandboxed build likely cannot run `~/.local/bin/herdr` or reach its socket.
