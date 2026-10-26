@@ -33,6 +33,7 @@ struct BlockingSettings: View {
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
                 SettingsError(message: model.rulesError)
                 ChromeSection(model: model)
+                OtherBrowsersSection()
                 PolicyDebugView(policy: model.snapshot.policy)
             }
             .padding(20)

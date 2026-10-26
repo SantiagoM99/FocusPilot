@@ -3,9 +3,10 @@ import FocusPilotCore
 import SwiftUI
 
 /// The menu bar popover (design 03): the Now task and Start focus when idle;
-/// during a session its phase, time left, task and Pause/Complete. The Apps
-/// line is separate from browsers, since app hiding needs FocusPilot running;
-/// browser health, iPhone and agent lines arrive with #13, #17, #22 and #19.
+/// during a session its phase, time left, task and Pause/Complete, and
+/// protection status (#17): Browsers, Safari and Apps as separate facts,
+/// since app hiding needs FocusPilot running. iPhone and agent lines arrive
+/// with #22 and #19.
 struct MenuBarContent: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
@@ -51,7 +52,7 @@ struct MenuBarContent: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            AppProtectionLine(text: model.appProtection)
+            ProtectionStatusView(model: model, showsDetail: false)
             if let error = model.startupError ?? model.sessionError {
                 Text(error)
                     .font(.callout)
@@ -91,7 +92,7 @@ struct MenuBarContent: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            AppProtectionLine(text: model.appProtection)
+            ProtectionStatusView(model: model)
             if let error = model.sessionError {
                 Text(error)
                     .font(.callout)
