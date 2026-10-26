@@ -23,11 +23,31 @@
     </div>
   </section>
   <section id="exception-panel" hidden>
-    <div class="card">
-      <h2>Timed exception</h2>
-      <p>Asking for a few minutes on this page arrives in a later FocusPilot update. For now, pause or end the session in FocusPilot.</p>
-      <div class="card-actions"><button id="close-exception" type="button" class="secondary">Close</button></div>
-    </div>
+    <form class="card" id="exception-form" novalidate>
+      <div class="card-head">
+        <h2 id="x-title"></h2>
+        <span class="badge" id="x-strict" hidden>Strict</span>
+      </div>
+      <p class="note" id="x-note"></p>
+      <div class="field">
+        <span class="label" id="x-duration-label">Duration</span>
+        <div class="segmented" role="radiogroup" aria-labelledby="x-duration-label" id="x-durations"></div>
+      </div>
+      <div class="field">
+        <span class="label" id="x-scope-label">Scope</span>
+        <div class="scopes" role="radiogroup" aria-labelledby="x-scope-label" id="x-scopes"></div>
+      </div>
+      <label class="field" id="x-reason-row">
+        <span class="label">Reason</span>
+        <input id="x-reason" type="text" maxlength="200" autocomplete="off">
+      </label>
+      <p class="wait" id="x-wait"></p>
+      <p class="error" id="x-error" role="alert"></p>
+      <div class="card-actions">
+        <button id="x-cancel" type="button" class="secondary">Cancel</button>
+        <button id="x-allow" type="submit"></button>
+      </div>
+    </form>
   </section>
 </main>
 <footer><span id="footer-left"></span><span id="footer-right"></span></footer>

@@ -15,8 +15,8 @@ extension AppModel {
             // against the policy that carries the exception.
             show(await coordinator.snapshot())
             return outcome
-        } catch ExceptionError.reasonRequired {
-            exceptionError = "Say why you need it for the task."
+        } catch let error as ExceptionError {
+            exceptionError = ExceptionErrorText.message(error)
         } catch {
             exceptionError = "Could not allow it: \(error.localizedDescription)"
         }

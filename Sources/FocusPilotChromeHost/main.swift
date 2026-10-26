@@ -30,6 +30,16 @@ final class HostProcess {
             send: { body in
                 guard let frame = try? NativeMessageFrame.encode(body) else { return }
                 try? output.write(contentsOf: frame)
+            },
+            // The app's answer can take a moment; the socket is read off the
+            // main queue so policy polling carries on, and the answer comes back on it.
+            command: { request, done in
+                let client = CommandSocketClient(path: location.commandSocketPath)
+                DispatchQueue.global().async {
+                    let answer: Result<CommandResponse, CommandSocketClient.Failure>
+                    do throws(CommandSocketClient.Failure) { answer = .success(try client.send(request)) } catch { answer = .failure(error) }
+                    DispatchQueue.main.async { done(answer) }
+                }
             }))
     }
 

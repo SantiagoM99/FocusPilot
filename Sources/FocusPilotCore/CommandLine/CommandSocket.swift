@@ -16,15 +16,21 @@ public final class CommandSocketServer: @unchecked Sendable {
 
     private let path: String
     private let maxConnections: Int
-    private let handler: @Sendable (CommandRequest) async -> CommandResponse
+    private let handler: @Sendable (CommandRequest, CommandPeer) async -> CommandResponse
     private let lock = NSLock()
     private var source: (any DispatchSourceRead)?
     private var openConnections = 0
 
     /// `maxConnections` bounds the connections handled at once; more are
     /// closed at once, so a runaway client cannot tie up the app.
+    public convenience init(path: String, maxConnections: Int = 16,
+                            handler: @escaping @Sendable (CommandRequest) async -> CommandResponse) {
+        self.init(path: path, maxConnections: maxConnections) { request, _ in await handler(request) }
+    }
+
+    /// The handler also learns which process sent the request.
     public init(path: String, maxConnections: Int = 16,
-                handler: @escaping @Sendable (CommandRequest) async -> CommandResponse) {
+                handler: @escaping @Sendable (CommandRequest, CommandPeer) async -> CommandResponse) {
         self.path = path
         self.maxConnections = maxConnections
         self.handler = handler
@@ -84,6 +90,7 @@ public final class CommandSocketServer: @unchecked Sendable {
             // Accepted sockets inherit the listener's O_NONBLOCK on Darwin;
             // the connection is read with blocking calls and a timeout.
             _ = fcntl(connection, F_SETFL, fcntl(connection, F_GETFL) & ~O_NONBLOCK)
+            let peer = CommandPeer(connection: connection)
             DispatchQueue.global().async { [handler] in
                 UnixSocket.prepare(connection)
                 guard let line = UnixSocket.readLine(connection),
@@ -93,7 +100,7 @@ public final class CommandSocketServer: @unchecked Sendable {
                     return
                 }
                 Task {
-                    let response = await handler(request)
+                    let response = await handler(request, peer)
                     if let data = try? JSONEncoder().encode(response) { UnixSocket.writeLine(data, to: connection) }
                     self.release(connection)
                 }
@@ -116,6 +123,33 @@ extension CommandSocketServer {
     fileprivate func release(_ connection: Int32) {
         close(connection)
         lock.withLock { openConnections -= 1 }
+    }
+}
+
+/// The process at the other end of a connection, read from the kernel when
+/// it connects (`LOCAL_PEERPID`), not from anything it sends.
+public struct CommandPeer: Equatable, Sendable {
+    public var processID: Int32
+    /// Nil when the process is gone or its path can't be read.
+    public var executablePath: String?
+
+    public init(processID: Int32, executablePath: String?) {
+        self.processID = processID
+        self.executablePath = executablePath
+    }
+
+    init(connection: Int32) {
+        var pid: pid_t = 0
+        var size = socklen_t(MemoryLayout<pid_t>.size)
+        let found = getsockopt(connection, SOL_LOCAL, LOCAL_PEERPID, &pid, &size) == 0
+        processID = found ? pid : -1
+        executablePath = found ? Self.executablePath(of: pid) : nil
+    }
+
+    static func executablePath(of pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return String(cString: buffer)
     }
 }
 

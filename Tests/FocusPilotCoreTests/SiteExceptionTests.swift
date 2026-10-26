@@ -174,3 +174,56 @@ struct SiteExceptionTests {
         #expect(await relaunched.snapshot().policy?.exceptions == [])
     }
 }
+
+@Suite("Site exceptions in Settings")
+struct SiteExceptionTextTests {
+    private let youtube = BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always)
+    private let now = wednesdayMorningInBogota
+    private func status(_ exceptions: [PolicyException], rule: BlockRuleSet? = nil, at instant: Date? = nil) -> String {
+        RuleText.status(rule ?? youtube, at: instant ?? now, sessionRulesApply: false, exceptions: exceptions)
+    }
+    private func expiring(_ scope: ExceptionScope, minutes: Double = 8) -> PolicyException {
+        PolicyException(scope: scope, expiresAt: now.addingTimeInterval(minutes * 60 - 1))
+    }
+
+    @Test func aSiteRuleShowsItsExceptionsTimeLeft() {
+        #expect(status([expiring(.site(domain: "youtube.com"))]) == "Exception · whole site · 8 min left")
+        #expect(status([expiring(.page(url: "https://youtube.com/watch?v=1"))]) == "Exception · 1 page · 8 min left")
+        #expect(status([expiring(.page(url: "https://youtube.com/watch?v=1")), expiring(.page(url: "https://youtube.com/watch?v=2"), minutes: 12)])
+            == "Exception · 2 pages · 12 min left")
+        #expect(status([expiring(.page(url: "https://youtube.com/watch?v=1")), expiring(.site(domain: "youtube.com"), minutes: 3)])
+            == "Exception · whole site · 3 min left", "a site exception covers its pages")
+    }
+
+    @Test func otherSitesAndExpiredExceptionsDoNotCount() {
+        let expired = expiring(.site(domain: "youtube.com"))
+        #expect(status([expiring(.site(domain: "instagram.com"))]) == "Blocked now")
+        #expect(status([expired], at: expired.expiresAt) == "Blocked now")
+        #expect(status([expiring(.app(bundleID: "com.google.youtube"))]) == "Blocked now")
+    }
+
+    @Test func whatTheOwnerTypesBecomesASiteOrAPage() {
+        #expect(ExceptionScope.requested("youtube.com/watch?v=1", wholeSite: true) == .site(domain: "youtube.com/watch?v=1"))
+        #expect(ExceptionScope.requested("youtube.com/watch?v=1", wholeSite: false) == .page(url: "https://youtube.com/watch?v=1"))
+        #expect(ExceptionScope.requested(" http://example.com/a ", wholeSite: false) == .page(url: "http://example.com/a"))
+        #expect(ExceptionScope.requested("   ", wholeSite: true) == nil)
+    }
+}
+
+@Suite("Site exceptions in the menu bar")
+struct SiteExceptionLineTests {
+    private let now = wednesdayMorningInBogota
+
+    @Test func eachRunningSiteOrPageExceptionHasALine() {
+        let exceptions = [
+            PolicyException(scope: .page(url: "https://youtube.com/watch?v=1"), expiresAt: now.addingTimeInterval(8 * 60 - 1)),
+            PolicyException(scope: .site(domain: "instagram.com"), expiresAt: now.addingTimeInterval(19 * 60 + 30)),
+            PolicyException(scope: .app(bundleID: "com.burbn.instagram"), expiresAt: now.addingTimeInterval(600)),
+            PolicyException(scope: .site(domain: "reddit.com"), expiresAt: now),
+        ]
+        #expect(SiteExceptionText.lines(exceptions, at: now) == [
+            "Exception · 1 page on youtube.com · 8 min left",
+            "Exception · all of instagram.com · 20 min left",
+        ])
+    }
+}

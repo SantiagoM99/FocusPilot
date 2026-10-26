@@ -178,6 +178,8 @@ test("the request names the page as it was blocked, or the rule's site", () => {
 
 test("a strict session asks why, then confirms, then counts down a wait", () => {
   const editing = form("strict");
+  assert.equal(editing.strict, true);
+  assert.equal(form("normal").strict, false);
   assert.equal(editing.reason.placeholder, "Why this page is needed for the task");
   assert.equal(editing.allow.disabled, true, "no reason yet");
   assert.equal(form("strict", { scope: "site" }).reason.placeholder, "Why this site is needed for the task");

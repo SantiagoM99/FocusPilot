@@ -88,7 +88,7 @@ public struct FocusPilotCommand: Sendable {
             switch try CommandSocketClient(path: location.commandSocketPath).send(.add(request)) {
             case .added(let result): return added(result, json: json)
             case .refused(let message), .failed(let message): return Outcome(status: 1, error: message + "\n")
-            case .tasks: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
+            case .tasks, .exception, .exceptionCancelled: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
             }
         } catch .pathTooLong {
             return Outcome(status: 1, error: "The FocusPilot data folder path is too long for its socket.\n")
@@ -143,7 +143,7 @@ public struct FocusPilotCommand: Sendable {
             switch try CommandSocketClient(path: location.commandSocketPath).send(.tasks(caller)) {
             case .tasks(let answer): scope = answer
             case .refused(let message), .failed(let message): return Outcome(status: 1, error: message + "\n")
-            case .added: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
+            case .added, .exception, .exceptionCancelled: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
             }
         } catch .pathTooLong {
             return Outcome(status: 1, error: "The FocusPilot data folder path is too long for its socket.\n")

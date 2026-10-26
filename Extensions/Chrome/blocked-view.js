@@ -187,7 +187,7 @@ var FocusBlockedView = (() => {
 
     const reason = state.reason.trim();
     return {
-      title: "Timed exception",
+      title: "Timed exception", strict,
       note: "Applies in every Chrome profile. Ends at the time shown, not at the session end.",
       durations: DURATIONS.map((seconds) => ({ seconds, label: minutes(seconds), selected: seconds === state.duration })),
       scopes: [

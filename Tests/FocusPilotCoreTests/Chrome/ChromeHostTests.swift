@@ -19,7 +19,7 @@ final class HostHarness {
     let frames = Locked<[Data]>([])
     let host: ChromeHost
 
-    init() throws {
+    init(command: @escaping ChromeHost.Environment.Command = { _, done in done(.failure(.notRunning)) }) throws {
         location = StorageLocation(directory: try makeTemporaryDirectory())
         let (clock, appRunning, opened, frames) = (clock, appRunning, opened, frames)
         host = ChromeHost(location: location, environment: ChromeHost.Environment(
@@ -27,7 +27,8 @@ final class HostHarness {
             openApp: { opened.withLock { $0 += 1 } },
             now: { clock.now },
             processID: 4242,
-            send: { data in frames.withLock { $0.append(data) } }))
+            send: { data in frames.withLock { $0.append(data) } },
+            command: command))
     }
 
     var sent: [[String: Any]] {
@@ -355,5 +356,78 @@ struct ChromeProfileStatusTests {
         #expect(ChromeProfileStatus.text(.waiting) == "Connected · waiting for the policy")
         #expect(ChromeProfileStatus.text(.syncing(acknowledged: 40)) == "Syncing · rev. 40 acknowledged")
         #expect(ChromeProfileStatus.text(.disconnected(lastSeen: nil)) == "Disconnected")
+    }
+}
+
+@Suite("Chrome host: exception requests from the blocked page")
+struct ChromeHostExceptionTests {
+    private func harness(answer: Result<CommandResponse, CommandSocketClient.Failure>) throws -> (HostHarness, Locked<[CommandRequest]>) {
+        let asked = Locked<[CommandRequest]>([])
+        let harness = try HostHarness(command: { request, done in
+            asked.withLock { $0.append(request) }
+            done(answer)
+        })
+        harness.hello()
+        return (harness, asked)
+    }
+
+    private let request: [String: Any] = [
+        "type": "exception-request", "id": "r1", "scope": ["kind": "page", "url": "https://www.youtube.com/watch?v=1"],
+        "durationSeconds": 600, "reason": NSNull(), "confirmed": false,
+    ]
+
+    @Test func aGrantIsRelayedWithItsExpiry() throws {
+        let (h, asked) = try harness(answer: .success(.exception(.granted(expiresAt: wednesdayMorningInBogota.addingTimeInterval(600)))))
+
+        h.receive(request)
+
+        #expect(asked.withLock { $0 } == [.exception(ExceptionCommand(scope: .page(url: "https://www.youtube.com/watch?v=1"), duration: 600, reason: nil, confirmed: false))])
+        let result = try #require(h.sent("exception-result").last)
+        #expect(result["id"] as? String == "r1")
+        #expect(result["outcome"] as? String == "granted")
+        #expect(result["expiresAt"] as? String == "2026-10-14T15:10:00Z")
+    }
+
+    @Test func aStrictSessionsStepsAreRelayed() throws {
+        let (confirm, _) = try harness(answer: .success(.exception(.needsConfirmation)))
+        confirm.receive(request)
+        #expect(confirm.sent("exception-result").last?["outcome"] as? String == "needs-confirmation")
+
+        let (wait, _) = try harness(answer: .success(.exception(.waitUntil(wednesdayMorningInBogota.addingTimeInterval(60)))))
+        wait.receive(request)
+        #expect(wait.sent("exception-result").last?["outcome"] as? String == "wait")
+        #expect(wait.sent("exception-result").last?["availableAt"] as? String == "2026-10-14T15:01:00Z")
+    }
+
+    @Test func refusalsAndAnAbsentAppComeBackAsMessages() throws {
+        let (refused, _) = try harness(answer: .success(.refused("example.com isn't blocked by any rule.")))
+        refused.receive(request)
+        #expect(refused.sent("exception-result").last?["message"] as? String == "example.com isn't blocked by any rule.")
+
+        let (closed, _) = try harness(answer: .failure(.notRunning))
+        closed.receive(request)
+        #expect(closed.sent("exception-result").last?["outcome"] as? String == "refused")
+        #expect(closed.sent("exception-result").last?["message"] as? String == "FocusPilot isn't running. Open it to ask for an exception.")
+    }
+
+    @Test func malformedRequestsAreIgnored() throws {
+        let (h, asked) = try harness(answer: .success(.exception(.needsConfirmation)))
+        var noScope = request
+        noScope["scope"] = ["kind": "app", "bundleID": "com.burbn.instagram"]
+        var noID = request
+        noID["id"] = nil
+        var badDuration = request
+        badDuration["durationSeconds"] = "ten"
+
+        for bad in [noScope, noID, badDuration] { h.receive(bad) }
+
+        #expect(asked.withLock { $0 }.isEmpty, "only site and page scopes come from the blocked page")
+        #expect(h.sent("exception-result").isEmpty)
+    }
+
+    @Test func cancellingIsPassedOn() throws {
+        let (h, asked) = try harness(answer: .success(.exceptionCancelled))
+        h.receive(["type": "exception-cancel"])
+        #expect(asked.withLock { $0 } == [.cancelException])
     }
 }

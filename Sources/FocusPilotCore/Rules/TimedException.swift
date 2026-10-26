@@ -55,6 +55,15 @@ extension ExceptionScope {
         }
     }
 
+    /// What the owner typed in the app's exception sheet, as a request: the
+    /// whole site, or that one page (an address without a scheme gets https).
+    public static func requested(_ typed: String, wholeSite: Bool) -> ExceptionScope? {
+        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        if wholeSite { return .site(domain: text) }
+        return .page(url: text.contains("://") ? text : "https://" + text)
+    }
+
     /// The site a site or page scope is on.
     var siteHost: String? {
         switch self {
@@ -133,7 +142,7 @@ public enum ExceptionError: Error, Equatable, Sendable {
 }
 
 /// What happened when the owner asked for an exception.
-public enum ExceptionOutcome: Equatable, Sendable {
+public enum ExceptionOutcome: Equatable, Codable, Sendable {
     case granted(expiresAt: Date)
     /// A strict session: the owner must confirm first; nothing changed.
     case needsConfirmation
