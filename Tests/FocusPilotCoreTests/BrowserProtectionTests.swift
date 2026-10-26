@@ -28,7 +28,7 @@ struct BrowserProtectionTests {
         #expect(s.level == .protected)
         #expect(s.line == "Chrome protected")
         #expect(s.footer == "Chrome · Protected")
-        #expect(s.detail == "2 Chrome profiles acknowledged policy rev. 9")
+        #expect(s.detail == "All 2 Chrome profiles have your latest rules")
     }
 
     // Decision 0003, 2026-10-22.
@@ -72,8 +72,8 @@ struct BrowserProtectionTests {
             let s = status([profile(), profile(profileB, state)])
 
             #expect(s.level == .syncing)
-            #expect(s.line == "Chrome syncing")
-            #expect(s.footer == "Chrome · Syncing")
+            #expect(s.line == "Chrome is updating…")
+            #expect(s.footer == "Chrome · Updating…")
         }
     }
 

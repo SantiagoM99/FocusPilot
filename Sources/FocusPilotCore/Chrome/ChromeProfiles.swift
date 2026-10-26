@@ -22,8 +22,8 @@ public struct ChromeProfileStatus: Equatable, Sendable, Identifiable {
 
     public static func text(_ state: State) -> String {
         switch state {
-        case .acknowledged(let revision): "Connected · policy rev. \(revision) acknowledged"
-        case .syncing(let acknowledged): "Syncing · rev. \(acknowledged) acknowledged"
+        case .acknowledged: "Chrome has your latest rules"
+        case .syncing: "Chrome is updating…"
         case .waiting: "Connected · waiting for the policy"
         case .disconnected: "Disconnected"
         }

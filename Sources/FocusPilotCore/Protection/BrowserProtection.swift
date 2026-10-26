@@ -80,7 +80,7 @@ public struct BrowserProtection: Equatable, Sendable {
             self.init(.degraded, "Chrome in front · not yet protected", "Chrome · Not yet protected",
                       "A Chrome profile hasn't applied the current policy yet")
         } else if pending {
-            self.init(.syncing, "Chrome syncing", "Chrome · Syncing", "A Chrome profile hasn't applied the current policy yet")
+            self.init(.syncing, "Chrome is updating…", "Chrome · Updating…", "A Chrome profile hasn't applied the current policy yet")
         } else if disconnected > 0 {
             self.init(.degraded, "Chrome protected · \(disconnected) profile\(disconnected == 1 ? "" : "s") disconnected",
                       "Chrome · Disconnected",
@@ -89,7 +89,7 @@ public struct BrowserProtection: Equatable, Sendable {
             self.init(.degraded, "Chrome protected · Incognito unprotected", "Chrome · Incognito unprotected",
                       "Turn on Allow in Incognito for the FocusPilot extension in chrome://extensions")
         } else {
-            self.init(.protected, "Chrome protected", "Chrome · Protected", Self.acknowledged(connected))
+            self.init(.protected, "Chrome protected", "Chrome · Protected", Self.upToDate(connected))
         }
     }
 
@@ -100,10 +100,10 @@ public struct BrowserProtection: Equatable, Sendable {
         self.detail = detail
     }
 
-    private static func acknowledged(_ profiles: [ChromeProfileStatus]) -> String {
-        let revision = profiles.compactMap(\.acknowledgedRevision).min() ?? 0
-        let who = profiles.count == 1 ? "Chrome" : "\(profiles.count) Chrome profiles"
-        return "\(who) acknowledged policy rev. \(revision)"
+    /// Revision numbers are diagnostics, kept in Settings' technical
+    /// details (decision 0003, 2026-10-26).
+    private static func upToDate(_ profiles: [ChromeProfileStatus]) -> String {
+        profiles.count == 1 ? "Chrome has your latest rules" : "All \(profiles.count) Chrome profiles have your latest rules"
     }
 }
 

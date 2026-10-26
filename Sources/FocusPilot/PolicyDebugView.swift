@@ -1,24 +1,30 @@
 import FocusPilotCore
 import SwiftUI
 
-/// "Policy rev. 41 · compiled 14:31" and, on request, the exact JSON the
-/// extensions receive, for checking what a rule edit produced.
+/// Settings › Blocking: one collapsed "Show technical details" with the
+/// policy revision, checksum, what each Chrome profile applied and the exact
+/// JSON the extensions receive. These are diagnostics; the rest of the UI
+/// speaks plainly (decision 0003, 2026-10-26).
 struct PolicyDebugView: View {
     let policy: CompiledPolicy?
-    @State private var isShowingJSON: Bool
+    var profiles: [ChromeProfileStatus] = []
+    @State private var isExpanded: Bool
 
-    init(policy: CompiledPolicy?, isShowingJSON: Bool = false) {
+    init(policy: CompiledPolicy?, profiles: [ChromeProfileStatus] = [], isExpanded: Bool = false) {
         self.policy = policy
-        _isShowingJSON = State(initialValue: isShowingJSON)
+        self.profiles = profiles
+        _isExpanded = State(initialValue: isExpanded)
     }
 
     var body: some View {
         if let policy {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Policy rev. \(policy.revision) · compiled \(policy.effectiveAt.formatted(date: .omitted, time: .shortened)) · checksum \(policy.checksum.prefix(8))")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
-                DisclosureGroup("Compiled policy", isExpanded: $isShowingJSON) {
+            DisclosureGroup("Show technical details", isExpanded: $isExpanded) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Policy rev. \(policy.revision) · compiled \(policy.effectiveAt.formatted(date: .omitted, time: .shortened)) · checksum \(policy.checksum.prefix(8))")
+                    ForEach(profiles) { profile in
+                        Text("Profile \(profile.profileID.prefix(4)) · \(applied(profile.state))")
+                    }
+                    Text("Compiled policy")
                     ScrollView(.horizontal) {
                         Text(json(policy))
                             .font(.system(.callout, design: .monospaced))
@@ -28,11 +34,19 @@ struct PolicyDebugView: View {
                     }
                     .background(.background, in: RoundedRectangle(cornerRadius: 6))
                 }
-                .font(.callout)
-                Text("Extensions receive this policy once Safari and Chrome support arrives (#13, #16).")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
             }
+            .font(.callout)
+        }
+    }
+
+    private func applied(_ state: ChromeProfileStatus.State) -> String {
+        switch state {
+        case .acknowledged(let revision): "applied rev. \(revision)"
+        case .syncing(let acknowledged): "applied rev. \(acknowledged), updating"
+        case .waiting: "nothing applied yet"
+        case .disconnected: "disconnected"
         }
     }
 
