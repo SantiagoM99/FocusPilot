@@ -145,7 +145,15 @@ async function submitForm() {
   switch (answer?.outcome) {
     case "granted": form.phase = "granted"; break;
     case "needs-confirmation": form.phase = "confirming"; break;
-    case "wait": form.phase = "waiting"; form.availableAt = Date.parse(answer.availableAt); break;
+    case "wait":
+      form.phase = "waiting";
+      form.availableAt = Date.parse(answer.availableAt);
+      // "Allow now" follows this page's clock; FocusPilot's wait runs on its
+      // own monotonic clock and can end a moment later. Ask again then.
+      if (resumeAs === "waiting") {
+        setTimeout(() => { if (form?.phase === "waiting") submitForm(); }, Math.max(0, form.availableAt - Date.now()) + 300);
+      }
+      break;
     default: form.phase = resumeAs; form.error = answer?.message ?? "FocusPilot didn't answer. Try again.";
   }
   render();

@@ -163,4 +163,6 @@ public struct PendingException: Equatable, Sendable {
     public var duration: TimeInterval
     /// When asking again grants it.
     public var availableAt: Date
+    /// The reason given when it was confirmed.
+    public var reason: String?
 }

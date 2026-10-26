@@ -227,3 +227,24 @@ struct SiteExceptionLineTests {
         ])
     }
 }
+
+@Suite("A strict-session exception keeps its confirmed reason")
+struct PendingReasonTests {
+    @Test func theReasonGivenAtConfirmationCarriesThroughTheWait() async throws {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
+        try await fixture.coordinator.startSession(duration: 50 * 60, mode: .strict)
+        let lecture = ExceptionScope.page(url: "https://youtube.com/watch?v=1")
+
+        _ = try await fixture.coordinator.requestException(lecture, duration: 600, reason: "Lecture for §4.2", confirmed: true)
+        #expect(await fixture.coordinator.snapshot().pendingException?.reason == "Lecture for §4.2")
+
+        // Reopened elsewhere (another profile, the app) without the reason typed again.
+        fixture.advance(seconds: 60)
+        #expect(try await fixture.coordinator.requestException(lecture, duration: 600)
+            == .granted(expiresAt: fixture.clock.now.addingTimeInterval(600)))
+        await #expect(throws: ExceptionError.reasonRequired) {
+            try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 300)
+        }
+    }
+}

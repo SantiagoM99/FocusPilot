@@ -84,6 +84,7 @@ extension FocusCoordinator {
             earlyEnd = nil
             ruleWait = nil
             exceptionWait = nil
+            exceptionWaitReason = nil
         }
         for effect in transition.effects {
             switch effect {

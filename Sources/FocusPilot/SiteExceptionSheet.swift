@@ -31,11 +31,19 @@ struct SiteExceptionSheet: View {
     private var namesAPage: Bool { SiteDomain.namesAPage(typed) }
     private var scope: ExceptionScope? { ExceptionScope.requested(typed, wholeSite: wholeSite || !namesAPage) }
 
-    /// When a confirmed strict request for this scope may be granted.
-    private var availableAt: Date? {
+    /// A confirmed strict request for this scope, waiting out its delay.
+    private var pending: PendingException? {
         guard let pending = model.snapshot.pendingException, let scope, (try? scope.normalized()) == pending.scope,
               pending.duration == duration else { return nil }
-        return pending.availableAt
+        return pending
+    }
+
+    private var availableAt: Date? { pending?.availableAt }
+
+    /// Typed here, or given when the waiting request was confirmed.
+    private var givenReason: String {
+        let typed = reason.trimmingCharacters(in: .whitespaces)
+        return typed.isEmpty ? pending?.reason ?? "" : typed
     }
 
     var body: some View {
@@ -72,7 +80,7 @@ struct SiteExceptionSheet: View {
                 .fixedSize()
                 .disabled(availableAt != nil)
                 if isStrict {
-                    TextField("Reason", text: $reason, prompt: Text(wholeSite || !namesAPage ? "Why this site is needed for the task" : "Why this page is needed for the task"))
+                    TextField("Reason", text: $reason, prompt: Text(pending?.reason ?? (wholeSite || !namesAPage ? "Why this site is needed for the task" : "Why this page is needed for the task")))
                         .disabled(availableAt != nil)
                 }
             }
@@ -98,7 +106,7 @@ struct SiteExceptionSheet: View {
                 Button(allowLabel(availableAt: availableAt)) { request() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(scope == nil || waiting || (isStrict && reason.trimmingCharacters(in: .whitespaces).isEmpty))
+                    .disabled(scope == nil || waiting || (isStrict && givenReason.isEmpty))
             }
         }
         .padding(20)
@@ -114,13 +122,21 @@ struct SiteExceptionSheet: View {
 
     private func request() {
         guard let scope else { return }
+        let afterWait = availableAt.map { model.now >= $0 } ?? false
         Task {
-            let outcome = await model.requestException(scope, duration: duration, reason: reason, confirmed: isConfirming)
+            let outcome = await model.requestException(scope, duration: duration, reason: givenReason, confirmed: isConfirming)
             error = model.exceptionError
             switch outcome {
             case .granted?: dismiss()
             case .needsConfirmation?: isConfirming = true
-            case .waitUntil?: isConfirming = false
+            case .waitUntil(let at)?:
+                isConfirming = false
+                // "Allow now" follows the wall clock; the coordinator's wait
+                // runs on the monotonic one and can end a moment later.
+                if afterWait {
+                    try? await Task.sleep(for: .seconds(max(0, at.timeIntervalSinceNow) + 0.3))
+                    request()
+                }
             case nil: break
             }
         }

@@ -20,36 +20,41 @@ extension FocusCoordinator {
         // Already allowed (say, from another Chrome profile): its expiry
         // stands and a strict session asks nothing.
         if let expiry = try await repository.coveringExpiry(of: scope, at: now()) { return .granted(expiresAt: expiry) }
-        let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let typed = reason?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         guard let active = session, !active.hasEnded, active.mode == .strict else {
-            return try await grant(scope, duration: duration, reason: reason)
+            return try await grant(scope, duration: duration, reason: typed)
         }
-        guard reason != nil else { throw ExceptionError.reasonRequired }
         let request = ExceptionRequest(scope: scope, duration: duration)
         if let wait = exceptionWait, wait.hasExpired(at: uptime()) || wait.request != request {
             exceptionWait = nil
+            exceptionWaitReason = nil
         }
+        guard let reason = typed ?? exceptionWaitReason else { throw ExceptionError.reasonRequired }
         guard let wait = exceptionWait else {
             guard confirmed else { return .needsConfirmation }
             let wait = StrictWait(request: request, confirmedAt: uptime())
             exceptionWait = wait
+            exceptionWaitReason = reason
             await broadcast()
             return .waitUntil(availableAt(wait))
         }
         if wait.remaining(at: uptime()) > .zero { return .waitUntil(availableAt(wait)) }
         exceptionWait = nil
+        exceptionWaitReason = nil
         return try await grant(scope, duration: duration, reason: reason)
     }
 
     /// The owner changed their mind about a strict-session exception.
     public func cancelException() async {
         exceptionWait = nil
+        exceptionWaitReason = nil
         await broadcast()
     }
 
     func pendingException() -> PendingException? {
         guard let wait = exceptionWait, !wait.hasExpired(at: uptime()) else { return nil }
-        return PendingException(scope: wait.request.scope, duration: wait.request.duration, availableAt: availableAt(wait))
+        return PendingException(scope: wait.request.scope, duration: wait.request.duration, availableAt: availableAt(wait),
+                                reason: exceptionWaitReason)
     }
 
     private func grant(_ scope: ExceptionScope, duration: TimeInterval, reason: String?) async throws -> ExceptionOutcome {
