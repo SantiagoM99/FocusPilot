@@ -67,6 +67,20 @@ var FocusBlockedView = (() => {
     const offline = appRunning === false;
     const openApp = { label: offline ? "Open FocusPilot" : "Return to task", action: "open-app" };
 
+    if (decision.excepted) {
+      const host = hostOf(url);
+      const { scope, expiresAt } = decision.excepted;
+      const what = scope.kind === "site" ? `All of ${scope.domain}` : "This page";
+      return {
+        kind: "excepted", domain: decision.domain,
+        status: { tone: "green", text: `Timed exception · ${countdown((expiresAt - now) / 1000)} left` },
+        title: `${host} is allowed for now`,
+        subtitle: `${what} is allowed until ${clock(expiresAt, timeZone)}, then it is blocked again.`,
+        primary: { label: `Go back to ${host}`, action: "go-back" }, backURL: FocusPolicy.returnURL(policy, url),
+        exceptionLink: false, footer: ["", "FocusPilot"],
+      };
+    }
+
     if (!decision.blocked) {
       const host = hostOf(url);
       const backURL = FocusPolicy.returnURL(policy, url);
@@ -134,7 +148,64 @@ var FocusBlockedView = (() => {
     };
   }
 
-  return { model, countdown, relative, days, when };
+  // StrictEarlyEnd.wait in the app; the real wait comes back as `availableAt`.
+  const STRICT_WAIT_TEXT = "1 minute";
+  const DURATIONS = [300, 600, 1200];
+
+  // "youtube.com/watch?v=3kqW9M…": the page as the scope choice shows it.
+  function shortPage(url) {
+    let text;
+    try {
+      const u = new URL(url);
+      text = u.hostname.replace(/^www\./, "") + u.pathname + u.search;
+    } catch { text = url; }
+    return text.length > 40 ? text.slice(0, 39) + "…" : text;
+  }
+
+  // The timed exception form (design 05B). `state` is the page's: the
+  // chosen duration and scope, the reason, and the phase of the request:
+  // editing, confirming (strict: asked to confirm), waiting (strict: the
+  // wait until `availableAt`), or sending.
+  function exceptionForm({ delivery, url, now, state }) {
+    const policy = delivery?.policy ?? null;
+    const decision = FocusPolicy.decide(policy, url, now);
+    const domain = decision.domain ?? hostOf(url);
+    const strict = policy?.session?.mode === "strict" && FocusPolicy.sessionApplies(policy.session, now);
+    const minutes = (seconds) => `${seconds / 60} min`;
+    const waiting = state.phase === "waiting";
+    const remaining = waiting ? Math.max(0, state.availableAt - now) : 0;
+
+    let allow;
+    if (state.phase === "sending") allow = { label: "Allowing…", disabled: true };
+    else if (state.phase === "confirming") allow = { label: "Start the wait", disabled: false };
+    else if (waiting) allow = remaining > 0 ? { label: `Allow in ${countdown(remaining / 1000)}`, disabled: true } : { label: "Allow now", disabled: false };
+    else allow = { label: `Allow for ${minutes(state.duration)}`, disabled: strict && !state.reason.trim() };
+
+    let waitNote = null;
+    if (state.phase === "confirming") waitNote = `A strict session waits ${STRICT_WAIT_TEXT} before allowing it.`;
+    else if (waiting && remaining > 0) waitNote = `Strict session · Allow becomes available in ${countdown(remaining / 1000)}`;
+
+    const reason = state.reason.trim();
+    return {
+      title: "Timed exception",
+      note: "Applies in every Chrome profile. Ends at the time shown, not at the session end.",
+      durations: DURATIONS.map((seconds) => ({ seconds, label: minutes(seconds), selected: seconds === state.duration })),
+      scopes: [
+        { id: "page", label: "This page only", detail: shortPage(url), selected: state.scope === "page" },
+        { id: "site", label: `All of ${domain}`, detail: "Every page on the site", selected: state.scope === "site" },
+      ],
+      reason: strict ? { placeholder: `Why this ${state.scope === "site" ? "site" : "page"} is needed for the task` } : null,
+      locked: waiting || state.phase === "sending",
+      waitNote, allow, error: state.error ?? null,
+      request: {
+        scope: state.scope === "site" ? { kind: "site", domain } : { kind: "page", url },
+        durationSeconds: state.duration, reason: strict && reason ? reason : null,
+        confirmed: state.phase === "confirming",
+      },
+    };
+  }
+
+  return { model, exceptionForm, countdown, relative, days, when };
 })();
 
 if (typeof module === "object") module.exports = FocusBlockedView;

@@ -11,6 +11,13 @@ public struct PolicyInputs: Equatable, Sendable {
     public var exceptions: [TimedException] = []
 }
 
+/// What storing a requested exception did.
+public enum ExceptionGrant: Equatable, Sendable {
+    case granted(PolicyChange)
+    /// A running exception already covers it; its expiry stands.
+    case alreadyCovered(expiresAt: Date)
+}
+
 /// A saved rule or allowed-list edit: the policy revision it was given and
 /// the inputs after it.
 public struct PolicyChange: Equatable, Sendable {
@@ -24,14 +31,38 @@ extension TaskRepository {
         return try await ownerDatabase.read { db in try Self.policyInputs(db, at: now) }
     }
 
-    /// Stores a granted exception and hands out the policy revision that carries it.
-    @discardableResult
-    public func grant(_ exception: TimedException) async throws -> PolicyChange {
-        try await policyChange { db in
+    /// Stores a granted exception and hands out the policy revision that
+    /// carries it, unless one still running already covers its scope: then
+    /// nothing changes and that one's expiry stands (one shared deadline,
+    /// whichever profile or the app asks). Checked in the same write, so two
+    /// profiles asking at once cannot both grant.
+    public func grant(_ exception: TimedException) async throws -> ExceptionGrant {
+        let now = now()
+        return try await ownerDatabase.write { db in
+            if let expiry = try Self.coveringExpiry(of: exception.scope, at: exception.grantedAt, db) {
+                return .alreadyCovered(expiresAt: expiry)
+            }
             var row = try ExceptionRow(exception)
             row.id = nil
             try row.insert(db)
+            return .granted(PolicyChange(revision: try Self.nextPolicyRevision(db), inputs: try Self.policyInputs(db, at: now)))
         }
+    }
+
+    /// The expiry of a running exception that already covers `scope`, if
+    /// any. Throws `notBlocked` for a site or page no rule blocks.
+    public func coveringExpiry(of scope: ExceptionScope, at instant: Date) async throws -> Date? {
+        try await ownerDatabase.read { db in try Self.coveringExpiry(of: scope, at: instant, db) }
+    }
+
+    private static func coveringExpiry(of scope: ExceptionScope, at instant: Date, _ db: Database) throws -> Date? {
+        if let host = scope.siteHost {
+            let blocked = try rules(db).flatMap(\.targets).contains {
+                if case .site(let domain) = $0 { SiteDomain.domain(host, isWithin: domain) } else { false }
+            }
+            guard blocked else { throw ExceptionError.notBlocked(host) }
+        }
+        return try exceptions(db, unexpiredAt: instant).filter { $0.scope.covers(scope) }.map(\.expiresAt).max()
     }
 
     /// Inserts or updates a rule set, bumping its revision on update. Sites

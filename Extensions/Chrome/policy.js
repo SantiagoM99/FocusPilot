@@ -61,9 +61,80 @@ var FocusPolicy = (() => {
     return host === domain || host.endsWith("." + domain);
   }
 
-  // Why `url` is blocked now, if it is: the session first, since its page
-  // shows the task; then a schedule; then always-on rules.
+  // ---- One page (#14) ----
+  // Mirrors PageAddress in FocusPilotCore; Tests/ChromeExtension/fixtures/pages.json
+  // pins both. A page is its host (without "www."), path and query, minus
+  // parameters that only track or position (a video's start time), so the
+  // same lecture stays the same page however it was reached.
+  const TRACKING = new Set(["fbclid", "gclid", "dclid", "msclkid", "igsh", "igshid", "si"]);
+  const YOUTUBE_NOISE = new Set(["t", "pp", "feature", "ab_channel", "list", "index", "start_radio", "embeds_referring_euri"]);
+
+  function pageParts(url) {
+    let parsed;
+    try { parsed = new URL(url); } catch { return null; }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    const host = parsed.hostname.toLowerCase().replace(/\.$/, "").replace(/^www\./, "");
+    const youtube = hostMatches(host, "youtube.com") || hostMatches(host, "youtu.be");
+    const params = parsed.search.slice(1).split("&").filter((pair) => {
+      if (!pair) return false;
+      const key = pair.split("=")[0];
+      return !key.startsWith("utm_") && !TRACKING.has(key) && !(youtube && YOUTUBE_NOISE.has(key));
+    }).sort();
+    return { host, port: parsed.port, path: parsed.pathname || "/", params };
+  }
+
+  function canonicalPage(url) {
+    const p = pageParts(url);
+    if (!p) return null;
+    return `https://${p.host}${p.port ? ":" + p.port : ""}${p.path}${p.params.length ? "?" + p.params.join("&") : ""}`;
+  }
+
+  // Same host, port and path, and every parameter the exception names.
+  function pageMatches(exceptionURL, url) {
+    const e = pageParts(exceptionURL), u = pageParts(url);
+    if (!e || !u || e.host !== u.host || e.port !== u.port || e.path !== u.path) return false;
+    const left = [...u.params];
+    return e.params.every((pair) => {
+      const i = left.indexOf(pair);
+      if (i < 0) return false;
+      left.splice(i, 1);
+      return true;
+    });
+  }
+
+  function isSiteOrPage(exception) {
+    return exception?.scope?.kind === "site" || exception?.scope?.kind === "page";
+  }
+
+  // Site and page exceptions that have not expired. Expiry is absolute, so
+  // sleep, a quit app or a browser restart never extends one.
+  function activeExceptions(policy, now) {
+    return (policy?.exceptions ?? []).filter((e) => isSiteOrPage(e) && now < Date.parse(e.expiresAt));
+  }
+
+  // The exception that lets `url` load now, with the latest expiry.
+  function exceptionFor(policy, url, host, now) {
+    let found = null;
+    for (const e of activeExceptions(policy, now)) {
+      const covers = e.scope.kind === "site" ? hostMatches(host, e.scope.domain) : pageMatches(e.scope.url, url);
+      const expiresAt = Date.parse(e.expiresAt);
+      if (covers && (!found || expiresAt > found.expiresAt)) found = { scope: e.scope, expiresAt };
+    }
+    return found;
+  }
+
+  // Why `url` is blocked now, if it is, and whether a timed exception lifts it.
   function decide(policy, url, now) {
+    const decision = ruleDecision(policy, url, now);
+    if (!decision.blocked) return decision;
+    const excepted = exceptionFor(policy, url, decision.host, now);
+    const { host, ...result } = decision;
+    return excepted ? { ...result, blocked: false, excepted } : result;
+  }
+
+  // The rule that blocks `url`: the session first, since its page shows
+  // the task; then a schedule; then always-on rules.
+  function ruleDecision(policy, url, now) {
     let host;
     try {
       const parsed = new URL(url);
@@ -75,14 +146,14 @@ var FocusPolicy = (() => {
     const match = (domains) => domains.find((d) => hostMatches(host, d));
     if (sessionApplies(policy?.session, now)) {
       const domain = match(policy.session.targets.domains);
-      if (domain) return { blocked: true, reason: "session", domain };
+      if (domain) return { blocked: true, reason: "session", domain, host };
     }
     for (const block of policy?.scheduled ?? []) {
       const domain = match(block.targets.domains);
-      if (domain && scheduleContains(block.schedule, now)) return { blocked: true, reason: "schedule", domain, schedule: block.schedule };
+      if (domain && scheduleContains(block.schedule, now)) return { blocked: true, reason: "schedule", domain, schedule: block.schedule, host };
     }
     const domain = match(policy?.always?.domains ?? []);
-    if (domain) return { blocked: true, reason: "always", domain };
+    if (domain) return { blocked: true, reason: "always", domain, host };
     return { blocked: false };
   }
 
@@ -105,8 +176,55 @@ var FocusPolicy = (() => {
       if (s.mode !== "strict") times.push(Date.parse(s.end));
     }
     for (const block of policy?.scheduled ?? []) times.push(scheduleNextChange(block.schedule, now));
+    for (const e of activeExceptions(policy, now)) times.push(Date.parse(e.expiresAt));
     const future = times.filter((t) => t !== null && t > now);
     return future.length ? Math.min(...future) : null;
+  }
+
+  // ---- Network rules ----
+
+  const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  function permutations(items) {
+    if (items.length <= 1) return [items];
+    return items.flatMap((item, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [item, ...rest]));
+  }
+
+  // Lets one excepted page load past the redirect, with everything it loads
+  // (allowAllRequests). RE2 has no lookahead, so up to three parameters are
+  // matched in any order; with more, the rule allows the path and the
+  // content script, which checks every parameter, blocks other pages.
+  function pageAllowRule(exception, id) {
+    const p = pageParts(exception.scope.url);
+    const prefix = `^https?://(?:www\\.)?${escapeRegex(p.host)}${p.port ? ":" + p.port : ""}${escapeRegex(p.path)}`;
+    let query = "(?:[?#].*)?";
+    if (p.params.length > 0 && p.params.length <= 3) {
+      const orders = permutations(p.params).map((order) =>
+        "\\?(?:[^#]*&)?" + order.map(escapeRegex).join("&(?:[^#]*&)?") + "(?:&[^#]*)?");
+      query = `(?:${orders.join("|")})(?:#.*)?`;
+    }
+    return { id, priority: 2, action: { type: "allowAllRequests" }, condition: { regexFilter: prefix + query + "$", resourceTypes: ["main_frame"] } };
+  }
+
+  // The dynamic rules for `now`: new top-level loads of blocked sites go to
+  // `blockedPage` with the URL in the fragment, frames are blocked, and
+  // timed exceptions are carved out (spike S2/S3: rules persist across restarts).
+  function networkRules(policy, now, blockedPage) {
+    const domains = blockedDomains(policy, now);
+    if (!domains.length) return [];
+    const live = activeExceptions(policy, now);
+    const excluded = [...new Set(live.filter((e) => e.scope.kind === "site").map((e) => e.scope.domain))].sort();
+    const exclusion = excluded.length ? { excludedRequestDomains: excluded } : {};
+    const pageURLs = [...new Set(live.filter((e) => e.scope.kind === "page").map((e) => canonicalPage(e.scope.url)).filter(Boolean))].sort();
+    return [
+      {
+        id: 1, priority: 1,
+        action: { type: "redirect", redirect: { regexSubstitution: blockedPage + "#\\0" } },
+        condition: { regexFilter: "^.+$", requestDomains: domains, ...exclusion, resourceTypes: ["main_frame"] },
+      },
+      { id: 2, priority: 1, action: { type: "block" }, condition: { requestDomains: domains, ...exclusion, resourceTypes: ["sub_frame"] } },
+      ...pageURLs.map((url, i) => pageAllowRule({ scope: { kind: "page", url } }, 10 + i)),
+    ];
   }
 
   // Deliveries, not policies: `source` names the FocusPilot data that
@@ -148,7 +266,7 @@ var FocusPolicy = (() => {
 
   return {
     localParts, scheduleContains, scheduleNextChange, sessionApplies, hostMatches, decide, blockedDomains, nextBoundary,
-    isNewer, supports, returnURL,
+    isNewer, supports, returnURL, canonicalPage, pageMatches, activeExceptions, networkRules, pageAllowRule,
   };
 })();
 

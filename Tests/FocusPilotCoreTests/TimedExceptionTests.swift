@@ -62,6 +62,7 @@ struct TimedExceptionTests {
 
     @Test func sitesAndPagesUseTheSameModel() async throws {
         let fixture = try await SessionFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always))
 
         _ = try await fixture.coordinator.requestException(.page(url: "https://www.youtube.com/watch?v=3kqW9M"), duration: 20 * 60)
         _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 5 * 60)
@@ -182,6 +183,7 @@ struct StrictStartExceptionTests {
     @Test func appAndSiteExceptionsGrantedBeforeAStrictStartAreCancelled() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.app(bundleID: "com.burbn.instagram", name: "Instagram")], activation: .always))
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
         _ = try await fixture.coordinator.requestException(instagram, duration: 20 * 60)
         _ = try await fixture.coordinator.requestException(youtube, duration: 20 * 60)
         fixture.advance(minutes: 1)

@@ -1,8 +1,11 @@
 import Foundation
 
-/// Timed exceptions (DATA_AND_MEMORY, Exception): an app now, sites and
-/// pages with #14. A grant is stored and published in the same write, with
-/// an absolute expiry measured from the grant.
+/// Timed exceptions (DATA_AND_MEMORY, Exception) for an app, a site or one
+/// page (#14). A grant is stored and published in the same write, with an
+/// absolute expiry measured from the grant. Sites and pages must be blocked
+/// by a rule; a request for something an exception already allows returns
+/// that exception's expiry and grants nothing, so every Chrome profile and
+/// the app share one deadline.
 ///
 /// During a strict session a request first returns `needsConfirmation`,
 /// then waits `StrictEarlyEnd.wait` from the confirmation on the monotonic
@@ -13,6 +16,10 @@ extension FocusCoordinator {
     public func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String? = nil,
                                  confirmed: Bool = false) async throws -> ExceptionOutcome {
         guard TimedException.durations.contains(duration) else { throw ExceptionError.unsupportedDuration }
+        let scope = try scope.normalized()
+        // Already allowed (say, from another Chrome profile): its expiry
+        // stands and a strict session asks nothing.
+        if let expiry = try await repository.coveringExpiry(of: scope, at: now()) { return .granted(expiresAt: expiry) }
         let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         guard let active = session, !active.hasEnded, active.mode == .strict else {
             return try await grant(scope, duration: duration, reason: reason)
@@ -50,8 +57,13 @@ extension FocusCoordinator {
         let activeSession = session.flatMap { $0.hasEnded ? nil : $0 }
         let exception = TimedException(scope: scope, grantedAt: at, expiresAt: at.addingTimeInterval(duration),
                                        sessionID: activeSession?.id, reason: reason)
-        await publish(try await repository.grant(exception))
-        return .granted(expiresAt: exception.expiresAt)
+        switch try await repository.grant(exception) {
+        case .granted(let change):
+            await publish(change)
+            return .granted(expiresAt: exception.expiresAt)
+        case .alreadyCovered(let expiry):
+            return .granted(expiresAt: expiry)
+        }
     }
 }
 
