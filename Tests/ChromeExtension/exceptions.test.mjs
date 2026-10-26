@@ -122,3 +122,17 @@ test("past three parameters the network rule allows the path and the page script
   assert.equal(P.decide(policy([page("https://example.com/p?a=1&b=2&c=3&d=4")], { always: { domains: ["example.com"], apps: [] } }),
     "https://example.com/p?a=1", now).blocked, true);
 });
+
+test("page rules match letter case exactly, as video ids do", () => {
+  const rule = P.pageAllowRule(page("https://youtube.com/watch?v=abc"), 10);
+  assert.equal(rule.condition.isUrlFilterCaseSensitive, true);
+});
+
+test("a page Chrome cannot take as a regex falls back to its path, not to no carve-out", () => {
+  const p = policy([page("https://youtube.com/watch?v=3kqW9M"), page("https://youtube.com/watch?v=other")]);
+  assert.deepEqual(P.pageURLs(p, now), ["https://youtube.com/watch?v=3kqW9M", "https://youtube.com/watch?v=other"]);
+  const rules = P.networkRules(p, now, BLOCKED, { pathOnly: new Set(["https://youtube.com/watch?v=other"]) });
+  const [first, second] = rules.filter((r) => r.action.type === "allowAllRequests");
+  assert.ok(first.condition.regexFilter.includes("v=3kqW9M"));
+  assert.equal(second.condition.regexFilter, "^https?://(?:www\\.)?youtube\\.com/watch(?:[?#].*)?$");
+});

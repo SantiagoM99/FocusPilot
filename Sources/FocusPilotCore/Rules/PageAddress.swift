@@ -45,18 +45,45 @@ public enum PageAddress {
         init?(_ url: String) {
             guard !url.contains(" "), let components = URLComponents(string: url),
                   let scheme = components.scheme?.lowercased(), scheme == "http" || scheme == "https",
-                  var host = components.percentEncodedHost?.lowercased(), !host.isEmpty else { return nil }
+                  var host = components.encodedHost?.lowercased(), !host.isEmpty else { return nil }
             if host.hasSuffix(".") { host.removeLast() }
             if host.hasPrefix("www.") { host.removeFirst(4) }
             self.host = host
             let defaultPort = scheme == "https" ? 443 : 80
             port = components.port.flatMap { $0 == defaultPort ? nil : $0 }
-            path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
+            // Path and query come from the address itself, encoded as a
+            // browser encodes them (URLComponents would also encode | ^ [ ]).
+            let (rawPath, rawQuery) = Self.pathAndQuery(url)
+            path = rawPath.isEmpty ? "/" : Self.encoded(rawPath, keeping: Self.pathCharacters)
             let youTube = SiteDomain.domain(host, isWithin: "youtube.com") || SiteDomain.domain(host, isWithin: "youtu.be")
-            parameters = (components.percentEncodedQuery ?? "").split(separator: "&").map(String.init).filter { pair in
+            parameters = Self.encoded(rawQuery ?? "", keeping: Self.queryCharacters).split(separator: "&").map(String.init).filter { pair in
                 let key = String(pair.prefix { $0 != "=" })
                 return !key.hasPrefix("utm_") && !PageAddress.tracking.contains(key) && !(youTube && PageAddress.youTubeNoise.contains(key))
             }.sorted()
+        }
+
+        /// The raw path and query: after the authority, before the fragment.
+        private static func pathAndQuery(_ url: String) -> (String, String?) {
+            var rest = Substring(url)
+            if let scheme = rest.range(of: "://") { rest = rest[scheme.upperBound...] }
+            if let hash = rest.firstIndex(of: "#") { rest = rest[..<hash] }
+            guard let start = rest.firstIndex(where: { $0 == "/" || $0 == "?" }) else { return ("", nil) }
+            rest = rest[start...]
+            guard let question = rest.firstIndex(of: "?") else { return (String(rest), nil) }
+            return (String(rest[..<question]), String(rest[rest.index(after: question)...]))
+        }
+
+        // WHATWG URL: printable ASCII stays except these, plus anything non-ASCII.
+        private static let pathCharacters = Set("!$%&'()*+,-./0123456789:;=@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_abcdefghijklmnopqrstuvwxyz|~")
+        private static let queryCharacters = pathCharacters.subtracting("'").union("?`{}")
+
+        private static func encoded(_ text: String, keeping allowed: Set<Character>) -> String {
+            var out = ""
+            for character in text {
+                if character.isASCII, allowed.contains(character) { out.append(character); continue }
+                for byte in String(character).utf8 { out += String(format: "%%%02X", byte) }
+            }
+            return out
         }
     }
 }

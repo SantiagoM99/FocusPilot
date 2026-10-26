@@ -95,6 +95,10 @@ final class AppModel {
         let server = CommandSocketServer(path: location.commandSocketPath) { [weak self] request, peer in
             let response = await service.handle(request, from: peer)
             if case .added = response { await self?.refresh() }
+            if case .exception(let asked) = request, case .exception(.granted(let until)) = response,
+               let scope = try? asked.scope.normalized() {
+                await UserNotices().announce(.grantedFromChrome(scope, until: until))
+            }
             return response
         }
         do {

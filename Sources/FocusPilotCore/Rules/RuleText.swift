@@ -150,3 +150,23 @@ public enum SiteExceptionText {
         }
     }
 }
+
+/// The notification for an exception granted from Chrome's blocked page,
+/// so a grant the owner did not ask for does not go unnoticed.
+public struct ExceptionNoticeText: Equatable, Sendable {
+    public var title: String
+    public var body: String
+
+    public static func grantedFromChrome(_ scope: ExceptionScope, until: Date, in timeZone: TimeZone = .current) -> ExceptionNoticeText {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "HH:mm"
+        let what = switch scope {
+        case .app(let bundleID): bundleID
+        case .site(let domain): "All of \(domain)"
+        case .page(let url): "1 page on \(PageAddress.host(url) ?? url)"
+        }
+        return ExceptionNoticeText(title: "Exception allowed from Chrome", body: "\(what) until \(formatter.string(from: until))")
+    }
+}

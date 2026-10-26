@@ -64,7 +64,7 @@ async function currentDelivery() {
 async function reconcileNow(trigger) {
   const now = Date.now();
   const policy = (await currentDelivery())?.policy ?? null;
-  await applyRules(FocusPolicy.networkRules(policy, now, chrome.runtime.getURL("blocked.html")));
+  await applyRules(policy, now);
   await chrome.alarms.clear("boundary");
   const next = FocusPolicy.nextBoundary(policy, now);
   if (next !== null) await chrome.alarms.create("boundary", { when: next });
@@ -72,8 +72,20 @@ async function reconcileNow(trigger) {
 }
 
 // FocusPolicy.networkRules: blocked sites redirect, frames are blocked,
-// timed exceptions are carved out. Rewritten only when they change.
-async function applyRules(rules) {
+// timed exceptions are carved out. A page regex Chrome would refuse (its
+// regex memory is limited) allows the page's path instead; the content
+// script, which checks every parameter, still blocks other pages there.
+// Rewritten only when they change.
+async function applyRules(policy, now) {
+  const blockedPage = chrome.runtime.getURL("blocked.html");
+  const urls = FocusPolicy.pageURLs(policy, now);
+  const pathOnly = new Set();
+  for (const rule of FocusPolicy.networkRules(policy, now, blockedPage)) {
+    if (rule.action.type !== "allowAllRequests") continue;
+    const check = await chrome.declarativeNetRequest.isRegexSupported({ regex: rule.condition.regexFilter, isCaseSensitive: true });
+    if (!check.isSupported) pathOnly.add(urls[rule.id - 10]);
+  }
+  const rules = FocusPolicy.networkRules(policy, now, blockedPage, { pathOnly });
   const existing = await chrome.declarativeNetRequest.getDynamicRules();
   const key = JSON.stringify(rules);
   const { appliedRules } = await store.get("appliedRules");
@@ -82,14 +94,16 @@ async function applyRules(rules) {
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: rules });
   } catch (error) {
-    // A page rule Chrome refuses must not cost the blocking: keep the
-    // blocks, drop page carve-outs (the content script still judges pages).
-    const blocks = rules.filter((r) => r.action.type !== "allowAllRequests");
-    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: blocks });
+    // Blocking must survive a refused rule: keep the blocks and site
+    // carve-outs, and let every excepted page through by its path.
+    const fallback = FocusPolicy.networkRules(policy, now, blockedPage, { pathOnly: true });
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: fallback })
+      .catch(() => chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: existing.map((r) => r.id), addRules: fallback.filter((r) => r.action.type !== "allowAllRequests"),
+      }));
     await observe("rules-rejected", { error: String(error?.message ?? error) });
-    await store.set({ appliedRules: JSON.stringify(blocks) });
-    return;
   }
+  // Recorded either way, so a refused set is not retried on every wake.
   await store.set({ appliedRules: key });
 }
 
@@ -143,6 +157,9 @@ function handlePolicy(message) {
       }
       return;
     }
+    // Rules first: the blocked page returns to a newly excepted page as
+    // soon as it sees the policy, and must not meet the old redirect.
+    await reconcileQueue(() => applyRules(incoming.policy, Date.now()));
     await store.set({ delivery: incoming });
     await reconcile("policy");
     await observe("policy-applied", { revision: incoming.policy.revision, checksum: incoming.policy.checksum, source: incoming.source });
@@ -180,7 +197,7 @@ function requestException(message, reply) {
     observe("exception-answered", { scope: scope?.kind ?? null, outcome: result.outcome });
     reply(result);
   };
-  const timer = setTimeout(() => done({ outcome: "refused", message: "FocusPilot didn't answer. Try again." }), EXCEPTION_TIMEOUT_MS);
+  const timer = setTimeout(() => done({ outcome: "refused", message: "FocusPilot is taking long to answer. If it allows it, this page will update." }), EXCEPTION_TIMEOUT_MS);
   pendingExceptions.set(id, done);
   post({
     type: "exception-request", id, scope, durationSeconds: message.durationSeconds,
@@ -245,7 +262,7 @@ chrome.runtime.onMessage.addListener((message, _from, reply) => {
       requestException(message, reply);
       return true;
     case "exception-cancel":
-      post({ type: "exception-cancel" });
+      post({ type: "exception-cancel", scope: message.scope });
       break;
     case "open-app":
       post({ type: "open-app" });

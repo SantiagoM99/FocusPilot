@@ -76,7 +76,10 @@ function openForm() {
 }
 
 function closeForm() {
-  if (form?.phase === "waiting") chrome.runtime.sendMessage({ type: "exception-cancel" }).catch(() => {});
+  if (form?.phase === "waiting") {
+    const { scope } = FocusBlockedView.exceptionForm({ ...state, url: from, now: Date.now(), state: form }).request;
+    chrome.runtime.sendMessage({ type: "exception-cancel", scope }).catch(() => {});
+  }
   form = null;
   $("exception-panel").hidden = true;
   $("page").hidden = false;

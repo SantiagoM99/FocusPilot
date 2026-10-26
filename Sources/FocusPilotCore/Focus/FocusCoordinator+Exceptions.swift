@@ -25,7 +25,17 @@ extension FocusCoordinator {
             return try await grant(scope, duration: duration, reason: typed)
         }
         let request = ExceptionRequest(scope: scope, duration: duration)
-        if let wait = exceptionWait, wait.hasExpired(at: uptime()) || wait.request != request {
+        if let wait = exceptionWait, wait.hasExpired(at: uptime()) {
+            exceptionWait = nil
+            exceptionWaitReason = nil
+        }
+        // One wait at a time, shared by every profile and the app: another
+        // request replaces it only once that request is confirmed too.
+        if let wait = exceptionWait, wait.request != request {
+            guard confirmed else {
+                guard typed != nil else { throw ExceptionError.reasonRequired }
+                return .needsConfirmation
+            }
             exceptionWait = nil
             exceptionWaitReason = nil
         }
@@ -49,6 +59,13 @@ extension FocusCoordinator {
         exceptionWait = nil
         exceptionWaitReason = nil
         await broadcast()
+    }
+
+    /// Cancels the wait only if it is for `scope`, so a page closing its own
+    /// form leaves another profile's or the app's wait alone.
+    public func cancelException(for scope: ExceptionScope) async {
+        guard let wait = exceptionWait, let scope = try? scope.normalized(), wait.request.scope.covers(scope) else { return }
+        await cancelException()
     }
 
     func pendingException() -> PendingException? {

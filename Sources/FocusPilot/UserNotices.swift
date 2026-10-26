@@ -21,4 +21,15 @@ struct UserNotices: FocusNoticeSink {
         }
         try? await center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }
+
+    /// A timed exception granted from Chrome's blocked page.
+    func announce(_ text: ExceptionNoticeText) async {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .provisional])
+        let content = UNMutableNotificationContent()
+        content.title = text.title
+        content.body = text.body
+        try? await center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+    }
 }

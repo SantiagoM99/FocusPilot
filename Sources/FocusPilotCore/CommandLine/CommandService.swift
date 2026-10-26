@@ -7,8 +7,8 @@ public enum CommandRequest: Codable, Equatable, Sendable {
     case add(HerdrAddRequest)
     case tasks(HerdrCaller?)
     case exception(ExceptionCommand)
-    /// The owner left a strict-session exception wait.
-    case cancelException
+    /// The owner left a strict-session exception wait for this scope.
+    case cancelException(ExceptionScope)
 }
 
 /// A timed exception as the blocked page asks for it.
@@ -72,7 +72,7 @@ public struct AddRateLimit: Sendable {
 /// strict-session confirmation and wait.
 public protocol ExceptionGate: Sendable {
     func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String?, confirmed: Bool) async throws -> ExceptionOutcome
-    func cancelException() async
+    func cancelException(for scope: ExceptionScope) async
 }
 
 extension FocusCoordinator: ExceptionGate {}
@@ -80,9 +80,11 @@ extension FocusCoordinator: ExceptionGate {}
 /// Answers command-socket requests inside the running app. CLI callers can
 /// only append tasks and read; everything written goes through
 /// `TaskRepository`. Exception requests are taken only from the Chrome host
-/// bundled with the app, identified by its executable, so an agent with the
-/// focuspilot command cannot grant itself one. That is a hurdle, not
-/// tamper resistance: any process of the owner's can run that host too.
+/// bundled with the app, identified by its executable, and only while Chrome
+/// started it, so an agent with the focuspilot command, or one that runs the
+/// host from a shell, cannot grant itself one. That is a hurdle, not tamper
+/// resistance (an agent could start its own Chrome); every grant from Chrome
+/// is therefore also announced to the owner (see AppModel).
 public actor CommandService {
     static let rateLimitMessage =
         "Refused: this pane has added \(AddRateLimit.limit) tasks in the last minute. Wait a minute and try again."
@@ -115,9 +117,9 @@ public actor CommandService {
             } catch {
                 return .failed("FocusPilot could not allow it: \(error.localizedDescription)")
             }
-        case .cancelException:
+        case .cancelException(let scope):
             guard let exceptions = gate(for: peer) else { return .refused(Self.exceptionCallerMessage) }
-            await exceptions.cancelException()
+            await exceptions.cancelException(for: scope)
             return .exceptionCancelled
         case .add(let add):
             guard add.capture.task.isValid else { return .refused("Nothing to add: the task needs a title.") }
@@ -139,8 +141,17 @@ public actor CommandService {
     }
 
     private func gate(for peer: CommandPeer?) -> (any ExceptionGate)? {
-        guard let exceptions, let exceptionCaller, let path = peer?.executablePath, Self.resolved(path) == exceptionCaller else { return nil }
+        guard let exceptions, let exceptionCaller, let path = peer?.executablePath, Self.resolved(path) == exceptionCaller,
+              let parent = peer?.parentExecutablePath, Self.isChrome(parent) else { return nil }
         return exceptions
+    }
+
+    /// Google Chrome and its Beta, Dev and Canary channels.
+    static func isChrome(_ path: String) -> Bool {
+        let parts = path.split(separator: "/")
+        guard parts.count >= 4, parts[parts.count - 3] == "Contents", parts[parts.count - 2] == "MacOS" else { return false }
+        let app = parts[parts.count - 4]
+        return app.hasPrefix("Google Chrome") && app.hasSuffix(".app")
     }
 
     private static func resolved(_ path: String) -> String {

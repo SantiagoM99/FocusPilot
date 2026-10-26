@@ -248,3 +248,51 @@ struct PendingReasonTests {
         }
     }
 }
+
+@Suite("Grants from Chrome are announced")
+struct ExceptionNoticeTests {
+    @Test func theNoticeSaysWhatWasAllowedAndUntilWhen() {
+        let until = instant("2026-10-14T10:32:00-05:00")
+        let bogota = TimeZone(identifier: "America/Bogota")!
+        #expect(ExceptionNoticeText.grantedFromChrome(.page(url: "https://youtube.com/watch?v=1"), until: until, in: bogota)
+            == ExceptionNoticeText(title: "Exception allowed from Chrome", body: "1 page on youtube.com until 10:32"))
+        #expect(ExceptionNoticeText.grantedFromChrome(.site(domain: "youtube.com"), until: until, in: bogota).body == "All of youtube.com until 10:32")
+    }
+}
+
+/// Profiles and the app share one strict wait; none may lose another's.
+@Suite("One strict wait across profiles")
+struct SharedStrictWaitTests {
+    private let lecture = ExceptionScope.page(url: "https://youtube.com/watch?v=1")
+    private let other = ExceptionScope.page(url: "https://youtube.com/watch?v=2")
+
+    private func waiting() async throws -> SessionFixture {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
+        try await fixture.coordinator.startSession(duration: 50 * 60, mode: .strict)
+        _ = try await fixture.coordinator.requestException(lecture, duration: 600, reason: "Lecture", confirmed: true)
+        return fixture
+    }
+
+    @Test func anotherUnconfirmedRequestLeavesTheConfirmedWaitAlone() async throws {
+        let fixture = try await waiting()
+
+        #expect(try await fixture.coordinator.requestException(other, duration: 300, reason: "Other") == .needsConfirmation)
+        #expect(await fixture.coordinator.snapshot().pendingException?.scope == lecture)
+
+        fixture.advance(seconds: 60)
+        guard case .granted = try await fixture.coordinator.requestException(lecture, duration: 600) else {
+            Issue.record("the confirmed wait was lost")
+            return
+        }
+    }
+
+    @Test func cancellingAnotherScopeKeepsTheWait() async throws {
+        let fixture = try await waiting()
+
+        await fixture.coordinator.cancelException(for: other)
+        #expect(await fixture.coordinator.snapshot().pendingException?.scope == lecture)
+        await fixture.coordinator.cancelException(for: .page(url: "https://www.youtube.com/watch?v=1&t=5"))
+        #expect(await fixture.coordinator.snapshot().pendingException == nil)
+    }
+}

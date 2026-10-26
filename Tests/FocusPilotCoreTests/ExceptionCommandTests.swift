@@ -16,12 +16,13 @@ private actor GateDouble: ExceptionGate {
         return try answer.get()
     }
 
-    func cancelException() async { cancels += 1 }
+    func cancelException(for scope: ExceptionScope) async { cancels += 1 }
 }
 
 @Suite("Exception requests over the command socket")
 struct ExceptionCommandTests {
-    private let host = CommandPeer(processID: 77, executablePath: "/Applications/FocusPilot.app/Contents/Helpers/focuspilot-chrome-host")
+    private let host = CommandPeer(processID: 77, executablePath: "/Applications/FocusPilot.app/Contents/Helpers/focuspilot-chrome-host",
+                                   parentExecutablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
     private let cli = CommandPeer(processID: 78, executablePath: "/Applications/FocusPilot.app/Contents/Helpers/focuspilot")
     private let gate = GateDouble()
     private let service: CommandService
@@ -44,9 +45,11 @@ struct ExceptionCommandTests {
     /// Agents in Herdr panes reach the same socket through the focuspilot
     /// command; only the Chrome host, which the blocked page talks to, may ask.
     @Test func anyOtherCallerIsRefusedAndNothingIsAsked() async {
-        for peer in [cli, CommandPeer(processID: 79, executablePath: nil), nil] {
+        // The host itself, started from a shell instead of by Chrome.
+        let hostFromAShell = CommandPeer(processID: 80, executablePath: host.executablePath, parentExecutablePath: "/bin/zsh")
+        for peer in [cli, CommandPeer(processID: 79, executablePath: nil), hostFromAShell, nil] {
             #expect(await service.handle(.exception(lecture), from: peer) == .refused(CommandService.exceptionCallerMessage))
-            #expect(await service.handle(.cancelException, from: peer) == .refused(CommandService.exceptionCallerMessage))
+            #expect(await service.handle(.cancelException(lecture.scope), from: peer) == .refused(CommandService.exceptionCallerMessage))
         }
         #expect(await gate.requests.isEmpty)
         #expect(await gate.cancels == 0)
@@ -60,7 +63,7 @@ struct ExceptionCommandTests {
     }
 
     @Test func cancellingReachesTheCoordinator() async {
-        #expect(await service.handle(.cancelException, from: host) == .exceptionCancelled)
+        #expect(await service.handle(.cancelException(lecture.scope), from: host) == .exceptionCancelled)
         #expect(await gate.cancels == 1)
     }
 
@@ -97,5 +100,6 @@ final class CommandPeerTests {
         #expect(peer.processID == getpid())
         #expect(peer.executablePath == CommandPeer.executablePath(of: getpid()))
         #expect(peer.executablePath?.hasPrefix("/") == true)
+        #expect(peer.parentExecutablePath == CommandPeer.executablePath(of: getppid()))
     }
 }

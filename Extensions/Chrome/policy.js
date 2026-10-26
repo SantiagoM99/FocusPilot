@@ -192,30 +192,39 @@ var FocusPolicy = (() => {
 
   // Lets one excepted page load past the redirect, with everything it loads
   // (allowAllRequests). RE2 has no lookahead, so up to three parameters are
-  // matched in any order; with more, the rule allows the path and the
-  // content script, which checks every parameter, blocks other pages.
-  function pageAllowRule(exception, id) {
+  // matched in any order; with more, or `pathOnly` (a regex Chrome refused),
+  // the rule allows the path and the content script, which checks every
+  // parameter, blocks other pages. Case-sensitive: video ids differ by case.
+  function pageAllowRule(exception, id, { pathOnly = false } = {}) {
     const p = pageParts(exception.scope.url);
     const prefix = `^https?://(?:www\\.)?${escapeRegex(p.host)}${p.port ? ":" + p.port : ""}${escapeRegex(p.path)}`;
     let query = "(?:[?#].*)?";
-    if (p.params.length > 0 && p.params.length <= 3) {
+    if (!pathOnly && p.params.length > 0 && p.params.length <= 3) {
       const orders = permutations(p.params).map((order) =>
         "\\?(?:[^#]*&)?" + order.map(escapeRegex).join("&(?:[^#]*&)?") + "(?:&[^#]*)?");
       query = `(?:${orders.join("|")})(?:#.*)?`;
     }
-    return { id, priority: 2, action: { type: "allowAllRequests" }, condition: { regexFilter: prefix + query + "$", resourceTypes: ["main_frame"] } };
+    return {
+      id, priority: 2, action: { type: "allowAllRequests" },
+      condition: { regexFilter: prefix + query + "$", isUrlFilterCaseSensitive: true, resourceTypes: ["main_frame"] },
+    };
+  }
+
+  // Excepted pages, canonical, sorted: page rule 10 + i is for the i-th.
+  function pageURLs(policy, now) {
+    return [...new Set(activeExceptions(policy, now).filter((e) => e.scope.kind === "page")
+      .map((e) => canonicalPage(e.scope.url)).filter(Boolean))].sort();
   }
 
   // The dynamic rules for `now`: new top-level loads of blocked sites go to
   // `blockedPage` with the URL in the fragment, frames are blocked, and
   // timed exceptions are carved out (spike S2/S3: rules persist across restarts).
-  function networkRules(policy, now, blockedPage) {
+  function networkRules(policy, now, blockedPage, { pathOnly = new Set() } = {}) {
     const domains = blockedDomains(policy, now);
     if (!domains.length) return [];
     const live = activeExceptions(policy, now);
     const excluded = [...new Set(live.filter((e) => e.scope.kind === "site").map((e) => e.scope.domain))].sort();
     const exclusion = excluded.length ? { excludedRequestDomains: excluded } : {};
-    const pageURLs = [...new Set(live.filter((e) => e.scope.kind === "page").map((e) => canonicalPage(e.scope.url)).filter(Boolean))].sort();
     return [
       {
         id: 1, priority: 1,
@@ -223,7 +232,7 @@ var FocusPolicy = (() => {
         condition: { regexFilter: "^.+$", requestDomains: domains, ...exclusion, resourceTypes: ["main_frame"] },
       },
       { id: 2, priority: 1, action: { type: "block" }, condition: { requestDomains: domains, ...exclusion, resourceTypes: ["sub_frame"] } },
-      ...pageURLs.map((url, i) => pageAllowRule({ scope: { kind: "page", url } }, 10 + i)),
+      ...pageURLs(policy, now).map((url, i) => pageAllowRule({ scope: { kind: "page", url } }, 10 + i, { pathOnly: pathOnly === true || pathOnly.has?.(url) })),
     ];
   }
 
@@ -266,7 +275,7 @@ var FocusPolicy = (() => {
 
   return {
     localParts, scheduleContains, scheduleNextChange, sessionApplies, hostMatches, decide, blockedDomains, nextBoundary,
-    isNewer, supports, returnURL, canonicalPage, pageMatches, activeExceptions, networkRules, pageAllowRule,
+    isNewer, supports, returnURL, canonicalPage, pageMatches, activeExceptions, networkRules, pageAllowRule, pageURLs,
   };
 })();
 

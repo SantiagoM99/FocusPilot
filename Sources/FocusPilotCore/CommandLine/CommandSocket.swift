@@ -132,10 +132,13 @@ public struct CommandPeer: Equatable, Sendable {
     public var processID: Int32
     /// Nil when the process is gone or its path can't be read.
     public var executablePath: String?
+    /// The executable of the process that started it: Chrome, for the native host.
+    public var parentExecutablePath: String?
 
-    public init(processID: Int32, executablePath: String?) {
+    public init(processID: Int32, executablePath: String?, parentExecutablePath: String? = nil) {
         self.processID = processID
         self.executablePath = executablePath
+        self.parentExecutablePath = parentExecutablePath
     }
 
     init(connection: Int32) {
@@ -144,6 +147,14 @@ public struct CommandPeer: Equatable, Sendable {
         let found = getsockopt(connection, SOL_LOCAL, LOCAL_PEERPID, &pid, &size) == 0
         processID = found ? pid : -1
         executablePath = found ? Self.executablePath(of: pid) : nil
+        parentExecutablePath = found ? Self.parent(of: pid).flatMap(Self.executablePath(of:)) : nil
+    }
+
+    static func parent(of pid: pid_t) -> pid_t? {
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+        return pid_t(info.pbi_ppid)
     }
 
     static func executablePath(of pid: pid_t) -> String? {

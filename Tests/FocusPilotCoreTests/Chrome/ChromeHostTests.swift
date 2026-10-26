@@ -410,6 +410,14 @@ struct ChromeHostExceptionTests {
         #expect(closed.sent("exception-result").last?["message"] as? String == "FocusPilot isn't running. Open it to ask for an exception.")
     }
 
+    @Test func nothingIsRelayedBeforeTheExtensionSaysHello() throws {
+        let asked = Locked<[CommandRequest]>([])
+        let h = try HostHarness(command: { request, done in asked.withLock { $0.append(request) }; done(.success(.exceptionCancelled)) })
+        h.receive(request)
+        h.receive(["type": "exception-cancel", "scope": ["kind": "site", "domain": "youtube.com"]])
+        #expect(asked.withLock { $0 }.isEmpty)
+    }
+
     @Test func malformedRequestsAreIgnored() throws {
         let (h, asked) = try harness(answer: .success(.exception(.needsConfirmation)))
         var noScope = request
@@ -427,7 +435,7 @@ struct ChromeHostExceptionTests {
 
     @Test func cancellingIsPassedOn() throws {
         let (h, asked) = try harness(answer: .success(.exceptionCancelled))
-        h.receive(["type": "exception-cancel"])
-        #expect(asked.withLock { $0 } == [.cancelException])
+        h.receive(["type": "exception-cancel", "scope": ["kind": "site", "domain": "youtube.com"]])
+        #expect(asked.withLock { $0 } == [.cancelException(.site(domain: "youtube.com"))])
     }
 }

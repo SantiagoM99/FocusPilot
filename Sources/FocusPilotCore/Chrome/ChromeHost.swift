@@ -58,8 +58,10 @@ public final class ChromeHost {
         case "hello": hello(message)
         case "observation": observation(message, body: body)
         case "open-app": environment.openApp()
-        case "exception-request": exceptionRequest(message)
-        case "exception-cancel": environment.command(.cancelException) { _ in }
+        // Only once the extension has said hello, as Chrome's would.
+        case "exception-request" where profileID != nil: exceptionRequest(message)
+        case "exception-cancel" where profileID != nil:
+            if let scope = Self.scope(message["scope"]) { environment.command(.cancelException(scope)) { _ in } }
         default: break
         }
     }
@@ -70,11 +72,8 @@ public final class ChromeHost {
     private func exceptionRequest(_ message: [String: Any]) {
         guard let id = message["id"] as? String, !id.isEmpty,
               let duration = message["durationSeconds"] as? Double,
-              let scopeObject = message["scope"],
-              let scopeData = try? JSONSerialization.data(withJSONObject: scopeObject),
-              let scope = try? JSONDecoder().decode(ExceptionScope.self, from: scopeData)
+              let scope = Self.scope(message["scope"])
         else { return }
-        if case .app = scope { return }
         let command = ExceptionCommand(scope: scope, duration: duration, reason: message["reason"] as? String,
                                        confirmed: message["confirmed"] as? Bool ?? false)
         let send = environment.send
@@ -84,6 +83,14 @@ public final class ChromeHost {
             reply["id"] = id
             if let data = try? JSONSerialization.data(withJSONObject: reply, options: [.sortedKeys, .withoutEscapingSlashes]) { send(data) }
         }
+    }
+
+    /// A site or page scope from the blocked page; app scopes never come from there.
+    private static func scope(_ object: Any?) -> ExceptionScope? {
+        guard let object, let data = try? JSONSerialization.data(withJSONObject: object),
+              let scope = try? JSONDecoder().decode(ExceptionScope.self, from: data) else { return nil }
+        if case .app = scope { return nil }
+        return scope
     }
 
     static func exceptionResult(_ answer: Result<CommandResponse, CommandSocketClient.Failure>) -> [String: Any] {
