@@ -38,7 +38,10 @@ extension AppModel {
         let profiles = (try? ChromeProfiles.statuses(location: location, currentRevision: snapshot.policy?.revision,
                                                      currentSource: source)) ?? []
         if profiles != chromeProfiles { chromeProfiles = profiles }
-        protectionEvidence.update(profiles)
+        // Only on a change: every write redraws the status, and this runs every 5 s.
+        var evidence = protectionEvidence
+        evidence.update(profiles)
+        if evidence != protectionEvidence { protectionEvidence = evidence }
         let running = !NSRunningApplication.runningApplications(withBundleIdentifier: ChromeExtension.chromeBundleID).isEmpty
         if running != chromeRunning { chromeRunning = running }
     }

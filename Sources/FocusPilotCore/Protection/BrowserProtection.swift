@@ -43,8 +43,9 @@ public struct BrowserProtection: Equatable, Sendable {
     public var level: Level
     /// "Chrome protected · Incognito unprotected".
     public var line: String
-    /// After "Browsers ·" in the sidebar footer.
-    public var short: String
+    /// The sidebar footer: "Chrome · Protected". It names Chrome, not
+    /// "Browsers", since Safari is never verified.
+    public var footer: String
     public var detail: String?
     /// FocusPilot can't see Safari's blocker, so this line never changes.
     public let safari = "Safari · external blocker, not verified"
@@ -58,43 +59,44 @@ public struct BrowserProtection: Equatable, Sendable {
         let pending = connected.contains { !$0.hasAcknowledged }
 
         if inSession, case .unsupported(let name) = front {
-            self.init(.degraded, "\(name) in front · not protected", "Unsupported browser",
+            self.init(.degraded, "\(name) in front · not protected", "\(name) · not protected",
                       "Chrome rules still apply; \(name) has no FocusPilot extension")
         } else if profiles.isEmpty {
-            self.init(.degraded, "Chrome extension not connected", "Chrome not connected",
+            self.init(.degraded, "Chrome extension not connected", "Chrome · Not connected",
                       "Load the FocusPilot extension in Chrome: Settings › Blocking › Chrome")
         } else if !chromeRunning {
-            self.init(.unknown, "Chrome not running", "Unknown", "It gets the current policy when it opens")
-        } else if !confirmedSinceStart {
-            self.init(.unknown, "Chrome not confirmed yet", "Unknown",
-                      "Waiting for Chrome to acknowledge the policy since FocusPilot started or the Mac woke")
+            self.init(.unknown, "Chrome not running", "Chrome · Unknown", "It gets the current policy when it opens")
         } else if connected.isEmpty {
-            self.init(.degraded, "Chrome extension not connected", "Chrome disconnected",
+            // Before the confirmation check: a turned-off extension never confirms.
+            self.init(.degraded, "Chrome extension not connected", "Chrome · Disconnected",
                       "Chrome is open but the extension isn't connected. Check that it's on in chrome://extensions.")
+        } else if !confirmedSinceStart {
+            self.init(.unknown, "Chrome not confirmed yet", "Chrome · Unknown",
+                      "Waiting for Chrome to acknowledge the policy since FocusPilot started or the Mac woke")
         } else if connected.contains(where: { !$0.allSitesAccess }) {
-            self.init(.degraded, "Chrome extension needs site access", "Permission missing",
+            self.init(.degraded, "Chrome extension needs site access", "Chrome · Permission missing",
                       "Chrome sites are not blocked until you allow the extension on all sites in chrome://extensions")
         } else if pending && inSession && front == .chrome {
-            self.init(.degraded, "Chrome in front · not yet protected", "Not yet protected",
+            self.init(.degraded, "Chrome in front · not yet protected", "Chrome · Not yet protected",
                       "A Chrome profile hasn't applied the current policy yet")
         } else if pending {
-            self.init(.syncing, "Chrome syncing", "Syncing", "A Chrome profile hasn't applied the current policy yet")
+            self.init(.syncing, "Chrome syncing", "Chrome · Syncing", "A Chrome profile hasn't applied the current policy yet")
         } else if disconnected > 0 {
             self.init(.degraded, "Chrome protected · \(disconnected) profile\(disconnected == 1 ? "" : "s") disconnected",
-                      "Chrome disconnected",
+                      "Chrome · Disconnected",
                       "A profile's extension isn't connected. Forget it in Settings if you no longer use it.")
         } else if connected.contains(where: { !$0.incognitoAllowed }) {
-            self.init(.degraded, "Chrome protected · Incognito unprotected", "Incognito unprotected",
+            self.init(.degraded, "Chrome protected · Incognito unprotected", "Chrome · Incognito unprotected",
                       "Turn on Allow in Incognito for the FocusPilot extension in chrome://extensions")
         } else {
-            self.init(.protected, "Chrome protected", "Protected", Self.acknowledged(connected))
+            self.init(.protected, "Chrome protected", "Chrome · Protected", Self.acknowledged(connected))
         }
     }
 
-    private init(_ level: Level, _ line: String, _ short: String, _ detail: String?) {
+    private init(_ level: Level, _ line: String, _ footer: String, _ detail: String?) {
         self.level = level
         self.line = line
-        self.short = short
+        self.footer = footer
         self.detail = detail
     }
 

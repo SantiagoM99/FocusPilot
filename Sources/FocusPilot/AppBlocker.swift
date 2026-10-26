@@ -10,26 +10,26 @@ import FocusPilotCore
 /// again whenever the policy changes and at `AppBlocking.nextChange`, so an
 /// exception that runs out while its app is in front is applied on time.
 @MainActor
+@Observable
 final class AppBlocker {
-    private unowned let model: AppModel
-    private lazy var panel = BlockedAppPanelController(model: model, blocker: self)
+    @ObservationIgnored private unowned let model: AppModel
+    @ObservationIgnored private lazy var panel = BlockedAppPanelController(model: model, blocker: self)
     /// The last app the owner had in front that was not hidden; Return to task goes back to it.
-    private var lastAllowedFront: NSRunningApplication?
-    private var recheck: Task<Void, Never>?
+    @ObservationIgnored private var lastAllowedFront: NSRunningApplication?
+    @ObservationIgnored private var recheck: Task<Void, Never>?
     /// The session last seen, to notice one starting.
-    private var sessionID: UUID?
-    private var isStarted = false
+    @ObservationIgnored private var sessionID: UUID?
+    /// Whether it watches app launches; only then are apps protected.
+    /// Observed, so the Apps line updates when it starts.
+    private(set) var isRunning = false
 
     init(model: AppModel) {
         self.model = model
     }
 
-    /// Whether it watches app launches; only then are apps protected.
-    var isRunning: Bool { isStarted }
-
     func start() {
-        guard !isStarted else { return }
-        isStarted = true
+        guard !isRunning else { return }
+        isRunning = true
         let center = NSWorkspace.shared.notificationCenter
         Task { [weak self] in
             for await note in center.notifications(named: NSWorkspace.didActivateApplicationNotification) {
@@ -50,7 +50,7 @@ final class AppBlocker {
     /// This only hides; it is not the owner switching apps, so it neither
     /// closes the panel nor changes where Return to task goes.
     func policyChanged() {
-        guard isStarted else { return }
+        guard isRunning else { return }
         let active = model.snapshot.activeSession?.id
         if let active, active != sessionID { hideRunningBlockedApps() }
         sessionID = active

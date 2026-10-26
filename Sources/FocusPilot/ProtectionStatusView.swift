@@ -82,7 +82,7 @@ extension BrowserProtection.Level {
     }
 }
 
-/// The planning window's sidebar footer (design 01): "Browsers · Protected"
+/// The planning window's sidebar footer (design 01): "Chrome · Protected"
 /// over "Apps · protected while running".
 struct SidebarProtectionFooter: View {
     let model: AppModel
@@ -91,7 +91,7 @@ struct SidebarProtectionFooter: View {
         let browsers = model.browserProtection
         let apps = model.appProtection
         VStack(alignment: .leading, spacing: 4) {
-            footerLine("Browsers · \(browsers.short)", color: browsers.level.color, hollow: browsers.level == .unknown)
+            footerLine(browsers.footer, color: browsers.level.color, hollow: browsers.level == .unknown)
             footerLine(apps.short, color: apps.isProtected ? .green : .secondary, hollow: !apps.isProtected)
         }
         .font(.caption)

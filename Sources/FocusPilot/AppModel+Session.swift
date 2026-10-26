@@ -39,8 +39,18 @@ extension AppModel {
             for await _ in NSWorkspace.shared.notificationCenter.notifications(named: NSWorkspace.didWakeNotification) {
                 // Before reconciling, which publishes the revision Chrome must confirm.
                 self?.markProtectionStale()
-                await self?.run { try await $0.reconcile() }
+                await self?.reconcileAfterWake()
             }
+        }
+    }
+
+    /// Retries until it succeeds: until the wake's revision is published,
+    /// Chrome can't confirm it and the status stays unknown.
+    private func reconcileAfterWake() async {
+        var delay = 1.0
+        while coordinator != nil, !(await run { try await $0.reconcile() }) {
+            try? await Task.sleep(for: .seconds(delay))
+            delay = min(delay * 2, 60)
         }
     }
 

@@ -27,7 +27,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .protected)
         #expect(s.line == "Chrome protected")
-        #expect(s.short == "Protected")
+        #expect(s.footer == "Chrome · Protected")
         #expect(s.detail == "2 Chrome profiles acknowledged policy rev. 9")
     }
 
@@ -37,7 +37,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · Incognito unprotected")
-        #expect(s.short == "Incognito unprotected")
+        #expect(s.footer == "Chrome · Incognito unprotected")
         #expect(s.detail == "Turn on Allow in Incognito for the FocusPilot extension in chrome://extensions")
     }
 
@@ -46,7 +46,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome extension not connected")
-        #expect(s.short == "Chrome not connected")
+        #expect(s.footer == "Chrome · Not connected")
     }
 
     @Test func limitedSiteAccessIsDegraded() {
@@ -54,7 +54,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome extension needs site access")
-        #expect(s.short == "Permission missing")
+        #expect(s.footer == "Chrome · Permission missing")
     }
 
     // With Chrome open, a disconnected profile may have the extension turned off.
@@ -63,7 +63,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · 1 profile disconnected")
-        #expect(s.short == "Chrome disconnected")
+        #expect(s.footer == "Chrome · Disconnected")
         #expect(s.detail == "A profile's extension isn't connected. Forget it in Settings if you no longer use it.")
     }
 
@@ -73,7 +73,7 @@ struct BrowserProtectionTests {
 
             #expect(s.level == .syncing)
             #expect(s.line == "Chrome syncing")
-            #expect(s.short == "Syncing")
+            #expect(s.footer == "Chrome · Syncing")
         }
     }
 
@@ -90,7 +90,23 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .unknown)
         #expect(s.line == "Chrome not confirmed yet")
-        #expect(s.short == "Unknown")
+        #expect(s.footer == "Chrome · Unknown")
+    }
+
+    // Review of #48: an extension turned off never acknowledges, so waiting
+    // for confirmation would say "not confirmed yet" forever.
+    @Test func afterARestartOrWakeAnExtensionTurnedOffIsDegradedNotUnknown() {
+        let s = status([profile(.disconnected(lastSeen: nil))], confirmed: false)
+
+        #expect(s.level == .degraded)
+        #expect(s.line == "Chrome extension not connected")
+        #expect(s.footer == "Chrome · Disconnected")
+    }
+
+    // Safari is unverified, so the footer names Chrome, not "Browsers".
+    @Test func theFooterNamesChromeAlone() {
+        #expect(status().footer.hasPrefix("Chrome · "))
+        #expect(status(chromeRunning: false).footer == "Chrome · Unknown")
     }
 
     @Test func anUnsupportedBrowserInFrontDuringASessionIsDegraded() {
@@ -98,7 +114,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Firefox in front · not protected")
-        #expect(s.short == "Unsupported browser")
+        #expect(s.footer == "Firefox · not protected")
         #expect(s.detail == "Chrome rules still apply; Firefox has no FocusPilot extension")
     }
 
