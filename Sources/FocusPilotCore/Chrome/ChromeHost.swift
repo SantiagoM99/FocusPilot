@@ -141,7 +141,11 @@ public final class ChromeHost {
         // new when it filled a gap; anything else below is a resend.
         if seq > record.lastSeq || record.skippedSeqs.contains(seq) {
             do {
-                try store.log(body, for: id)
+                if message["kind"] as? String == "tab-front" {
+                    try recordFrontTab(message)
+                } else {
+                    try store.log(body, for: id)
+                }
             } catch {
                 return // Not recorded, so not acknowledged: the extension resends it.
             }
@@ -168,6 +172,14 @@ public final class ChromeHost {
         default:
             break
         }
+    }
+
+    /// Raw activity (#21): kept only while observing with the app running
+    /// to drain it, and never in the diagnostic log, which outlives a day.
+    private func recordFrontTab(_ message: [String: Any]) throws {
+        guard environment.isAppRunning(), (try? ChromePolicyMailbox.read(location))?.observe == true else { return }
+        let at = (message["observedAt"] as? String).flatMap { try? Date($0, strategy: .iso8601) } ?? environment.now()
+        try ChromeActivityInbox(location: location).append(reported: message["domain"] as? String, at: at)
     }
 
     private func existingRecord(_ id: String) -> ChromeProfileRecord {

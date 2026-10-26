@@ -1,7 +1,7 @@
 // Runs the real service worker (worker.js, with policy.js and outbox.js) in
 // a node vm against a stand-in for the Chrome APIs it uses, on a clock the
 // test moves. Only what the worker touches is modelled: storage, network
-// rules, alarms and the native port; there are no tabs.
+// rules, alarms, the native port, and tabs and window focus for observe mode.
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 
@@ -20,6 +20,9 @@ export function startWorker(startAt) {
   const toHost = [];
   const port = { onMessage: event(), onDisconnect: event(), postMessage: (m) => toHost.push(structuredClone(m)) };
   const onAlarm = event();
+  let tabList = [];
+  let focusedWindow = -1;
+  const onActivated = event(), onUpdated = event(), onFocusChanged = event();
 
   class FakeDate extends Date {
     constructor(...args) { super(...(args.length ? args : [now])); }
@@ -58,7 +61,20 @@ export function startWorker(startAt) {
       clear: async (name) => alarms.delete(name),
       onAlarm,
     },
-    tabs: { query: async () => [], onUpdated: event(), sendMessage: async () => {}, get: async () => null, update: async () => {} },
+    tabs: {
+      query: async (filter) => structuredClone(tabList.filter((t) =>
+        (!filter.active || t.active) && (!filter.lastFocusedWindow || t.windowId === focusedWindow)
+        && (filter.windowId === undefined || t.windowId === filter.windowId)
+        && (!filter.url || /^https?:/.test(t.url)))),
+      onActivated, onUpdated,
+      sendMessage: async () => {},
+      get: async (id) => structuredClone(tabList.find((t) => t.id === id) ?? null),
+      update: async () => {},
+    },
+    windows: {
+      WINDOW_ID_NONE: -1, onFocusChanged,
+      getLastFocused: async () => ({ id: focusedWindow, focused: focusedWindow !== -1 }),
+    },
     scripting: { executeScript: async () => {} },
   };
 
@@ -93,5 +109,26 @@ export function startWorker(startAt) {
       await settle();
     },
     now: () => now,
+    // Tabs as Chrome reports them; each change fires what Chrome would.
+    tabs: {
+      set: (list) => { tabList = structuredClone(list); },
+      async activate(id) {
+        const tab = tabList.find((t) => t.id === id);
+        tabList.forEach((t) => { if (t.windowId === tab.windowId) t.active = t.id === id; });
+        onActivated.fire({ tabId: id, windowId: tab.windowId });
+        await settle();
+      },
+      async navigate(id, url) {
+        const tab = tabList.find((t) => t.id === id);
+        tab.url = url;
+        onUpdated.fire(id, { url }, structuredClone(tab));
+        await settle();
+      },
+      async focusWindow(windowId) {
+        focusedWindow = windowId;
+        onFocusChanged.fire(windowId);
+        await settle();
+      },
+    },
   };
 }

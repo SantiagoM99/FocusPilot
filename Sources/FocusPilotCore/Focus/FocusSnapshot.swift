@@ -10,8 +10,9 @@ public struct FocusSnapshot: Equatable, Sendable {
     public var currentTaskTitle: String?
     /// The latest session, which may have ended; `nil` before the first one.
     public var session: FocusSession?
-    /// Observe-only mode measures without blocking (P0, ticket T13).
-    public var isObserveOnly: Bool
+    /// Observe-only mode measures without blocking (#21): when it started.
+    public var observeSince: Date?
+    public var isObserveOnly: Bool { observeSince != nil }
     /// When a strict session the owner asked to end early may be completed;
     /// `nil` when no early end is waiting.
     public var earlyEndAvailableAt: Date?
@@ -24,12 +25,12 @@ public struct FocusSnapshot: Equatable, Sendable {
     /// Higher for later coordinator states; the app keeps the newest.
     public var revision: Int
 
-    public init(currentTaskTitle: String? = nil, session: FocusSession? = nil, isObserveOnly: Bool = false,
+    public init(currentTaskTitle: String? = nil, session: FocusSession? = nil, observeSince: Date? = nil,
                 earlyEndAvailableAt: Date? = nil, policy: CompiledPolicy? = nil,
                 pendingRuleEdit: PendingRuleEdit? = nil, pendingException: PendingException? = nil, revision: Int = 0) {
         self.currentTaskTitle = currentTaskTitle
         self.session = session
-        self.isObserveOnly = isObserveOnly
+        self.observeSince = observeSince
         self.earlyEndAvailableAt = earlyEndAvailableAt
         self.policy = policy
         self.pendingRuleEdit = pendingRuleEdit
