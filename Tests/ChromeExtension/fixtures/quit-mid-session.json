@@ -1,0 +1,260 @@
+{
+  "normal" : [
+    {
+      "at" : "2026-10-14T15:00:00Z",
+      "frames" : [
+        {
+          "focus" : {
+            "title" : "Explain baseline results"
+          },
+          "policy" : {
+            "allowed" : {
+              "apps" : [
+                "com.apple.Terminal",
+                "com.apple.finder",
+                "com.apple.systempreferences"
+              ],
+              "domains" : [
+                "overleaf.com"
+              ],
+              "tools" : [
+                "herdr"
+              ]
+            },
+            "always" : {
+              "apps" : [
+
+              ],
+              "domains" : [
+                "instagram.com"
+              ]
+            },
+            "checksum" : "checksum",
+            "effectiveAt" : "2026-10-14T15:00:00Z",
+            "exceptions" : [
+
+            ],
+            "revision" : 3,
+            "scheduled" : [
+
+            ],
+            "schemaVersion" : 1,
+            "session" : {
+              "end" : "2026-10-14T15:25:00Z",
+              "mode" : "normal",
+              "sessionID" : "session",
+              "targets" : {
+                "apps" : [
+
+                ],
+                "domains" : [
+                  "youtube.com"
+                ]
+              }
+            }
+          },
+          "source" : "source",
+          "type" : "policy"
+        },
+        {
+          "appRunning" : true,
+          "type" : "status"
+        }
+      ],
+      "step" : "session-started"
+    },
+    {
+      "at" : "2026-10-14T15:10:00Z",
+      "frames" : [
+        {
+          "appRunning" : false,
+          "type" : "status"
+        }
+      ],
+      "step" : "app-quit"
+    },
+    {
+      "at" : "2026-10-14T15:26:00Z",
+      "frames" : [
+
+      ],
+      "step" : "past-planned-end"
+    },
+    {
+      "at" : "2026-10-14T15:45:00Z",
+      "frames" : [
+        {
+          "policy" : {
+            "allowed" : {
+              "apps" : [
+                "com.apple.Terminal",
+                "com.apple.finder",
+                "com.apple.systempreferences"
+              ],
+              "domains" : [
+                "overleaf.com"
+              ],
+              "tools" : [
+                "herdr"
+              ]
+            },
+            "always" : {
+              "apps" : [
+
+              ],
+              "domains" : [
+                "instagram.com"
+              ]
+            },
+            "checksum" : "checksum",
+            "effectiveAt" : "2026-10-14T15:45:00Z",
+            "exceptions" : [
+
+            ],
+            "revision" : 4,
+            "scheduled" : [
+
+            ],
+            "schemaVersion" : 1
+          },
+          "source" : "source",
+          "type" : "policy"
+        },
+        {
+          "appRunning" : true,
+          "type" : "status"
+        }
+      ],
+      "step" : "app-relaunched"
+    }
+  ],
+  "strict" : [
+    {
+      "at" : "2026-10-14T15:00:00Z",
+      "frames" : [
+        {
+          "focus" : {
+            "title" : "Explain baseline results"
+          },
+          "policy" : {
+            "allowed" : {
+              "apps" : [
+                "com.apple.Terminal",
+                "com.apple.finder",
+                "com.apple.systempreferences"
+              ],
+              "domains" : [
+                "overleaf.com"
+              ],
+              "tools" : [
+                "herdr"
+              ]
+            },
+            "always" : {
+              "apps" : [
+
+              ],
+              "domains" : [
+                "instagram.com"
+              ]
+            },
+            "checksum" : "checksum",
+            "effectiveAt" : "2026-10-14T15:00:00Z",
+            "exceptions" : [
+
+            ],
+            "revision" : 3,
+            "scheduled" : [
+
+            ],
+            "schemaVersion" : 1,
+            "session" : {
+              "end" : "2026-10-14T15:25:00Z",
+              "mode" : "strict",
+              "sessionID" : "session",
+              "targets" : {
+                "apps" : [
+
+                ],
+                "domains" : [
+                  "youtube.com"
+                ]
+              }
+            }
+          },
+          "source" : "source",
+          "type" : "policy"
+        },
+        {
+          "appRunning" : true,
+          "type" : "status"
+        }
+      ],
+      "step" : "session-started"
+    },
+    {
+      "at" : "2026-10-14T15:10:00Z",
+      "frames" : [
+        {
+          "appRunning" : false,
+          "type" : "status"
+        }
+      ],
+      "step" : "app-quit"
+    },
+    {
+      "at" : "2026-10-14T15:26:00Z",
+      "frames" : [
+
+      ],
+      "step" : "past-planned-end"
+    },
+    {
+      "at" : "2026-10-14T15:45:00Z",
+      "frames" : [
+        {
+          "policy" : {
+            "allowed" : {
+              "apps" : [
+                "com.apple.Terminal",
+                "com.apple.finder",
+                "com.apple.systempreferences"
+              ],
+              "domains" : [
+                "overleaf.com"
+              ],
+              "tools" : [
+                "herdr"
+              ]
+            },
+            "always" : {
+              "apps" : [
+
+              ],
+              "domains" : [
+                "instagram.com"
+              ]
+            },
+            "checksum" : "checksum",
+            "effectiveAt" : "2026-10-14T15:45:00Z",
+            "exceptions" : [
+
+            ],
+            "revision" : 4,
+            "scheduled" : [
+
+            ],
+            "schemaVersion" : 1
+          },
+          "source" : "source",
+          "type" : "policy"
+        },
+        {
+          "appRunning" : true,
+          "type" : "status"
+        }
+      ],
+      "step" : "app-relaunched"
+    }
+  ]
+}
