@@ -47,6 +47,18 @@ extension TaskRepository {
         }
     }
 
+    /// The "exception granted" event, written in the grant's own write and
+    /// linked to its session and that session's task.
+    static func recordGrant(of exception: TimedException, _ db: Database) throws {
+        let taskID = try exception.sessionID.flatMap {
+            try Int64.fetchOne(db, sql: "SELECT taskID FROM focusSession WHERE id = ?", arguments: [$0.uuidString])
+        }
+        var event = PilotEventRow(PilotEvent(kind: .exceptionGranted, at: exception.grantedAt,
+                                             duration: exception.expiresAt.timeIntervalSince(exception.grantedAt),
+                                             sessionID: exception.sessionID, taskID: taskID))
+        try event.insert(db)
+    }
+
     /// Deletes raw activity that ended more than a day ago. Events stay.
     public func pruneRawActivity() async throws {
         let cutoff = now().addingTimeInterval(-Self.rawActivityRetention)

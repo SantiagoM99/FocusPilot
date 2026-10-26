@@ -101,3 +101,27 @@ test("a new connection resends everything not yet acknowledged", async () => {
 
   assert.deepEqual(posted, [1, 2, 2, 3]);
 });
+
+// #21 review: front-tab reports are raw activity, kept at most 24 hours,
+// and never crowd out the diagnostics the host needs.
+test("activity reports older than a day are dropped", async () => {
+  let now = 0;
+  const outbox = FocusOutbox.create(memoryStorage(), profile, () => now);
+  await outbox.add("tab-front", { domain: "github.com" });
+
+  now = 24 * 3600 * 1000 + 1;
+  await outbox.add("worker-start");
+
+  assert.deepEqual((await outbox.pending()).map((o) => o.kind), ["worker-start"]);
+});
+
+test("activity reports never evict diagnostics", async () => {
+  const outbox = FocusOutbox.create(memoryStorage(), profile, () => 0, { limit: 2, activityLimit: 2 });
+  await outbox.add("worker-start");
+  await outbox.add("policy-applied");
+
+  for (const domain of ["a.com", "b.com", "c.com", "d.com"]) await outbox.add("tab-front", { domain });
+
+  assert.deepEqual((await outbox.pending()).map((o) => o.domain ?? o.kind),
+    ["worker-start", "policy-applied", "c.com", "d.com"]);
+});

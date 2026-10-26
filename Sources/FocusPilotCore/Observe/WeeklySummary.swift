@@ -19,6 +19,9 @@ public struct WeeklySummary: Equatable, Sendable {
     public var distractionVisitsInSessions = 0
     public var distractionTime: TimeInterval = 0
     public var exceptionsGranted = 0
+    /// While blocking: blocked apps hidden as they came forward.
+    public var blockedVisits = 0
+    public var blockedVisitsInSessions = 0
 
     public init(events: [PilotEvent], now: Date) {
         let start = now.addingTimeInterval(-Self.period)
@@ -35,6 +38,9 @@ public struct WeeklySummary: Equatable, Sendable {
                 if event.sessionID != nil { distractionVisitsInSessions += 1 }
                 distractionTime += event.duration ?? 0
             case .exceptionGranted: exceptionsGranted += 1
+            case .blockedVisit:
+                blockedVisits += 1
+                if event.sessionID != nil { blockedVisitsInSessions += 1 }
             }
         }
         medianResume = Self.median(resumeTimes)
@@ -49,6 +55,8 @@ public struct WeeklySummary: Equatable, Sendable {
             } ?? "No resumes yet"),
             Line(label: "Distraction visits", value: distractionVisits == 0 ? "None"
                  : "\(distractionVisits) · \(Self.minutes(distractionTime)) · \(distractionVisitsInSessions) during sessions"),
+            Line(label: "Blocked visits", value: blockedVisits == 0 ? "None"
+                 : "\(blockedVisits) · \(blockedVisitsInSessions) during sessions"),
             Line(label: "Exceptions", value: "\(exceptionsGranted) granted"),
         ]
     }

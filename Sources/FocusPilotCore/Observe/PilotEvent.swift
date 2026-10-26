@@ -12,6 +12,8 @@ public struct PilotEvent: Equatable, Sendable {
         case resume
         /// Time in front of a site or app a block rule names.
         case distractionVisit
+        /// While blocking: a blocked app hidden as it came forward.
+        case blockedVisit
         case exceptionGranted
     }
 

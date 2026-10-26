@@ -47,10 +47,7 @@ extension TaskRepository {
             var row = try ExceptionRow(exception)
             row.id = nil
             try row.insert(db)
-            var event = PilotEventRow(PilotEvent(kind: .exceptionGranted, at: exception.grantedAt,
-                                                 duration: exception.expiresAt.timeIntervalSince(exception.grantedAt),
-                                                 sessionID: exception.sessionID))
-            try event.insert(db)
+            try Self.recordGrant(of: exception, db)
             return .granted(PolicyChange(revision: try Self.nextPolicyRevision(db), inputs: try Self.policyInputs(db, at: now)))
         }
     }

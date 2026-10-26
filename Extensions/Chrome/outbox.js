@@ -10,7 +10,21 @@ var FocusOutbox = (() => {
     return (fn) => (tail = tail.then(fn, fn));
   }
 
-  function create(storage, profileId, now = Date.now, { limit = 500 } = {}) {
+  // Front-tab reports (#21) are raw activity: kept a day at most, and
+  // capped on their own so they never push out diagnostics.
+  const ACTIVITY = new Set(["tab-front"]);
+  const ACTIVITY_MS = 24 * 3600 * 1000;
+
+  function trim(outbox, at, limit, activityLimit) {
+    const fresh = outbox.filter((o) => !ACTIVITY.has(o.kind) || at - Date.parse(o.observedAt) <= ACTIVITY_MS);
+    const keep = new Set([
+      ...fresh.filter((o) => !ACTIVITY.has(o.kind)).slice(-limit),
+      ...fresh.filter((o) => ACTIVITY.has(o.kind)).slice(-activityLimit),
+    ]);
+    return fresh.filter((o) => keep.has(o));
+  }
+
+  function create(storage, profileId, now = Date.now, { limit = 500, activityLimit = 200 } = {}) {
     const queue = serial();
 
     function add(kind, details = {}) {
@@ -21,7 +35,7 @@ var FocusOutbox = (() => {
           observedAt: new Date(now()).toISOString(), profileId: await profileId(),
         };
         outbox.push(observation);
-        await storage.set({ nextSeq: nextSeq + 1, outbox: outbox.slice(-limit) });
+        await storage.set({ nextSeq: nextSeq + 1, outbox: trim(outbox, now(), limit, activityLimit) });
         return observation;
       });
     }

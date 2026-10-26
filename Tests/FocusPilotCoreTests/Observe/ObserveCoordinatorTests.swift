@@ -95,4 +95,17 @@ struct ObserveCoordinatorTests {
 
         #expect(try await fixture.coordinator.pilotEvents(since: fixture.clock.now.addingTimeInterval(-60)) == [event])
     }
+
+    // Review of #51: the exception event names the session and its task.
+    @Test func anExceptionDuringASessionIsLinkedToItAndItsTask() async throws {
+        let fixture = try await fixture()
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+        let session = try #require(await fixture.coordinator.snapshot().activeSession)
+
+        _ = try await fixture.coordinator.requestException(.site(domain: "instagram.com"), duration: 5 * 60)
+
+        let events = try await fixture.coordinator.pilotEvents(since: fixture.clock.now.addingTimeInterval(-60))
+        #expect(events == [PilotEvent(kind: .exceptionGranted, at: fixture.clock.now, duration: 300,
+                                      sessionID: session.id, taskID: session.taskID)])
+    }
 }

@@ -22,6 +22,8 @@ struct WeeklySummaryTests {
             PilotEvent(kind: .resume, at: ago(days: 2), duration: 12),
             PilotEvent(kind: .distractionVisit, at: ago(days: 3), duration: 600, target: "com.burbn.instagram"),
             PilotEvent(kind: .exceptionGranted, at: ago(days: 3), duration: 300),
+            PilotEvent(kind: .blockedVisit, at: ago(days: 1, minutes: -7), target: "com.burbn.instagram", sessionID: session),
+            PilotEvent(kind: .blockedVisit, at: ago(days: 4), target: "com.burbn.instagram"),
             // Older than a week: left out.
             PilotEvent(kind: .sessionStarted, at: ago(days: 8)),
             PilotEvent(kind: .distractionVisit, at: ago(days: 8), duration: 60, target: "youtube.com"),
@@ -39,6 +41,8 @@ struct WeeklySummaryTests {
         #expect(summary.distractionVisitsInSessions == 1)
         #expect(summary.distractionTime == 720)
         #expect(summary.exceptionsGranted == 1)
+        #expect(summary.blockedVisits == 2)
+        #expect(summary.blockedVisitsInSessions == 1)
     }
 
     @Test func itReadsAsPlainLines() {
@@ -48,6 +52,7 @@ struct WeeklySummaryTests {
             WeeklySummary.Line(label: "Focus sessions", value: "2 started · 1 ended"),
             WeeklySummary.Line(label: "Resume time", value: "median 12 s · 3 resumes"),
             WeeklySummary.Line(label: "Distraction visits", value: "2 · 12 min · 1 during sessions"),
+            WeeklySummary.Line(label: "Blocked visits", value: "2 · 1 during sessions"),
             WeeklySummary.Line(label: "Exceptions", value: "1 granted"),
         ])
     }
@@ -58,6 +63,7 @@ struct WeeklySummaryTests {
         #expect(lines[0].value == "None yet")
         #expect(lines[1].value == "No resumes yet")
         #expect(lines[2].value == "None")
+        #expect(lines[3].value == "None")
     }
 
     @Test func anEvenCountTakesTheMiddleTwo() {
