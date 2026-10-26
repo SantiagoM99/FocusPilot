@@ -7,7 +7,7 @@ Read README.md and the relevant design documents before editing. Phase 1 impleme
 - Treat deadlines, priorities, current focus, and block policies as structured state, not inferred conversation memory.
 - AI proposes changes; deterministic code validates authority and executes authorized actions.
 - No autonomous prompts to other Herdr agents, approvals, pane closure, or focus changes by default.
-- Native macOS interface: SwiftUI/AppKit. Safari first, with Chrome supported.
+- Native macOS interface: SwiftUI/AppKit. Chrome first for enforcement; Safari through an owner-chosen external blocker until a signed Safari extension is possible (decision 0003, 2026-10-20).
 - All user-facing text is in English; capture input is parsed in Spanish or English (decision 0003, 2026-10-15).
 - Cache derived values only; clearing caches must not remove tasks, preferences, deadlines, or focus rules.
 - Preserve usage provenance and uncertainty; external Herdr agents are not automatically instrumented. Do not double-count request events, cumulative counters, or trace rollups.
