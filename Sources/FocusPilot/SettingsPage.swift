@@ -2,10 +2,10 @@ import FocusPilotCore
 import SwiftUI
 
 /// Settings in the planning window (design 07): tabs over grouped forms.
-/// Browsers, iPhone and Observe arrive with #17, #22 and #21.
+/// Browsers and iPhone arrive with #17 and #22.
 struct SettingsPage: View {
     enum Tab: String, CaseIterable {
-        case blocking = "Blocking", allowed = "Allowed", general = "General"
+        case blocking = "Blocking", allowed = "Allowed", observe = "Observe", general = "General"
     }
 
     let model: AppModel
@@ -25,6 +25,7 @@ struct SettingsPage: View {
                 switch tab {
                 case .blocking: BlockingSettings(model: model)
                 case .allowed: AllowedSettings(model: model)
+                case .observe: ObserveSettings(model: model)
                 case .general: GeneralSettings(model: model)
                 }
             }

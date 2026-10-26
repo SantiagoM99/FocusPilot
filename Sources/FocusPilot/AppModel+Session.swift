@@ -25,6 +25,7 @@ extension AppModel {
             for await snapshot in await coordinator.snapshots() {
                 guard let self else { return }
                 show(snapshot)
+                track(snapshot)
                 scheduleReconcile(at: snapshot.nextDeadline)
                 focusPanel.update()
                 // Rules name the apps the Apps line shows; every rule edit publishes a policy.

@@ -69,15 +69,22 @@ struct StartFocusSheet: View {
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
                 }
-                GridRow {
-                    label("Browsers")
-                    BrowserStatusLine(status: model.browserProtection)
-                }
-                GridRow {
-                    label("Apps")
-                    Text(AppProtectionText.preflight(rules: model.ruleSets, at: .now))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                if model.snapshot.isObserveOnly {
+                    GridRow {
+                        label("Blocking")
+                        ObservingLine(model: model, showsWeek: false)
+                    }
+                } else {
+                    GridRow {
+                        label("Browsers")
+                        BrowserStatusLine(status: model.browserProtection)
+                    }
+                    GridRow {
+                        label("Apps")
+                        Text(AppProtectionText.preflight(rules: model.ruleSets, at: .now))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
 
@@ -96,7 +103,9 @@ struct StartFocusSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 // Design 11: starting with partial protection is a deliberate choice.
-                Button(model.browserProtection.level == .protected ? "Start focus" : "Start anyway", action: start)
+                // Observing blocks nothing by choice, so there is nothing to start anyway.
+                Button(model.browserProtection.level == .protected || model.snapshot.isObserveOnly
+                       ? "Start focus" : "Start anyway", action: start)
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.nowTask == nil || isStarting)
             }
