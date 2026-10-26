@@ -91,6 +91,7 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-22: Starting a strict session cancels exceptions granted before it (for apps and sites); an exception inside a strict session needs a reason, confirmation and the 60-second wait.
 - 2026-10-26: Policy revision numbers, checksums and the compiled policy are diagnostics. The UI shows plain language ("Chrome has your latest rules" / "Chrome is updating…"), and the numbers sit behind a collapsed "Show technical details".
 - 2026-10-26: Exceptions requested from Chrome are trusted only from a parent process signed by Google (Team ID check), not by path. No extra in-app confirmation per request; the strict wait and the notification still apply.
+- 2026-10-26: Observe-only mode records raw activity (front app bundle ID; Chrome front-tab domain, never incognito or full URLs) only while observe-only is on, deleted after about 24 h; pilot events (sessions, resume time, blocked visits, exceptions) are kept. Nothing leaves the Mac. Turning observe-only off restores blocking immediately.
 
 ## Sources
 
