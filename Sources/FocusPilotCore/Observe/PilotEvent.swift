@@ -58,5 +58,10 @@ public struct ActivityRecord: Equatable, Sendable {
     public var spans: [ActivitySpan] = []
     public var events: [PilotEvent] = []
 
+    public init(spans: [ActivitySpan] = [], events: [PilotEvent] = []) {
+        self.spans = spans
+        self.events = events
+    }
+
     public var isEmpty: Bool { spans.isEmpty && events.isEmpty }
 }
