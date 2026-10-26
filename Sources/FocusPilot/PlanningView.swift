@@ -5,7 +5,8 @@ import SwiftUI
 /// The planning window (design 01, 07, 15 and 16): a sidebar with Today,
 /// Projects, Review queue and Settings, and the quick capture sheet. A
 /// selected task shows its Agent section in the inspector; the rest of the
-/// task detail pane and protection status arrive with their tickets.
+/// task detail pane arrives with its ticket. The sidebar footer shows
+/// protection status (#17).
 struct PlanningView: View {
     static let windowID = "planning"
 
@@ -33,6 +34,7 @@ struct PlanningView: View {
                 Label("Settings", systemImage: "gearshape").tag(Page.settings)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            .safeAreaInset(edge: .bottom) { SidebarProtectionFooter(model: model) }
         } detail: {
             content
                 .navigationTitle(title)

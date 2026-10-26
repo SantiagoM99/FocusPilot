@@ -54,6 +54,11 @@ final class AppModel {
     /// Where the owner loads the extension, and any setup problem.
     var chromeSetup: ChromeSetup?
     @ObservationIgnored var chromeLocation: StorageLocation?
+    /// Protection status inputs (#17); see `AppModel+Protection.swift`.
+    var chromeRunning = false
+    var protectionEvidence = ProtectionEvidence()
+    /// The browser the owner last had in front, if the last app was one.
+    var frontBrowser: FrontBrowser?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
