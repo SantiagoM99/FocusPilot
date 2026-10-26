@@ -89,7 +89,7 @@ var FocusBlockedView = (() => {
         primary: { label: "Open FocusPilot", action: "open-app" },
         hint: "Applications › FocusPilot, or Spotlight. Exceptions can only be requested while it runs.",
         exceptionLink: false,
-        footer: [`Compiled policy rev. ${policy.revision} · cached in the extension · no planned end while strict`, "FocusPilot"],
+        footer: ["Your last rules are saved in Chrome · no planned end while strict", "FocusPilot"],
       };
     }
     if (offlineSession) {
@@ -101,7 +101,7 @@ var FocusBlockedView = (() => {
         primary: { label: "Open FocusPilot", action: "open-app" },
         hint: "Open it from Applications or Spotlight to pause, complete, or request an exception.",
         exceptionLink: false,
-        footer: [`Compiled policy rev. ${policy.revision} · session end ${end} cached in the extension`, "FocusPilot"],
+        footer: [`Your last rules are saved in Chrome · the session ends at ${end}`, "FocusPilot"],
       };
     }
     const offlineHint = offline ? "FocusPilot isn't running. Open it from Applications or Spotlight to request an exception." : null;

@@ -2,7 +2,7 @@ import FocusPilotCore
 import SwiftUI
 
 /// Settings › Blocking: the RuleTable of blocked sites and apps, and the
-/// compiled policy the extensions receive.
+/// Chrome status, with the policy diagnostics collapsed.
 struct BlockingSettings: View {
     let model: AppModel
     @State private var selection: Int64?
@@ -34,7 +34,7 @@ struct BlockingSettings: View {
                 SettingsError(message: model.rulesError)
                 ChromeSection(model: model)
                 OtherBrowsersSection()
-                PolicyDebugView(policy: model.snapshot.policy)
+                PolicyDebugView(policy: model.snapshot.policy, profiles: model.chromeProfiles)
             }
             .padding(20)
         }

@@ -74,7 +74,7 @@ test("a strict session past its end without the app says how to reopen it", () =
   assert.equal(m.subtitle, "Your last policy keeps youtube.com blocked until FocusPilot is running again.");
   assert.equal(m.hint, "Applications › FocusPilot, or Spotlight. Exceptions can only be requested while it runs.");
   assert.equal(m.exceptionLink, false);
-  assert.deepEqual(m.footer, ["Compiled policy rev. 41 · cached in the extension · no planned end while strict", "FocusPilot"]);
+  assert.deepEqual(m.footer, ["Your last rules are saved in Chrome · no planned end while strict", "FocusPilot"]);
 });
 
 // Design 05 D applies to the whole strict session, not only past its end.
@@ -95,7 +95,7 @@ test("a normal session without the app says when the rule lifts (05 D2)", () => 
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
   assert.equal(m.hint, "Open it from Applications or Spotlight to pause, complete, or request an exception.");
   assert.equal(m.exceptionLink, false);
-  assert.deepEqual(m.footer, ["Compiled policy rev. 41 · session end 10:51 cached in the extension", "FocusPilot"]);
+  assert.deepEqual(m.footer, ["Your last rules are saved in Chrome · the session ends at 10:51", "FocusPilot"]);
 });
 
 // The offline session variants speak about the session, so a site blocked

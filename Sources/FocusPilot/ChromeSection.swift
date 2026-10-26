@@ -10,7 +10,7 @@ struct ChromeSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("Chrome", note: "Each profile acknowledges the policy separately")
+            SectionHeader("Chrome", note: "Each Chrome profile gets your rules separately")
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(model.chromeProfiles.enumerated()), id: \.element.id) { index, profile in
                     if index > 0 { Divider() }
