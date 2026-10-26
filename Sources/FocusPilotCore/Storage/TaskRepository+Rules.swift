@@ -172,5 +172,25 @@ extension TaskRepository {
     static func cancelExceptions(grantedBy instant: Date, _ db: Database) throws {
         try ExceptionRow.filter(Column("cancelledAt") == nil && Column("expiresAt") > instant && Column("grantedAt") <= instant)
             .updateAll(db, Column("cancelledAt").set(to: instant))
+        try forgetEndedExceptions(at: instant, db)
+    }
+
+    /// Which page was allowed and why is kept only while an exception runs:
+    /// once it has expired or was cancelled, its page address and reason are
+    /// blanked. The row stays, with its site or app, times and session.
+    public func forgetEndedExceptions() async throws {
+        let now = now()
+        try await ownerDatabase.write { db in try Self.forgetEndedExceptions(at: now, db) }
+    }
+
+    static func forgetEndedExceptions(at instant: Date, _ db: Database) throws {
+        let blankPage = try JSONCoding.string(ExceptionScope.page(url: ""))
+        for var row in try ExceptionRow.filter(Column("expiresAt") <= instant || Column("cancelledAt") != nil).fetchAll(db) {
+            let isPage = if case .page(let url) = try row.exception().scope { !url.isEmpty } else { false }
+            guard isPage || row.reason != nil else { continue }
+            if isPage { row.scope = blankPage }
+            row.reason = nil
+            try row.update(db)
+        }
     }
 }

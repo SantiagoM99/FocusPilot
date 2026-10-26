@@ -1,6 +1,9 @@
 // Renders FocusBlockedView for this tab and keeps it current: the session
 // countdown ticks, and a new policy or app status redraws it.
 
+// frame-guard.js emptied the page if it is framed; nothing here may run then.
+if (globalThis.focusPilotFramed) throw new Error("FocusPilot's blocked page does not run inside a frame.");
+
 const params = new URLSearchParams(location.search);
 // The content script and worker pass ?from=; network rules put the URL in the fragment.
 const from = params.get("from") ?? safelyDecoded(location.hash.slice(1));

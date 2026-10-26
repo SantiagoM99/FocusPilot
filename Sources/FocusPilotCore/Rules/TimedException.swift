@@ -127,6 +127,13 @@ public struct TimedException: Hashable, Sendable {
     }
 }
 
+/// Where an exception request came from.
+public enum ExceptionOrigin: Sendable {
+    case app
+    /// The blocked page, through the Chrome host.
+    case chrome
+}
+
 /// Why an exception request was refused.
 public enum ExceptionError: Error, Equatable, Sendable {
     /// Not one of `TimedException.durations`.

@@ -18,18 +18,11 @@ struct UserNotices: FocusNoticeSink {
         case .breakEnded:
             content.title = "Break is over"
             content.body = "Back to your focus session."
+        case .exceptionGrantedFromChrome(let scope, let until):
+            let text = ExceptionNoticeText.grantedFromChrome(scope, until: until)
+            content.title = text.title
+            content.body = text.body
         }
-        try? await center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
-    }
-
-    /// A timed exception granted from Chrome's blocked page.
-    func announce(_ text: ExceptionNoticeText) async {
-        guard Bundle.main.bundleIdentifier != nil else { return }
-        let center = UNUserNotificationCenter.current()
-        _ = try? await center.requestAuthorization(options: [.alert, .sound, .provisional])
-        let content = UNMutableNotificationContent()
-        content.title = text.title
-        content.body = text.body
         try? await center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }
 }

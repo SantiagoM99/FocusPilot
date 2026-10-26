@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import Testing
 @testable import FocusPilotCore
 
@@ -294,5 +295,85 @@ struct SharedStrictWaitTests {
         #expect(await fixture.coordinator.snapshot().pendingException?.scope == lecture)
         await fixture.coordinator.cancelException(for: .page(url: "https://www.youtube.com/watch?v=1&t=5"))
         #expect(await fixture.coordinator.snapshot().pendingException == nil)
+    }
+}
+
+@Suite("Cancelling a strict wait")
+struct CancelStrictWaitTests {
+    @Test func aPageClosingItsFormLeavesTheWholeSitesWaitAlone() async throws {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
+        try await fixture.coordinator.startSession(duration: 50 * 60, mode: .strict)
+        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 600, reason: "Course", confirmed: true)
+
+        await fixture.coordinator.cancelException(for: .page(url: "https://youtube.com/watch?v=1"))
+
+        #expect(await fixture.coordinator.snapshot().pendingException?.scope == .site(domain: "youtube.com"))
+    }
+}
+
+/// Which page was allowed and why is private (DATA_AND_MEMORY): it is kept
+/// only while the exception runs.
+@Suite("Ended exceptions keep no page or reason")
+struct EndedExceptionPrivacyTests {
+    private func rows(_ fixture: SessionFixture) async throws -> [TimedException] {
+        try await TaskRepository(location: fixture.location).ownerDatabase.read { db in
+            try ExceptionRow.order(Column("id")).fetchAll(db).map { try $0.exception() }
+        }
+    }
+
+    private func fixture() async throws -> SessionFixture {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
+        return fixture
+    }
+
+    @Test func anExpiredPageExceptionLosesItsAddressAndReason() async throws {
+        let fixture = try await fixture()
+        try await fixture.coordinator.startSession(duration: 50 * 60, mode: .strict)
+        let page = ExceptionScope.page(url: "https://youtube.com/watch?v=private")
+        _ = try await fixture.coordinator.requestException(page, duration: 300, reason: "Lecture for §4.2", confirmed: true)
+        fixture.advance(seconds: 60)
+        _ = try await fixture.coordinator.requestException(page, duration: 300, reason: "Lecture for §4.2")
+        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 1200, reason: "Course", confirmed: true)
+        fixture.advance(seconds: 60)
+        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 1200, reason: "Course")
+
+        #expect(try await rows(fixture).map(\.reason) == ["Lecture for §4.2", "Course"], "kept while running")
+
+        fixture.advance(minutes: 5)
+        try await fixture.coordinator.reconcile()
+
+        let after = try await rows(fixture)
+        #expect(after[0].scope == .page(url: ""))
+        #expect(after[0].reason == nil)
+        #expect(after[1].scope == .site(domain: "youtube.com"), "the running one is untouched")
+        #expect(after[1].reason == "Course")
+    }
+
+    @Test func exceptionsCancelledByAStrictStartAreForgottenAtOnce() async throws {
+        let fixture = try await fixture()
+        _ = try await fixture.coordinator.requestException(.page(url: "https://youtube.com/watch?v=private"), duration: 600, reason: "Note")
+
+        try await fixture.coordinator.startSession(duration: 50 * 60, mode: .strict)
+
+        #expect(try await rows(fixture).map(\.scope) == [.page(url: "")])
+        #expect(try await rows(fixture).map(\.reason) == [nil])
+    }
+}
+
+@Suite("Only new grants from Chrome are announced")
+struct ChromeGrantNoticeTests {
+    @Test func aNewGrantFromChromeIsAnnouncedOnceAndNothingElseIs() async throws {
+        let fixture = try await SessionFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always))
+        let page = ExceptionScope.page(url: "https://www.youtube.com/watch?v=1")
+        let until = fixture.clock.now.addingTimeInterval(600)
+
+        _ = try await fixture.coordinator.requestException(page, duration: 600, origin: .chrome)
+        _ = try await fixture.coordinator.requestException(page, duration: 1200, origin: .chrome)  // already covered
+        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 300)  // from the app
+
+        #expect(await fixture.notices.delivered == [.exceptionGrantedFromChrome(.page(url: "https://youtube.com/watch?v=1"), until: until)])
     }
 }

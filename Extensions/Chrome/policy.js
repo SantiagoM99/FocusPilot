@@ -89,17 +89,18 @@ var FocusPolicy = (() => {
     return `https://${p.host}${p.port ? ":" + p.port : ""}${p.path}${p.params.length ? "?" + p.params.join("&") : ""}`;
   }
 
-  // Same host, port and path, and every parameter the exception names.
+  // Same host, port, path and parameters (in any order), ignoring the
+  // tracking and position ones: one page, not every query on its path.
   function pageMatches(exceptionURL, url) {
     const e = pageParts(exceptionURL), u = pageParts(url);
-    if (!e || !u || e.host !== u.host || e.port !== u.port || e.path !== u.path) return false;
-    const left = [...u.params];
-    return e.params.every((pair) => {
-      const i = left.indexOf(pair);
-      if (i < 0) return false;
-      left.splice(i, 1);
-      return true;
-    });
+    return !!e && !!u && e.host === u.host && e.port === u.port && e.path === u.path && e.params.join("&") === u.params.join("&");
+  }
+
+  // A parameter canonicalPage drops, as a regex for the network rule.
+  function ignorableParameter(host) {
+    const youtube = hostMatches(host, "youtube.com") || hostMatches(host, "youtu.be");
+    const keys = [...TRACKING, ...(youtube ? YOUTUBE_NOISE : [])].map(escapeRegex);
+    return `(?:utm_[^=&#]*|${keys.join("|")})(?:=[^&#]*)?`;
   }
 
   function isSiteOrPage(exception) {
@@ -191,18 +192,24 @@ var FocusPolicy = (() => {
   }
 
   // Lets one excepted page load past the redirect, with everything it loads
-  // (allowAllRequests). RE2 has no lookahead, so up to three parameters are
-  // matched in any order; with more, or `pathOnly` (a regex Chrome refused),
-  // the rule allows the path and the content script, which checks every
-  // parameter, blocks other pages. Case-sensitive: video ids differ by case.
+  // (allowAllRequests): exactly its parameters, in any order, among
+  // ignorable ones. RE2 has no lookahead, so orders are spelled out for up
+  // to three parameters; with more, or `pathOnly` (a regex Chrome refused),
+  // the rule allows the path and the content script, which compares the
+  // parameters, blocks other pages. Case-sensitive: video ids differ by case.
   function pageAllowRule(exception, id, { pathOnly = false } = {}) {
     const p = pageParts(exception.scope.url);
     const prefix = `^https?://(?:www\\.)?${escapeRegex(p.host)}${p.port ? ":" + p.port : ""}${escapeRegex(p.path)}`;
     let query = "(?:[?#].*)?";
-    if (!pathOnly && p.params.length > 0 && p.params.length <= 3) {
-      const orders = permutations(p.params).map((order) =>
-        "\\?(?:[^#]*&)?" + order.map(escapeRegex).join("&(?:[^#]*&)?") + "(?:&[^#]*)?");
-      query = `(?:${orders.join("|")})(?:#.*)?`;
+    if (!pathOnly && p.params.length <= 3) {
+      const noise = ignorableParameter(p.host);
+      if (p.params.length === 0) {
+        query = `(?:\\?(?:${noise}(?:&${noise})*)?)?(?:#.*)?`;
+      } else {
+        const orders = permutations(p.params).map((order) =>
+          `\\?(?:${noise}&)*` + order.map(escapeRegex).join(`(?:&${noise})*&(?:${noise}&)*`) + `(?:&${noise})*`);
+        query = `(?:${orders.join("|")})(?:#.*)?`;
+      }
     }
     return {
       id, priority: 2, action: { type: "allowAllRequests" },

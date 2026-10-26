@@ -71,7 +71,8 @@ public struct AddRateLimit: Sendable {
 /// Where exception requests go: the coordinator, which applies the
 /// strict-session confirmation and wait.
 public protocol ExceptionGate: Sendable {
-    func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String?, confirmed: Bool) async throws -> ExceptionOutcome
+    func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String?, confirmed: Bool,
+                          origin: ExceptionOrigin) async throws -> ExceptionOutcome
     func cancelException(for scope: ExceptionScope) async
 }
 
@@ -79,12 +80,10 @@ extension FocusCoordinator: ExceptionGate {}
 
 /// Answers command-socket requests inside the running app. CLI callers can
 /// only append tasks and read; everything written goes through
-/// `TaskRepository`. Exception requests are taken only from the Chrome host
-/// bundled with the app, identified by its executable, and only while Chrome
-/// started it, so an agent with the focuspilot command, or one that runs the
-/// host from a shell, cannot grant itself one. That is a hurdle, not tamper
-/// resistance (an agent could start its own Chrome); every grant from Chrome
-/// is therefore also announced to the owner (see AppModel).
+/// `TaskRepository`. Exception requests are taken only from callers
+/// `ExceptionCallerCheck` allows: in the app, the bundled Chrome host started
+/// by a Google-signed Chrome (see there for exactly what that guarantees).
+/// The focuspilot CLI, or the host started from a shell, is refused.
 public actor CommandService {
     static let rateLimitMessage =
         "Refused: this pane has added \(AddRateLimit.limit) tasks in the last minute. Wait a minute and try again."
@@ -92,16 +91,16 @@ public actor CommandService {
 
     private let repository: TaskRepository
     private let exceptions: (any ExceptionGate)?
-    /// The Chrome host's executable path; nil refuses every exception request.
-    private let exceptionCaller: String?
+    /// Nil refuses every exception request.
+    private let exceptionCaller: ExceptionCallerCheck?
     private let now: @Sendable () -> Date
     private var rateLimit = AddRateLimit()
 
-    public init(repository: TaskRepository, exceptions: (any ExceptionGate)? = nil, exceptionCaller: String? = nil,
+    public init(repository: TaskRepository, exceptions: (any ExceptionGate)? = nil, exceptionCaller: ExceptionCallerCheck? = nil,
                 now: @escaping @Sendable () -> Date = Date.init) {
         self.repository = repository
         self.exceptions = exceptions
-        self.exceptionCaller = exceptionCaller.map(Self.resolved)
+        self.exceptionCaller = exceptionCaller
         self.now = now
     }
 
@@ -111,7 +110,8 @@ public actor CommandService {
             guard let exceptions = gate(for: peer) else { return .refused(Self.exceptionCallerMessage) }
             do {
                 return .exception(try await exceptions.requestException(command.scope, duration: command.duration,
-                                                                        reason: command.reason, confirmed: command.confirmed))
+                                                                        reason: command.reason, confirmed: command.confirmed,
+                                                                        origin: .chrome))
             } catch let error as ExceptionError {
                 return .refused(ExceptionErrorText.message(error))
             } catch {
@@ -141,21 +141,8 @@ public actor CommandService {
     }
 
     private func gate(for peer: CommandPeer?) -> (any ExceptionGate)? {
-        guard let exceptions, let exceptionCaller, let path = peer?.executablePath, Self.resolved(path) == exceptionCaller,
-              let parent = peer?.parentExecutablePath, Self.isChrome(parent) else { return nil }
+        guard let exceptions, let exceptionCaller, exceptionCaller.allows(peer) else { return nil }
         return exceptions
-    }
-
-    /// Google Chrome and its Beta, Dev and Canary channels.
-    static func isChrome(_ path: String) -> Bool {
-        let parts = path.split(separator: "/")
-        guard parts.count >= 4, parts[parts.count - 3] == "Contents", parts[parts.count - 2] == "MacOS" else { return false }
-        let app = parts[parts.count - 4]
-        return app.hasPrefix("Google Chrome") && app.hasSuffix(".app")
-    }
-
-    private static func resolved(_ path: String) -> String {
-        URL(fileURLWithPath: path).resolvingSymlinksInPath().path
     }
 }
 

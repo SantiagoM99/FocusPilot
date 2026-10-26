@@ -11,7 +11,9 @@ private actor GateDouble: ExceptionGate {
 
     func set(_ answer: Result<ExceptionOutcome, ExceptionError>) { self.answer = answer }
 
-    func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String?, confirmed: Bool) async throws -> ExceptionOutcome {
+    func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String?, confirmed: Bool,
+                          origin: ExceptionOrigin) async throws -> ExceptionOutcome {
+        #expect(origin == .chrome)
         requests.append(ExceptionCommand(scope: scope, duration: duration, reason: reason, confirmed: confirmed))
         return try answer.get()
     }
@@ -22,7 +24,7 @@ private actor GateDouble: ExceptionGate {
 @Suite("Exception requests over the command socket")
 struct ExceptionCommandTests {
     private let host = CommandPeer(processID: 77, executablePath: "/Applications/FocusPilot.app/Contents/Helpers/focuspilot-chrome-host",
-                                   parentExecutablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+                                   auditToken: [0, 501, 20, 501, 20, 77, 100, 3])
     private let cli = CommandPeer(processID: 78, executablePath: "/Applications/FocusPilot.app/Contents/Helpers/focuspilot")
     private let gate = GateDouble()
     private let service: CommandService
@@ -30,8 +32,9 @@ struct ExceptionCommandTests {
 
     init() throws {
         let repository = try TaskRepository(location: StorageLocation(directory: makeTemporaryDirectory()), now: { wednesdayMorningInBogota })
+        let host = host
         service = CommandService(repository: repository, exceptions: gate,
-                                 exceptionCaller: "/Applications/FocusPilot.app/Contents/Helpers/focuspilot-chrome-host")
+                                 exceptionCaller: ExceptionCallerCheck { $0 == host })
     }
 
     @Test func theChromeHostsRequestReachesTheCoordinator() async {
@@ -45,9 +48,7 @@ struct ExceptionCommandTests {
     /// Agents in Herdr panes reach the same socket through the focuspilot
     /// command; only the Chrome host, which the blocked page talks to, may ask.
     @Test func anyOtherCallerIsRefusedAndNothingIsAsked() async {
-        // The host itself, started from a shell instead of by Chrome.
-        let hostFromAShell = CommandPeer(processID: 80, executablePath: host.executablePath, parentExecutablePath: "/bin/zsh")
-        for peer in [cli, CommandPeer(processID: 79, executablePath: nil), hostFromAShell, nil] {
+        for peer in [cli, CommandPeer(processID: 79, executablePath: nil), nil] {
             #expect(await service.handle(.exception(lecture), from: peer) == .refused(CommandService.exceptionCallerMessage))
             #expect(await service.handle(.cancelException(lecture.scope), from: peer) == .refused(CommandService.exceptionCallerMessage))
         }
@@ -100,6 +101,5 @@ final class CommandPeerTests {
         #expect(peer.processID == getpid())
         #expect(peer.executablePath == CommandPeer.executablePath(of: getpid()))
         #expect(peer.executablePath?.hasPrefix("/") == true)
-        #expect(peer.parentExecutablePath == CommandPeer.executablePath(of: getppid()))
     }
 }

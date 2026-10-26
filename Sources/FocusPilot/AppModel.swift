@@ -73,9 +73,9 @@ final class AppModel {
             coordinator = FocusCoordinator(repository: repository, herdr: herdr, agents: herdr,
                                            publisher: ChromePolicyMailbox(location: location), notices: UserNotices())
             // Site exceptions come only from the Chrome host in this bundle (#14).
-            let chromeHost = Bundle.main.bundleURL.appending(path: "Contents/Helpers/focuspilot-chrome-host").path
+            let chromeHost = Bundle.main.bundleURL.appending(path: "Contents/Helpers/focuspilot-chrome-host")
             listenForCommands(location: location, service: CommandService(repository: repository, exceptions: coordinator,
-                                                                          exceptionCaller: chromeHost))
+                                                                          exceptionCaller: .chromeHost(at: chromeHost)))
             setUpChrome(location: location)
         } catch {
             coordinator = nil
@@ -95,10 +95,6 @@ final class AppModel {
         let server = CommandSocketServer(path: location.commandSocketPath) { [weak self] request, peer in
             let response = await service.handle(request, from: peer)
             if case .added = response { await self?.refresh() }
-            if case .exception(let asked) = request, case .exception(.granted(let until)) = response,
-               let scope = try? asked.scope.normalized() {
-                await UserNotices().announce(.grantedFromChrome(scope, until: until))
-            }
             return response
         }
         do {

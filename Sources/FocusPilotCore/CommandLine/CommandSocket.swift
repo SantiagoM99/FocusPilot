@@ -130,31 +130,36 @@ extension CommandSocketServer {
 /// it connects (`LOCAL_PEERPID`), not from anything it sends.
 public struct CommandPeer: Equatable, Sendable {
     public var processID: Int32
-    /// Nil when the process is gone or its path can't be read.
+    /// Nil when the process is gone or its path can't be read. For display
+    /// and logs only; identity checks use `auditToken`.
     public var executablePath: String?
-    /// The executable of the process that started it: Chrome, for the native host.
-    public var parentExecutablePath: String?
+    /// The connection's audit token (`LOCAL_PEERTOKEN`): names the process,
+    /// pid version included, so it can't be confused with a later process
+    /// that reuses the pid. `ExceptionCallerCheck` verifies code with it.
+    public var auditToken: [UInt32]?
 
-    public init(processID: Int32, executablePath: String?, parentExecutablePath: String? = nil) {
+    public init(processID: Int32, executablePath: String?, auditToken: [UInt32]? = nil) {
         self.processID = processID
         self.executablePath = executablePath
-        self.parentExecutablePath = parentExecutablePath
+        self.auditToken = auditToken
     }
 
     init(connection: Int32) {
-        var pid: pid_t = 0
-        var size = socklen_t(MemoryLayout<pid_t>.size)
-        let found = getsockopt(connection, SOL_LOCAL, LOCAL_PEERPID, &pid, &size) == 0
-        processID = found ? pid : -1
-        executablePath = found ? Self.executablePath(of: pid) : nil
-        parentExecutablePath = found ? Self.parent(of: pid).flatMap(Self.executablePath(of:)) : nil
+        var token = audit_token_t()
+        var size = socklen_t(MemoryLayout<audit_token_t>.size)
+        // LOCAL_PEERTOKEN in <sys/un.h>.
+        guard getsockopt(connection, SOL_LOCAL, 0x006, &token, &size) == 0 else {
+            self.init(processID: -1, executablePath: nil)
+            return
+        }
+        let values = withUnsafeBytes(of: token) { Array($0.bindMemory(to: UInt32.self)) }
+        let pid = Self.processID(of: values)
+        self.init(processID: pid, executablePath: Self.executablePath(of: pid), auditToken: values)
     }
 
-    static func parent(of pid: pid_t) -> pid_t? {
-        var info = proc_bsdinfo()
-        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
-        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
-        return pid_t(info.pbi_ppid)
+    /// The pid an audit token names (its sixth value, as audit_token_to_pid reads it).
+    static func processID(of token: [UInt32]) -> pid_t {
+        pid_t(bitPattern: token[5])
     }
 
     static func executablePath(of pid: pid_t) -> String? {

@@ -99,6 +99,17 @@ test("network rules leave excepted sites out and let excepted pages load", () =>
   assert.ok(!re.test("https://evil.com/?u=https://youtube.com/watch?v=3kqW9M"));
 });
 
+test("a page without a query covers only itself, not every query on its path", () => {
+  const p = policy([page("https://youtube.com/watch")]);
+  assert.equal(P.decide(p, "https://www.youtube.com/watch?v=any", now).blocked, true);
+  assert.equal(P.decide(p, "https://www.youtube.com/watch?t=4", now).blocked, false);
+  const re = new RegExp(P.pageAllowRule(page("https://youtube.com/watch"), 10).condition.regexFilter);
+  assert.ok(re.test("https://www.youtube.com/watch"));
+  assert.ok(re.test("https://www.youtube.com/watch?t=4&pp=x#c"));
+  assert.ok(!re.test("https://www.youtube.com/watch?v=any"));
+  assert.ok(!re.test("https://www.youtube.com/watch?t=4&v=any"));
+});
+
 test("network rules ignore expired exceptions and need none without blocks", () => {
   const p = policy([site("youtube.com", "2026-10-14T15:00:00Z")]);
   const redirect = P.networkRules(p, now, BLOCKED).find((r) => r.id === 1);
@@ -106,11 +117,12 @@ test("network rules ignore expired exceptions and need none without blocks", () 
   assert.deepEqual(P.networkRules(policy([], { always: { domains: [], apps: [] }, session: null }), now, BLOCKED), []);
 });
 
-test("a page with several parameters needs all of them, in any order", () => {
+test("a page with several parameters needs exactly those, in any order, plus ignorable ones", () => {
   const rule = P.pageAllowRule(page("https://example.com/docs/page?a=1&b=2&c=3"), 10);
   const re = new RegExp(rule.condition.regexFilter);
   assert.ok(re.test("https://example.com/docs/page?c=3&a=1&b=2"));
-  assert.ok(re.test("https://www.example.com/docs/page?b=2&x=9&a=1&c=3"));
+  assert.ok(re.test("https://www.example.com/docs/page?b=2&utm_source=mail&a=1&c=3&fbclid=x"));
+  assert.ok(!re.test("https://www.example.com/docs/page?b=2&x=9&a=1&c=3"), "an unknown extra parameter is another page");
   assert.ok(!re.test("https://example.com/docs/page?a=1&b=2"));
   assert.ok(!re.test("https://example.com/docs/pages?a=1&b=2&c=3"));
 });

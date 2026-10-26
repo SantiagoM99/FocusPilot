@@ -3,7 +3,8 @@ import Foundation
 /// One page for a timed exception (#14): its host without "www.", port,
 /// path and query, minus parameters that only track the visit or position
 /// a video (its start time, the playlist it came from), so the same lecture
-/// stays the same page however it was reached. Mirrors `pageParts` in the
+/// stays the same page however it was reached; any other parameter makes it
+/// another page. Mirrors `pageParts` in the
 /// extension's policy.js; `Tests/ChromeExtension/fixtures/pages.json` pins both.
 public enum PageAddress {
     static let tracking: Set<String> = ["fbclid", "gclid", "dclid", "msclkid", "igsh", "igshid", "si"]
@@ -22,17 +23,13 @@ public enum PageAddress {
         Parts(url)?.host
     }
 
-    /// Whether `url` is the excepted page: same host, port and path, and
-    /// every parameter the exception names (others may be added).
+    /// Whether `url` is the excepted page: same host, port, path and
+    /// parameters (in any order), ignoring tracking and position ones. A page
+    /// without a query is only that page, not every query on its path.
     public static func matches(_ exceptionURL: String, _ url: String) -> Bool {
-        guard let excepted = Parts(exceptionURL), let page = Parts(url),
-              excepted.host == page.host, excepted.port == page.port, excepted.path == page.path else { return false }
-        var left = page.parameters
-        for parameter in excepted.parameters {
-            guard let index = left.firstIndex(of: parameter) else { return false }
-            left.remove(at: index)
-        }
-        return true
+        guard let excepted = Parts(exceptionURL), let page = Parts(url) else { return false }
+        return excepted.host == page.host && excepted.port == page.port && excepted.path == page.path
+            && excepted.parameters == page.parameters
     }
 
     private struct Parts {

@@ -1,5 +1,5 @@
 {
-  "about": "One-page exceptions (#14). Read by Tests/ChromeExtension/exceptions.test.mjs and PageAddressTests in Swift, so the app and the extension agree on what one page is.",
+  "about": "One-page exceptions (#14). Read by Tests/ChromeExtension/exceptions.test.mjs and PageAddressTests in Swift, so the app and the extension agree on what one page is. A page matches only with exactly the same parameters, ignoring tracking and (on YouTube) position ones.",
   "canonical": [
     [
       "https://www.youtube.com/watch?v=3kqW9M&t=42s&pp=ygUFbGVjdHVyZQ%3D%3D",
@@ -93,7 +93,7 @@
     [
       "https://example.com/docs/page?a=1&b=2",
       "https://example.com/docs/page?b=2&c=3&a=1#top",
-      true
+      false
     ],
     [
       "https://example.com/docs/page?a=1&b=2",
@@ -113,11 +113,31 @@
     [
       "https://example.com/a?ids[]=1",
       "https://example.com/a?ids[]=1&x=2",
-      true
+      false
     ],
     [
       "https://xn--bcher-kva.de/x",
       "https://bücher.de/x",
+      true
+    ],
+    [
+      "https://example.com/docs/page?a=1&b=2",
+      "https://example.com/docs/page?b=2&a=1#top",
+      true
+    ],
+    [
+      "https://youtube.com/watch",
+      "https://www.youtube.com/watch?v=any",
+      false
+    ],
+    [
+      "https://youtube.com/watch",
+      "https://www.youtube.com/watch?t=5&utm_source=x",
+      true
+    ],
+    [
+      "https://example.com/docs/page",
+      "https://example.com/docs/page?utm_campaign=x",
       true
     ]
   ]

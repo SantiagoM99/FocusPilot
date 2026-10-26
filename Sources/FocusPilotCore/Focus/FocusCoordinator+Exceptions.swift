@@ -14,7 +14,7 @@ import Foundation
 /// needs a reason. Outside a strict session the grant is immediate.
 extension FocusCoordinator {
     public func requestException(_ scope: ExceptionScope, duration: TimeInterval, reason: String? = nil,
-                                 confirmed: Bool = false) async throws -> ExceptionOutcome {
+                                 confirmed: Bool = false, origin: ExceptionOrigin = .app) async throws -> ExceptionOutcome {
         guard TimedException.durations.contains(duration) else { throw ExceptionError.unsupportedDuration }
         let scope = try scope.normalized()
         // Already allowed (say, from another Chrome profile): its expiry
@@ -22,7 +22,7 @@ extension FocusCoordinator {
         if let expiry = try await repository.coveringExpiry(of: scope, at: now()) { return .granted(expiresAt: expiry) }
         let typed = reason?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         guard let active = session, !active.hasEnded, active.mode == .strict else {
-            return try await grant(scope, duration: duration, reason: typed)
+            return try await grant(scope, duration: duration, reason: typed, origin: origin)
         }
         let request = ExceptionRequest(scope: scope, duration: duration)
         if let wait = exceptionWait, wait.hasExpired(at: uptime()) {
@@ -51,7 +51,7 @@ extension FocusCoordinator {
         if wait.remaining(at: uptime()) > .zero { return .waitUntil(availableAt(wait)) }
         exceptionWait = nil
         exceptionWaitReason = nil
-        return try await grant(scope, duration: duration, reason: reason)
+        return try await grant(scope, duration: duration, reason: reason, origin: origin)
     }
 
     /// The owner changed their mind about a strict-session exception.
@@ -61,10 +61,11 @@ extension FocusCoordinator {
         await broadcast()
     }
 
-    /// Cancels the wait only if it is for `scope`, so a page closing its own
-    /// form leaves another profile's or the app's wait alone.
+    /// Cancels the wait only if it is for exactly `scope`, so a page closing
+    /// its own form leaves another page's, the whole site's, another
+    /// profile's or the app's wait alone.
     public func cancelException(for scope: ExceptionScope) async {
-        guard let wait = exceptionWait, let scope = try? scope.normalized(), wait.request.scope.covers(scope) else { return }
+        guard let wait = exceptionWait, let scope = try? scope.normalized(), wait.request.scope == scope else { return }
         await cancelException()
     }
 
@@ -74,7 +75,7 @@ extension FocusCoordinator {
                                 reason: exceptionWaitReason)
     }
 
-    private func grant(_ scope: ExceptionScope, duration: TimeInterval, reason: String?) async throws -> ExceptionOutcome {
+    private func grant(_ scope: ExceptionScope, duration: TimeInterval, reason: String?, origin: ExceptionOrigin) async throws -> ExceptionOutcome {
         let at = now()
         let activeSession = session.flatMap { $0.hasEnded ? nil : $0 }
         let exception = TimedException(scope: scope, grantedAt: at, expiresAt: at.addingTimeInterval(duration),
@@ -82,6 +83,7 @@ extension FocusCoordinator {
         switch try await repository.grant(exception) {
         case .granted(let change):
             await publish(change)
+            if origin == .chrome { await notices.deliver(.exceptionGrantedFromChrome(scope, until: exception.expiresAt)) }
             return .granted(expiresAt: exception.expiresAt)
         case .alreadyCovered(let expiry):
             return .granted(expiresAt: expiry)
