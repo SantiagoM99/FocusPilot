@@ -124,7 +124,8 @@ extension FocusCoordinator {
     /// with a newer one is still published (extensions drop it by revision)
     /// but never replaces the newer one here.
     func publish(revision: Int, inputs: PolicyInputs, session: SessionPolicy?, at: Date) async {
-        let rules = PolicyCompiler.compile(rules: inputs.rules, allowed: inputs.allowed, session: session)
+        let exceptions = inputs.exceptions.filter { $0.expiresAt > at }.map(\.policyException)
+        let rules = PolicyCompiler.compile(rules: inputs.rules, allowed: inputs.allowed, session: session, exceptions: exceptions)
         let compiled = CompiledPolicy(revision: revision, effectiveAt: at, rules: rules)
         if compiled.revision > policy?.revision ?? 0 {
             policy = compiled

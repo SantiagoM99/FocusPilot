@@ -85,6 +85,7 @@ struct FocusPanelView: View {
                 Text(session.action)
                     .font(.headline)
                     .lineLimit(2)
+                AppProtectionLine(text: model.appProtection)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
