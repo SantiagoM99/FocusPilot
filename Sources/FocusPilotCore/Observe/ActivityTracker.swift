@@ -9,8 +9,6 @@ import Foundation
 /// time runs from a session start or resume to the first app or site in
 /// front that is neither FocusPilot nor a distraction (0 if one already is).
 public struct ActivityTracker: Sendable {
-    static let chromeBundleID = "com.google.Chrome"
-
     private let ownBundleID: String?
     private var distractingDomains: [String] = []
     private var distractingApps: Set<String> = []
@@ -73,7 +71,7 @@ public struct ActivityTracker: Sendable {
 
     private var key: ActivityKey? {
         guard let frontApp else { return nil }
-        if frontApp == Self.chromeBundleID, let chromeDomain { return .site(domain: chromeDomain) }
+        if frontApp == ChromeExtension.chromeBundleID, let chromeDomain { return .site(domain: chromeDomain) }
         return .app(bundleID: frontApp)
     }
 
