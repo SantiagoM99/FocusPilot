@@ -34,8 +34,8 @@ struct ObserveSettings: View {
             }
             Section("What is recorded") {
                 Group {
-                    Text("Kept for 24 hours: which app is in front and, while observing, the domain of Chrome's front tab.")
-                    Text("Kept for the pilot: session starts and ends, resume times, visits to sites and apps your rules name, and exceptions, as times and durations with their session and task.")
+                    Text("Only while observing, kept for 24 hours: which app is in front and the domain of Chrome's front tab.")
+                    Text("Kept for the pilot: session starts and ends, exceptions, and blocked apps you opened; while observing, also resume times and visits to sites and apps your rules name. Times and durations, with their session and task.")
                     Text("Never stored: URLs, page titles or content, keystrokes or screenshots.")
                 }
                 .font(.callout)
