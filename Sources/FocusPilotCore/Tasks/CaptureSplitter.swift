@@ -29,8 +29,11 @@ public struct CaptureSplit: Equatable, Sendable {
 /// A guessed misspelling never blocks saving, drops a readable deadline or
 /// takes words out of the title. When no deadline was read, a near-miss
 /// date word ("fryday") is named for a quiet hint, unless it is a real word
-/// or name: in `NearMissWords`, known to `isKnownWord` (asked with the word
-/// as typed), or capitalized mid-sentence ("Call Martha").
+/// or name: in `NearMissWords` or known to `isKnownWord`, asked in the case
+/// typed and, since a capitalized word may be a name ("Call Martha"), in
+/// lowercase and capitalized too. A deadline that is only a time ("5pm",
+/// meaning today) keeps the hint for a typo before it ("fryday 5pm").
+/// Trailing sentence punctuation ("tomorrow.") is not part of the phrase.
 ///
 /// Saving is blocked only for a clear date attempt after a marker that has
 /// impossible values ("by Feb 30", "para el 31 de febrero", "at 25:00"):
@@ -44,31 +47,51 @@ public struct CaptureSplitter: Sendable {
     }
 
     public func split(_ text: String, isKnownWord: (String) -> Bool) -> CaptureSplit {
-        let words = text.ranges(of: /\S+/).map { text[$0] }
-        if let start = readablePhrase(text, words) {
-            let phrase = String(text[words[start].startIndex...])
-            return CaptureSplit(title: Self.title(text[..<words[start].startIndex]), deadlineText: phrase,
-                                deadline: parser.parse(phrase))
+        // "Buy milk, tomorrow." reads as "Buy milk, tomorrow"; the full stop
+        // goes only when a deadline phrase is split off.
+        let body = text.replacing(/[\s.!?…]+$/, with: "")
+        let words = body.ranges(of: /\S+/).map { body[$0] }
+        if let start = readablePhrase(body, words) {
+            let phrase = String(body[words[start].startIndex...])
+            var result = CaptureSplit(title: Self.title(body[..<words[start].startIndex]), deadlineText: phrase,
+                                      deadline: parser.parse(phrase))
+            // A time alone means today: a typo before it is likely the day meant.
+            if DateVocabulary.isTimeOnly(words[start...]) {
+                result.unrecognizedWord = Self.typo(in: words, before: start, isKnownWord)
+            }
+            return result
         }
-        let start = unreadablePhrase(text, words)
-        var result = CaptureSplit(title: Self.title(text[...]), deadlineText: nil, deadline: nil)
-        if let start {
-            result = CaptureSplit(title: Self.title(text[..<words[start].startIndex]),
-                                  deadlineText: String(text[words[start].startIndex...]), deadline: nil)
+        guard let start = unreadablePhrase(body, words) else {
+            var result = CaptureSplit(title: Self.title(text[...]), deadlineText: nil, deadline: nil)
+            result.unrecognizedWord = Self.typo(in: words, before: words.count, isKnownWord)
+            return result
         }
-        result.unrecognizedWord = (0..<(start ?? words.count))
-            .first { Self.isTypo(words, $0, isKnownWord) && DateVocabulary.isInDatePosition(words, $0) }
-            .map { words[$0].trimmingCharacters(in: .punctuationCharacters) }
+        var result = CaptureSplit(title: Self.title(body[..<words[start].startIndex]),
+                                  deadlineText: String(body[words[start].startIndex...]), deadline: nil)
+        result.unrecognizedWord = Self.typo(in: words, before: start, isKnownWord)
         return result
     }
 
-    /// A near-miss date word that is not a real word or a name.
-    private static func isTypo(_ words: [Substring], _ index: Int, _ isKnownWord: (String) -> Bool) -> Bool {
-        let word = words[index]
+    /// The first near-miss date word before `end` that sits where a date would go.
+    private static func typo(in words: [Substring], before end: Int, _ isKnownWord: (String) -> Bool) -> String? {
+        (0..<end)
+            .first { isTypo(words[$0], isKnownWord) && DateVocabulary.isInDatePosition(words, $0) }
+            .map { words[$0].trimmingCharacters(in: .punctuationCharacters) }
+    }
+
+    /// A near-miss date word that is not a real word or a name. A capitalized
+    /// word may be a name, so the checker is also asked in lowercase and
+    /// capitalized ("Martha", "MARCIA"); the bundled list ignores case.
+    /// "Fryday" is in neither.
+    private static func isTypo(_ word: Substring, _ isKnownWord: (String) -> Bool) -> Bool {
         let asTyped = word.trimmingCharacters(in: .punctuationCharacters)
-        let isCapitalizedMidSentence = index > 0 && word.first?.isUppercase == true
-        return DateVocabulary.isMisspelledName(word) && !isCapitalizedMidSentence
-            && !NearMissWords.contains(asTyped) && !isKnownWord(asTyped)
+        guard DateVocabulary.isMisspelledName(word), !NearMissWords.contains(asTyped) else { return false }
+        let lowercased = asTyped.lowercased()
+        let forms = [asTyped, lowercased, lowercased.prefix(1).uppercased() + lowercased.dropFirst()]
+        // An all-caps word is not asked as typed: checkers may accept any
+        // word in capitals as an acronym.
+        let isAllCaps = asTyped == asTyped.uppercased()
+        return !forms.dropFirst(isAllCaps ? 1 : 0).contains(where: isKnownWord)
     }
 
     /// Where the readable phrase starts, if any.

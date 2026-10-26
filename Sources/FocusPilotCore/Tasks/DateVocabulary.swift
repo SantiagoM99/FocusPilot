@@ -66,6 +66,13 @@ enum DateVocabulary {
         return Int(first) != nil && (second == "am" || second == "pm") ? 2 : nil
     }
 
+    /// A phrase that is only a time, with any markers ("at 5pm", "10:00"):
+    /// it names no day, so it means today.
+    static func isTimeOnly(_ words: ArraySlice<Substring>) -> Bool {
+        let time = words.filter { !isMarker($0) }
+        return !time.isEmpty && timeLength(time[...]) == time.count
+    }
+
     /// A misspelling of a date name, such as "fryday", "mañnana" or "vierns";
     /// never an exact name, and never a plural or possessive ("Sundays",
     /// "today's").
