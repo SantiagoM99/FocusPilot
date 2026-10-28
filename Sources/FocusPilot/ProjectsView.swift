@@ -50,6 +50,7 @@ struct ProjectsView: View {
             } label: {
                 Image(systemName: "plus")
             }
+            .accessibilityLabel("New project")
             .menuStyle(.button)
             .buttonStyle(.borderless)
             .menuIndicator(.hidden)
@@ -112,5 +113,6 @@ private struct ProjectRow: View {
                 .foregroundStyle(project.isOverdue(at: now) ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
     }
 }

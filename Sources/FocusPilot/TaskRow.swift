@@ -29,6 +29,13 @@ struct TaskRow: View {
             }
         }
         .padding(.vertical, 4)
+        // One item for VoiceOver: "PhD shortlist, Applications, due Tuesday
+        // 20 October"; Undo stays reachable as an action.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.spokenLabel(showsProject: showsProject, at: now))
+        .accessibilityActions {
+            if let undo { Button("Undo add from Herdr", action: undo) }
+        }
     }
 }
 
@@ -50,6 +57,7 @@ struct TaskMeta: View {
             + Text(label).foregroundStyle(isOverdue ? Color.red : Color.secondary)
             + Text(source).foregroundStyle(Color.secondary))
             .help(deadline?.inspection ?? "")
-            .accessibilityLabel(project + label + (deadline.map { ", " + $0.inspection } ?? "") + source)
+            .accessibilityLabel([showsProject ? item.projectTitle : nil, item.deadline.map { DeadlineText($0).spoken(at: now) } ?? "no deadline",
+                                 item.isFromHerdr ? "added from Herdr" : nil].compactMap(\.self).joined(separator: ", "))
     }
 }

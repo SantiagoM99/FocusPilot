@@ -69,6 +69,25 @@ public struct DeadlineText: Sendable {
         }
     }
 
+    // MARK: VoiceOver
+
+    /// The deadline as VoiceOver reads it, with full names and no middle
+    /// dots: "due Tuesday 20 October", "overdue since Tuesday 13 October at
+    /// 18:00, Bogotá time", "due today at 17:00, Bogotá time".
+    public func spoken(at now: Date) -> String {
+        let today = LocalDate(containing: now, in: deadline.timeZone)
+        let days = Calendar.gregorian(in: deadline.timeZone)
+            .dateComponents([.day], from: today.start(in: deadline.timeZone), to: dayStart).day!
+        let day = switch days {
+        case 0: "today"
+        case 1: "tomorrow"
+        default: format(dayStart, deadline.localDate.year == today.year ? "EEEE d MMMM" : "EEEE d MMMM yyyy")
+        }
+        let time: String
+        if case .timed(let instant) = deadline.due { time = " at " + format(instant, "HH:mm") + ", \(city) time" } else { time = "" }
+        return (deadline.isOverdue(at: now) ? "overdue since " : "due ") + day + time
+    }
+
     // MARK: Projects
 
     /// The day only, for a project row: "Due Sat 17 Oct" or "Overdue Tue 13 Oct".

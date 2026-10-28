@@ -99,6 +99,7 @@ struct StartFocusSheet: View {
                 Button(model.browserProtection.level == .protected ? "Start focus" : "Start anyway", action: start)
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.nowTask == nil || isStarting)
+                    .accessibilityHint(model.nowTask.map { "Starts a session for \($0.title)" } ?? "")
             }
         }
         .padding(20)

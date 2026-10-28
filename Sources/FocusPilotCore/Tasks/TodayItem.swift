@@ -1,3 +1,4 @@
+import Foundation
 import GRDB
 
 /// One row of the Today list: a task with its project's title.
@@ -34,6 +35,17 @@ extension TodayItem {
     /// coordinator refuse the rest anyway.
     public func offersHerdrUndo(activeSessionTaskID: Int64?) -> Bool {
         isFromHerdr && (status == .next || status == .later) && id != activeSessionTaskID
+    }
+}
+
+extension TodayItem {
+    /// A task row as VoiceOver reads it, one item: "PhD shortlist,
+    /// Applications, due Tuesday 20 October". The project is left out inside
+    /// a project, as on screen.
+    public func spokenLabel(showsProject: Bool, at now: Date) -> String {
+        [title, showsProject ? projectTitle : nil, deadline.map { DeadlineText($0).spoken(at: now) } ?? "no deadline",
+         isFromHerdr ? "added from Herdr" : nil]
+            .compactMap(\.self).joined(separator: ", ")
     }
 }
 

@@ -39,6 +39,7 @@ struct AllowedSettings: View {
                         } label: {
                             Image(systemName: "plus")
                         }
+                        .accessibilityLabel("Add app or site")
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
                         .fixedSize()

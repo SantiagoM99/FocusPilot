@@ -84,6 +84,7 @@ struct FocusPanelView: View {
                 }
                 Text(session.action)
                     .font(.headline)
+                    .contrastEmphasis()
                     .lineLimit(2)
                 ProtectionStatusView(model: model, showsDetail: false, showsSafari: false)
             }
@@ -94,7 +95,7 @@ struct FocusPanelView: View {
             SessionControls(model: model)
                 .controlSize(.regular)
                 .padding(12)
-                .background(.bar)
+                .barBackground()
         }
         .frame(width: 320)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -108,6 +109,7 @@ struct FocusPanelView: View {
                 Circle()
                     .fill(session.phase == .running ? Color.accentColor : Color.secondary)
                     .frame(width: 7, height: 7)
+                    .contrastOutline()
                 Text(reduceMotion ? text.minutesLeft(at: model.now) : text.timeLeft(at: model.now))
                     .font(.callout.weight(.semibold))
                     .monospacedDigit()

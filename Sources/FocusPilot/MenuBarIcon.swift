@@ -10,9 +10,10 @@ import SwiftUI
 struct MenuBarIcon: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let status = model.menuBarStatus
+        let status = model.menuBarStatus(reducesMotion: reduceMotion)
         HStack(spacing: 4) {
             Image(nsImage: MenuBarGlyphImage.image(for: status.glyph))
             if let time = status.timeText {

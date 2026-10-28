@@ -14,6 +14,7 @@ struct DeadlinePreview: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "calendar")
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(text.exact)
                         .font(.body.weight(.semibold))

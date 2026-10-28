@@ -106,6 +106,7 @@ private struct AgentLinkView: View {
         }
         .padding(10)
         .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 8))
+        .contrastBorder(cornerRadius: 8)
     }
 }
 
@@ -153,6 +154,7 @@ struct StatusDot: View {
             Image(systemName: filled ? "circle.fill" : "circle")
                 .font(.system(size: 8))
                 .foregroundStyle(color)
+                .contrastOutline()
                 .accessibilityHidden(true)
             Text(title)
                 .font(.callout.weight(.medium))

@@ -86,6 +86,10 @@ struct AgentResultRow: View {
             StatusDot(title: item.stateTitle, color: item.kind == .approval ? .orange : .green, filled: true)
         }
         .padding(.vertical, 4)
+        // One item for VoiceOver, without the arrow and middle dots.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([item.place.replacing(" · ", with: ", "), "for \(item.taskTitle)", item.timeTitle,
+                             item.headline, item.stateTitle].compactMap(\.self).joined(separator: ", "))
     }
 }
 
@@ -120,6 +124,7 @@ struct AgentResultDetail: View {
                         .padding(10)
                 }
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 6))
+                .contrastBorder(cornerRadius: 6)
                 Text(lineCaption)
                     .font(.caption)
                     .foregroundStyle(.secondary)

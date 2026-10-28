@@ -159,8 +159,9 @@ final class AppModel {
     /// The instant session times are computed for; see `tickWhileTimeIsShown`.
     private(set) var now = Date.now
 
-    var menuBarStatus: MenuBarStatus {
-        MenuBarStatus(snapshot: snapshot, now: now, showsTime: menuBarPreferences.showsTime)
+    /// With Reduce Motion the time reads in whole minutes.
+    func menuBarStatus(reducesMotion: Bool = false) -> MenuBarStatus {
+        MenuBarStatus(snapshot: snapshot, now: now, showsTime: menuBarPreferences.showsTime, reducesMotion: reducesMotion)
     }
 
     // Advances `now` once a second while a session is active (its time is
@@ -170,7 +171,7 @@ final class AppModel {
         Task { [weak self] in
             while let self {
                 try? await Task.sleep(for: .seconds(1))
-                if snapshot.activeSession != nil || menuBarStatus.timeText != nil {
+                if snapshot.activeSession != nil || menuBarStatus().timeText != nil {
                     now = .now
                 }
             }

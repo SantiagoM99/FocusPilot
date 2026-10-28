@@ -28,7 +28,7 @@ struct StrictRuleEditBanner: View {
 
     private func banner(_ title: String, detail: String, @ViewBuilder actions: () -> some View) -> some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "lock.fill").foregroundStyle(.secondary)
+            Image(systemName: "lock.fill").foregroundStyle(.secondary).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
                 Text(detail).font(.callout).foregroundStyle(.secondary).monospacedDigit()

@@ -50,7 +50,7 @@ private struct ChromeProfileRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Circle().fill(color).frame(width: 7, height: 7)
+            Circle().fill(color).frame(width: 7, height: 7).contrastOutline().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 // Chrome gives extensions no profile name; the ID's start tells them apart.
                 Text("Profile \(profile.profileID.prefix(4))")
@@ -124,7 +124,7 @@ struct OtherBrowsersSection: View {
 
     private func row(_ title: String, _ detail: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Circle().strokeBorder(.secondary, lineWidth: 1).frame(width: 7, height: 7)
+            Circle().strokeBorder(.secondary, lineWidth: 1).frame(width: 7, height: 7).contrastOutline().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                 Text(detail).font(.callout).foregroundStyle(.secondary)
