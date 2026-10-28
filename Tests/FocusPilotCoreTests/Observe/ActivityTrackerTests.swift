@@ -219,7 +219,7 @@ struct ActivityTrackerTests {
     }
 
     // Owner decision (a), 2026-10-25: outside observe-only, no front-app
-    // activity; only session, blocked-visit and exception events.
+    // activity; only session, resume, blocked-visit and exception events.
     @Test func outsideObserveOnlyTheFrontAppIsNotRecorded() {
         var t = tracker(observing: false)
         _ = t.session(nil, at: at(0))
@@ -229,8 +229,22 @@ struct ActivityTrackerTests {
         let switched = t.frontApp("com.burbn.instagram", at: at(10))
         let left = t.frontApp(xcode, at: at(40))
 
-        #expect(started.events.map(\.kind) == [.sessionStarted], "No resume time")
-        #expect(switched.isEmpty && left.isEmpty)
+        #expect(started.events.map(\.kind) == [.sessionStarted])
+        #expect(switched.isEmpty && left.spans.isEmpty, "No spans or visits")
+    }
+
+    // Decision 0003: resume time is a pilot event, measured without raw activity.
+    @Test func outsideObserveOnlyResumeTimeIsStillMeasured() {
+        var t = tracker(observing: false)
+        _ = t.session(nil, at: at(0))
+        _ = t.frontApp(own, at: at(0))
+        _ = t.session(session(.running), at: at(0))
+        _ = t.frontApp("com.burbn.instagram", at: at(10))
+
+        let record = t.frontApp(xcode, at: at(40))
+
+        #expect(record.spans.isEmpty)
+        #expect(record.events == [PilotEvent(kind: .resume, at: at(0), duration: 40, sessionID: sessionID, taskID: 7)])
     }
 
     @Test func turningObserveOffEndsTheSpanAndTheVisit() {

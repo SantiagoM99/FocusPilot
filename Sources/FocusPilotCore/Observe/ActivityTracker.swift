@@ -62,7 +62,7 @@ public struct ActivityTracker: Sendable {
     }
 
     /// Outside observe-only nothing is in front as far as recording goes:
-    /// no spans, visits or resume times, only session events.
+    /// no spans or visits, only session and resume events.
     public mutating func observing(_ on: Bool, at now: Date) -> ActivityRecord {
         isObserving = on
         return moved(at: now)
@@ -119,15 +119,20 @@ public struct ActivityTracker: Sendable {
 
     // MARK: Spans and visits
 
-    private var key: ActivityKey? {
-        guard isObserving, away.isEmpty, let frontApp else { return nil }
+    /// What is recorded: nothing outside observe-only.
+    private var key: ActivityKey? { isObserving ? inFront : nil }
+
+    /// What is in front, for resume time either way (decision 0003); outside
+    /// observe-only Chrome reports no domain, so Chrome counts as work.
+    private var inFront: ActivityKey? {
+        guard away.isEmpty, let frontApp else { return nil }
         if frontApp == ChromeExtension.chromeBundleID, let chromeDomain { return .site(domain: chromeDomain) }
         return .app(bundleID: frontApp)
     }
 
     private mutating func moved(at now: Date) -> ActivityRecord {
         let key = key
-        guard key != current?.key else { return ActivityRecord() }
+        guard key != current?.key else { return ActivityRecord(events: resumedIfWorking(at: now)) }
         let target = key.flatMap(distraction)
         let continuesVisit = target != nil && target == visit?.target
         var record = continuesVisit ? closeSpan(at: now) : close(at: now)
@@ -177,7 +182,7 @@ public struct ActivityTracker: Sendable {
     }
 
     private mutating func resumedIfWorking(at now: Date) -> [PilotEvent] {
-        guard let since = resumeSince, let key, isWork(key) else { return [] }
+        guard let since = resumeSince, let inFront, isWork(inFront) else { return [] }
         resumeSince = nil
         return [event(.resume, at: since, duration: max(0, now.timeIntervalSince(since)), session: session)]
     }

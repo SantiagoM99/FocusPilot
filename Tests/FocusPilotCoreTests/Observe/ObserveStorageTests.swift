@@ -58,13 +58,19 @@ struct ObserveStorageTests {
         #expect(try await repository.events(since: start) == [event])
     }
 
-    @Test func grantingAnExceptionRecordsAnEventInTheSameWrite() async throws {
+    // Only a grant that stores an exception is an event; one already covered changes nothing.
+    @Test func grantingAnExceptionRecordsAnEventInTheSameWriteOnlyWhenGranted() async throws {
         let (repository, _) = try repository(SettableClock(start))
+        _ = try await repository.save(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always))
         let session = UUID()
+        let exception = TimedException(scope: .site(domain: "youtube.com"), grantedAt: start,
+                                       expiresAt: start.addingTimeInterval(300), sessionID: session)
 
-        try await repository.grant(TimedException(scope: .site(domain: "youtube.com"), grantedAt: start,
-                                                  expiresAt: start.addingTimeInterval(300), sessionID: session))
+        let first = try await repository.grant(exception)
+        let second = try await repository.grant(exception)
 
+        guard case .granted = first else { Issue.record("first: \(first)"); return }
+        #expect(second == .alreadyCovered(expiresAt: start.addingTimeInterval(300)))
         #expect(try await repository.events(since: start) == [
             PilotEvent(kind: .exceptionGranted, at: start, duration: 300, sessionID: session),
         ])
