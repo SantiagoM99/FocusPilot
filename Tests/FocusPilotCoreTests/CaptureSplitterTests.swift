@@ -4,7 +4,7 @@ import Testing
 
 /// Stands in for a system spelling checker that has only the English
 /// dictionary. It is case-sensitive, like the real one for names.
-let englishOnly: Set<String> = ["match", "money", "monkey", "fridge", "banana", "total", "lunch", "sundae", "Martha"]
+let englishOnly: Set<String> = ["match", "money", "monkey", "fridge", "banana", "total", "lunch", "sundae", "Martha", "Marcia"]
 
 @Suite("CaptureSplitter")
 struct CaptureSplitterTests {
@@ -140,9 +140,7 @@ struct CaptureSplitterTests {
         ("Call Martha by Friday", "Call Martha", "by Friday"),
         ("Email Marta by Friday", "Email Marta", "by Friday"),
         ("Llamar a Marco el viernes", "Llamar a Marco", "el viernes"),
-        ("Present fryday by 10:00", "Present fryday", "by 10:00"),
-        ("Present fryday 10:00", "Present fryday", "10:00"),
-        ("Llamar a Ana mañnana 10:00", "Llamar a Ana mañnana", "10:00"),
+        ("Call Fryday by Friday", "Call Fryday", "by Friday"),
     ])
     func readableDeadlineWinsOverANearMissWord(text: String, title: String, deadlineText: String) {
         let result = split(text)
@@ -151,6 +149,91 @@ struct CaptureSplitterTests {
         #expect(result.deadlineText == deadlineText)
         #expect(result.deadline != nil)
         #expect(result.unrecognizedWord == nil)
+    }
+
+    // #31: a time alone means today, so a typo just before it is probably
+    // the day the owner meant. The time still wins; the typo gets the hint.
+    @Test(arguments: [
+        ("Submit report fryday 5pm", "Submit report fryday", "5pm", "fryday"),
+        ("Present fryday by 10:00", "Present fryday", "by 10:00", "fryday"),
+        ("Present fryday 10:00", "Present fryday", "10:00", "fryday"),
+        ("Llamar a Ana mañnana 10:00", "Llamar a Ana mañnana", "10:00", "mañnana"),
+        ("Present Fryday at 3 pm", "Present Fryday", "at 3 pm", "Fryday"),
+    ])
+    func aTypoBeforeATimeKeepsTheTimeAndIsNamed(text: String, title: String, deadlineText: String, word: String) {
+        let result = split(text)
+
+        #expect(result.title == title)
+        #expect(result.deadlineText == deadlineText)
+        #expect(result.deadline?.due == DeadlineParser(now: wednesdayMorningInBogota, timeZone: bogota).parse(deadlineText)?.due)
+        #expect(result.unrecognizedWord == word)
+    }
+
+    @Test func aTypoBeforeATimeStillMeansToday() {
+        #expect(split("Submit report fryday 5pm").deadline?.due == .timed(instant("2026-10-14T17:00:00-05:00")))
+    }
+
+    // #31: capitalized and all-caps typos are named; real names, from the
+    // bundled list or the checker in any case, are not.
+    @Test(arguments: [
+        ("Present Fryday", "Fryday"),
+        ("PRESENT FRYDAY", "FRYDAY"),
+        ("Send slides by next Tuesdy", "Tuesdy"),
+        ("LLAMAR A ANA EL VIERNS", "VIERNS"),
+    ])
+    func capitalizedTyposAreNamed(text: String, word: String) {
+        let result = split(text)
+
+        #expect(result.title == text)
+        #expect(result.deadline == nil)
+        #expect(result.unrecognizedWord == word)
+    }
+
+    @Test(arguments: [
+        "Call Martha", "CALL MARTHA", "Call Marcia", "CALL MARCIA", "Email Fryda", "EMAIL FRYDA",
+        "Watch the Match", "WATCH THE MATCH", "Llamar a Marco", "HABLAR CON DOMINGO", "Ver a Mario",
+    ])
+    func capitalizedRealNamesAndWordsAreNotNamed(_ text: String) {
+        #expect(split(text).unrecognizedWord == nil)
+    }
+
+    // #31: sentence punctuation after the deadline does not hide it.
+    @Test(arguments: [
+        ("Buy milk, tomorrow.", "Buy milk", "tomorrow"),
+        ("Buy milk tomorrow!", "Buy milk", "tomorrow"),
+        ("Write NLP report by Friday 11pm.", "Write NLP report", "by Friday 11pm"),
+        ("Llamar a Ana mañana 10:00.", "Llamar a Ana", "mañana 10:00"),
+        ("Entregar informe el viernes?", "Entregar informe", "el viernes"),
+        ("Meet Ana 10:00...", "Meet Ana", "10:00"),
+    ])
+    func trailingPunctuationIsNotPartOfTheDeadline(text: String, title: String, deadlineText: String) {
+        let result = split(text)
+
+        #expect(result.title == title)
+        #expect(result.deadlineText == deadlineText)
+        #expect(result.deadline != nil)
+        #expect(result.deadline?.due == DeadlineParser(now: wednesdayMorningInBogota, timeZone: bogota).parse(deadlineText)?.due)
+        #expect(result.deadline?.originalText == deadlineText)
+    }
+
+    @Test func anImpossibleDateWithAFullStopStillBlocks() {
+        let result = split("Pay rent by Feb 30.")
+
+        #expect(result.title == "Pay rent")
+        #expect(result.deadlineText == "by Feb 30")
+        #expect(result.deadline == nil)
+    }
+
+    @Test(arguments: ["Email Ana.", "Read page 3 pm.", "Go running on Sundays."])
+    func aTitleWithAFullStopAndNoDeadlineIsKeptAsTyped(_ text: String) {
+        let result = split(text)
+
+        #expect(result.title == text)
+        #expect(result.deadlineText == nil)
+    }
+
+    @Test func aTypoWithAFullStopIsNamedWithoutIt() {
+        #expect(split("Present fryday.").unrecognizedWord == "fryday")
     }
 
     // Real words and names, from the bundled list, the checker, or a capital
@@ -205,6 +288,15 @@ struct CaptureDraftTests {
         #expect(typed.unrecognizedDateHint == "Did you mean a date? “fryday” wasn’t recognized.")
         #expect(typed.newTask == NewTask(title: "Present fryday"))
         #expect(draft("Present Friday 10:00").unrecognizedDateHint == nil)
+    }
+
+    // #31: the hint shows next to the time, and saving keeps the time.
+    @Test func aTypoBeforeATimeShowsAHintAndSavesTheTime() {
+        let typed = draft("Submit report fryday 5pm")
+
+        #expect(typed.unrecognizedDateHint == "Did you mean a date? “fryday” wasn’t recognized.")
+        #expect(typed.newTask?.title == "Submit report fryday")
+        #expect(typed.newTask?.deadline?.due == .timed(instant("2026-10-14T17:00:00-05:00")))
     }
 
     @Test func impossibleDateTypedAloneCannotBeSaved() {
