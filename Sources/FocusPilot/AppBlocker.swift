@@ -80,6 +80,7 @@ final class AppBlocker {
         // An app allowed a moment ago (its schedule opened, its exception
         // ran out) is no longer somewhere to return to.
         if lastAllowedFront == app { lastAllowedFront = nil }
+        if ownerSwitched { model.noteBlockedApp(bundleID) }
         hide(app)
         panel.show(BlockedApp(app: app, reason: reason))
     }

@@ -30,6 +30,8 @@ public actor FocusCoordinator {
     var session: FocusSession?
     /// The last policy published, shown in Settings.
     var policy: CompiledPolicy?
+    /// When observe-only mode started, as of that policy.
+    var observeSince: Date?
     /// The owner confirmed ending the current strict session early.
     var earlyEnd: StrictWait<UUID>?
     /// The owner confirmed a rule change that weakens the strict session.
@@ -68,7 +70,7 @@ public actor FocusCoordinator {
 
     public func snapshot() async -> FocusSnapshot {
         FocusSnapshot(currentTaskTitle: try? await repository.nowTask()?.title, session: session,
-                      earlyEndAvailableAt: earlyEndAvailableAt(), policy: policy,
+                      observeSince: observeSince, earlyEndAvailableAt: earlyEndAvailableAt(), policy: policy,
                       pendingRuleEdit: pendingRuleEdit(), pendingException: pendingException(),
                       revision: revision)
     }

@@ -5,7 +5,7 @@
 // so blocking keeps working while FocusPilot is quit (decision 0003).
 // Lifecycle: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle
 
-importScripts("policy.js", "outbox.js");
+importScripts("policy.js", "outbox.js", "observe.js");
 
 const HOST = "com.santiagom99.focuspilot";
 // The content script stops media and redirects first; the worker redirects
@@ -139,13 +139,41 @@ chrome.tabs.onUpdated.addListener(async (tabId, change) => {
   if (FocusPolicy.decide(policy, change.url, Date.now()).blocked) enforceTab(tabId, "navigation");
 });
 
+// ---- Observe-only (#21) ----
+
+// While the app's delivery says observe, the domain of the tab in front
+// goes to the host on every change; null when Chrome is not in front.
+const frontQueue = FocusOutbox.serial();
+let lastFront;
+
+function reportFront() {
+  return frontQueue(async () => {
+    if ((await currentDelivery())?.observe !== true) {
+      lastFront = undefined;
+      return;
+    }
+    const win = await chrome.windows.getLastFocused().catch(() => null);
+    const [tab] = win?.focused ? await chrome.tabs.query({ active: true, windowId: win.id }) : [];
+    const domain = FocusObserve.domainOf(tab);
+    if (domain === lastFront) return;
+    lastFront = domain;
+    await observe("tab-front", { domain });
+  });
+}
+
+chrome.tabs.onActivated.addListener(() => reportFront());
+chrome.tabs.onUpdated.addListener((_id, change, tab) => { if (change.url && tab?.active) reportFront(); });
+chrome.windows.onFocusChanged.addListener(() => reportFront());
+
 // ---- Native host ----
 
 const policyQueue = FocusOutbox.serial();
 
 function handlePolicy(message) {
   return policyQueue(async () => {
-    const incoming = { policy: message.policy, focus: message.focus ?? null, source: message.source ?? null };
+    const incoming = {
+      policy: message.policy, focus: message.focus ?? null, source: message.source ?? null, observe: message.observe === true,
+    };
     if (!FocusPolicy.supports(incoming)) {
       await observe("policy-rejected-schema", { schemaVersion: incoming.policy?.schemaVersion ?? null });
       return;
@@ -163,6 +191,7 @@ function handlePolicy(message) {
     await store.set({ delivery: incoming });
     await reconcile("policy");
     await observe("policy-applied", { revision: incoming.policy.revision, checksum: incoming.policy.checksum, source: incoming.source });
+    reportFront();
   });
 }
 

@@ -9,6 +9,8 @@ public struct PolicyInputs: Equatable, Sendable {
     /// Exceptions unexpired at the repository's clock when read; the
     /// coordinator drops any that expired before it publishes.
     public var exceptions: [TimedException] = []
+    /// When observe-only mode was turned on; nil while rules are enforced.
+    public var observeSince: Date?
 }
 
 /// What storing a requested exception did.
@@ -45,6 +47,7 @@ extension TaskRepository {
             var row = try ExceptionRow(exception)
             row.id = nil
             try row.insert(db)
+            try Self.recordGrant(of: exception, db)
             return .granted(PolicyChange(revision: try Self.nextPolicyRevision(db), inputs: try Self.policyInputs(db, at: now)))
         }
     }
@@ -132,7 +135,7 @@ extension TaskRepository {
 
     /// Runs `edit`, then hands out the next revision and reads the inputs,
     /// all in one write (decision 0003).
-    private func policyChange(_ edit: @escaping @Sendable (Database) throws -> Void) async throws -> PolicyChange {
+    func policyChange(_ edit: @escaping @Sendable (Database) throws -> Void) async throws -> PolicyChange {
         let now = now()
         return try await ownerDatabase.write { db in
             try edit(db)
@@ -149,7 +152,8 @@ extension TaskRepository {
     }
 
     static func policyInputs(_ db: Database, at now: Date) throws -> PolicyInputs {
-        PolicyInputs(rules: try rules(db), allowed: try allowed(db), exceptions: try exceptions(db, unexpiredAt: now))
+        PolicyInputs(rules: try rules(db), allowed: try allowed(db), exceptions: try exceptions(db, unexpiredAt: now),
+                     observeSince: try Date.fetchOne(db, sql: "SELECT since FROM observeMode WHERE id = 1"))
     }
 
     private static func exceptions(_ db: Database, unexpiredAt now: Date) throws -> [TimedException] {
