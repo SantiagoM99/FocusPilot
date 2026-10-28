@@ -24,19 +24,26 @@ public struct ChromeInstaller: Sendable {
         self.extensionDirectory = extensionDirectory
     }
 
-    /// Chrome's per-user host folder, or nil when Chrome was never run here.
-    /// With `FOCUSPILOT_DATA_DIR` (trying a build without touching the
-    /// owner's setup) it is the host folder of a Chrome started with
+    /// The data folders of Chrome's channels under Application Support; each
+    /// reads user-level host manifests from its own `NativeMessagingHosts`
+    /// (https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-location).
+    static let channels = ["Google/Chrome", "Google/Chrome Beta", "Google/Chrome Dev", "Google/Chrome Canary"]
+
+    /// The per-user host folder of every Chrome channel that has run here,
+    /// in channel order; empty when none has. With `FOCUSPILOT_DATA_DIR`
+    /// (trying a build without touching the owner's setup) only the host
+    /// folder of a Chrome started with
     /// `--user-data-dir="$FOCUSPILOT_DATA_DIR/Chrome User Data"`, so the
-    /// owner's Chrome keeps the host of the FocusPilot they use.
-    public static func chromeManifestDirectory(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
+    /// owner's Chromes keep the host of the FocusPilot they use.
+    public static func chromeManifestDirectories(applicationSupport: URL = .applicationSupportDirectory,
+                                                 environment: [String: String] = ProcessInfo.processInfo.environment) -> [URL] {
         if let override = environment["FOCUSPILOT_DATA_DIR"], !override.isEmpty {
-            return URL(fileURLWithPath: override, isDirectory: true)
-                .appending(path: "Chrome User Data/NativeMessagingHosts", directoryHint: .isDirectory)
+            return [URL(fileURLWithPath: override, isDirectory: true)
+                .appending(path: "Chrome User Data/NativeMessagingHosts", directoryHint: .isDirectory)]
         }
-        let chrome = URL.applicationSupportDirectory.appending(path: "Google/Chrome", directoryHint: .isDirectory)
-        guard FileManager.default.fileExists(atPath: chrome.path) else { return nil }
-        return chrome.appending(path: "NativeMessagingHosts", directoryHint: .isDirectory)
+        return channels.map { applicationSupport.appending(path: $0, directoryHint: .isDirectory) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .map { $0.appending(path: "NativeMessagingHosts", directoryHint: .isDirectory) }
     }
 
     private var manifestURL: URL {

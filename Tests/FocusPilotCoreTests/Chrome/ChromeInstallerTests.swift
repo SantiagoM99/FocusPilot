@@ -93,7 +93,58 @@ struct ChromeTryOutTests {
     /// Chrome at itself; it registers its host for a Chrome started with
     /// `--user-data-dir` inside that folder instead.
     @Test func aDataFolderOverrideKeepsTheHostManifestInsideIt() {
-        let directory = ChromeInstaller.chromeManifestDirectory(environment: ["FOCUSPILOT_DATA_DIR": "/tmp/fp-try"])
-        #expect(directory?.path == "/tmp/fp-try/Chrome User Data/NativeMessagingHosts")
+        let directories = ChromeInstaller.chromeManifestDirectories(environment: ["FOCUSPILOT_DATA_DIR": "/tmp/fp-try"])
+        #expect(directories.map(\.path) == ["/tmp/fp-try/Chrome User Data/NativeMessagingHosts"])
+    }
+}
+
+/// Chrome Beta, Dev and Canary each read user-level host manifests from their
+/// own data folder, so each installed channel gets the manifest.
+@Suite("Chrome channels")
+struct ChromeChannelTests {
+    private let support: URL
+
+    init() throws {
+        support = try makeTemporaryDirectory()
+    }
+
+    private func install(_ channels: String...) throws {
+        for channel in channels {
+            try FileManager.default.createDirectory(at: support.appending(path: "Google/\(channel)"), withIntermediateDirectories: true)
+        }
+    }
+
+    private func directories() -> [String] {
+        ChromeInstaller.chromeManifestDirectories(applicationSupport: support, environment: [:])
+            .map { String($0.path.dropFirst(support.path.count + 1)) }
+    }
+
+    @Test func everyInstalledChannelGetsItsOwnHostFolder() throws {
+        try install("Chrome", "Chrome Beta", "Chrome Dev", "Chrome Canary")
+        #expect(directories() == [
+            "Google/Chrome/NativeMessagingHosts", "Google/Chrome Beta/NativeMessagingHosts",
+            "Google/Chrome Dev/NativeMessagingHosts", "Google/Chrome Canary/NativeMessagingHosts",
+        ])
+    }
+
+    @Test func channelsNeverRunHereAreLeftAlone() throws {
+        try install("Chrome Canary")
+        #expect(directories() == ["Google/Chrome Canary/NativeMessagingHosts"])
+    }
+
+    @Test func noChromeAtAllMeansNoFolder() {
+        #expect(directories().isEmpty)
+    }
+
+    @Test func theManifestIsWrittenIntoEachChannelsFolder() throws {
+        try install("Chrome", "Chrome Beta")
+        let host = support.appending(path: "FocusPilot.app/Contents/Helpers/focuspilot-chrome-host")
+        for directory in ChromeInstaller.chromeManifestDirectories(applicationSupport: support, environment: [:]) {
+            let installer = ChromeInstaller(manifestDirectory: directory, hostExecutable: host,
+                                            bundledExtension: support.appending(path: "none"), extensionDirectory: support.appending(path: "ext"))
+            #expect(try installer.installHost() == .installed)
+            let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: directory.appending(path: "\(ChromeExtension.hostName).json"))) as? [String: Any]
+            #expect(manifest?["path"] as? String == host.path)
+        }
     }
 }
