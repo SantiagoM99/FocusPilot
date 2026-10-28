@@ -59,13 +59,14 @@ public struct DeadlineParser: Sendable {
 
     /// Marker words that may open a deadline phrase ("by Friday", "el viernes",
     /// "antes del lunes").
-    static let fillerWords: Set<Substring> = ["by", "due", "on", "at", "before", "el", "para", "antes"]
+    static let fillerWords: Set<Substring> = ["by", "due", "on", "at", "before", "el", "para", "antes", "a las", "a la"]
 
     /// Spanish connectors inside a phrase: "antes del lunes", "20 de octubre".
     static let connectorWords: Set<Substring> = ["de", "del"]
 
     private static func tokens(in text: String) -> [Substring] {
-        Substring(text.lowercased())
+        // "a las 5pm" is "at 5pm"; its two words are one marker.
+        Substring(text.lowercased().replacing(/(^|\s)a\s+las?(?=\s|$)/) { $0.1 + "at" })
             .split(whereSeparator: { $0.isWhitespace || $0 == "," })
             .filter { !fillerWords.contains($0) && !connectorWords.contains($0) }
     }

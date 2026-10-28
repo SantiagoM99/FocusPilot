@@ -169,6 +169,43 @@ struct CaptureSplitterTests {
         #expect(result.unrecognizedWord == word)
     }
 
+    // #23: "a las" opens a time the way "at" does, so it leaves the title.
+    @Test(arguments: [
+        ("Llamar al dentista viernees a las 5pm", "Llamar al dentista viernees", "a las 5pm", "viernees"),
+        ("Llamar al dentista el vierns a las 5pm", "Llamar al dentista el vierns", "a las 5pm", "vierns"),
+    ])
+    func aLasOpensTheTimeAndTheTypoBeforeItIsNamed(text: String, title: String, deadlineText: String, word: String) {
+        let result = split(text)
+
+        #expect(result.title == title)
+        #expect(result.deadlineText == deadlineText)
+        #expect(result.deadline?.due == .timed(instant("2026-10-14T17:00:00-05:00")))
+        #expect(result.unrecognizedWord == word)
+    }
+
+    @Test(arguments: [
+        ("Llamar al dentista el viernes a las 5pm", "Llamar al dentista", "el viernes a las 5pm", "2026-10-16T17:00:00-05:00"),
+        ("Llamar al dentista mañana a las 10:00", "Llamar al dentista", "mañana a las 10:00", "2026-10-15T10:00:00-05:00"),
+        ("Reunión a la 1pm", "Reunión", "a la 1pm", "2026-10-14T13:00:00-05:00"),
+        ("Ir a la tienda mañana a las 9am", "Ir a la tienda", "mañana a las 9am", "2026-10-15T09:00:00-05:00"),
+    ])
+    func aLasInsideADeadlineIsRead(text: String, title: String, deadlineText: String, due: String) {
+        let result = split(text)
+
+        #expect(result.title == title)
+        #expect(result.deadlineText == deadlineText)
+        #expect(result.deadline?.due == .timed(instant(due)))
+    }
+
+    @Test(arguments: ["Ir a la tienda", "Volver a las andadas", "Llamar a las vecinas"])
+    func aLaWithoutATimeStaysInTheTitle(_ text: String) {
+        let result = split(text)
+
+        #expect(result.title == text)
+        #expect(result.deadlineText == nil)
+        #expect(result.unrecognizedWord == nil)
+    }
+
     @Test func aTypoBeforeATimeStillMeansToday() {
         #expect(split("Submit report fryday 5pm").deadline?.due == .timed(instant("2026-10-14T17:00:00-05:00")))
     }

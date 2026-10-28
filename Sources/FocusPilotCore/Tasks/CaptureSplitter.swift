@@ -17,7 +17,7 @@ public struct CaptureSplit: Equatable, Sendable {
 ///
 /// The deadline is the longest trailing phrase the parser fully reads that
 /// starts with:
-/// - a marker word (by, due, on, at, before, el, para, antes);
+/// - a marker word (by, due, on, at, before, el, para, antes, a las, a la);
 /// - an unambiguous date word: a full English weekday or month name,
 ///   today/tomorrow/hoy/mañana/pasado, or an ISO date;
 /// - a time written as one token ("10:00", "3pm"), or any time followed by
@@ -50,7 +50,7 @@ public struct CaptureSplitter: Sendable {
         // "Buy milk, tomorrow." reads as "Buy milk, tomorrow"; the full stop
         // goes only when a deadline phrase is split off.
         let body = text.replacing(/[\s.!?…]+$/, with: "")
-        let words = body.ranges(of: /\S+/).map { body[$0] }
+        let words = DateVocabulary.words(in: body)
         if let start = readablePhrase(body, words) {
             let phrase = String(body[words[start].startIndex...])
             var result = CaptureSplit(title: Self.title(body[..<words[start].startIndex]), deadlineText: phrase,
