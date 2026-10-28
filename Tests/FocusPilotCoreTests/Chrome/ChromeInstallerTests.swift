@@ -86,3 +86,14 @@ struct ChromeInstallerTests {
         #expect(!FileManager.default.fileExists(atPath: stray.path))
     }
 }
+
+@Suite("Trying FocusPilot with its own data folder")
+struct ChromeTryOutTests {
+    /// A try-out build with FOCUSPILOT_DATA_DIR must not repoint the owner's
+    /// Chrome at itself; it registers its host for a Chrome started with
+    /// `--user-data-dir` inside that folder instead.
+    @Test func aDataFolderOverrideKeepsTheHostManifestInsideIt() {
+        let directory = ChromeInstaller.chromeManifestDirectory(environment: ["FOCUSPILOT_DATA_DIR": "/tmp/fp-try"])
+        #expect(directory?.path == "/tmp/fp-try/Chrome User Data/NativeMessagingHosts")
+    }
+}

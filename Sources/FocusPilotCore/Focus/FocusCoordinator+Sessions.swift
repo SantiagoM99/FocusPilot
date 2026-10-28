@@ -9,6 +9,7 @@ extension FocusCoordinator {
     public func launch() async throws {
         session = try await repository.latestSession()
         try await handle(.reconcile)
+        try await repository.forgetEndedExceptions()
         if policy == nil {
             try await publish(repository.republish())
         }
@@ -32,6 +33,7 @@ extension FocusCoordinator {
     /// after the Mac wakes, and at launch.
     public func reconcile() async throws {
         try await handle(.reconcile)
+        try await repository.forgetEndedExceptions()
     }
 
     /// Completes the session. A strict session ending before its planned end
@@ -84,6 +86,7 @@ extension FocusCoordinator {
             earlyEnd = nil
             ruleWait = nil
             exceptionWait = nil
+            exceptionWaitReason = nil
         }
         for effect in transition.effects {
             switch effect {

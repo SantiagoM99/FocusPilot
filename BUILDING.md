@@ -44,6 +44,8 @@ build/FocusPilot.app/Contents/Helpers/focuspilot add "Try the command by tomorro
 
 Note that this runs under the same bundle ID as an installed FocusPilot, so it shares its settings (for example the first-launch flag). Quit the installed copy first.
 
+With `FOCUSPILOT_DATA_DIR` set, the app does not touch your Chrome's host registration. It registers its host in `$FOCUSPILOT_DATA_DIR/Chrome User Data/NativeMessagingHosts`, which a Chrome started with `--user-data-dir="$FOCUSPILOT_DATA_DIR/Chrome User Data"` reads. That separate Chrome keeps your own Chrome and its FocusPilot connection as they are.
+
 ## Artwork
 
 The app icon and the menu bar glyphs are drawn from the logo geometry in code (`Sources/FocusPilotCore/AppIcon` and `Sources/FocusPilotCore/MenuBar`); there are no hand-drawn image files. `build-app.sh` writes `build/artwork/AppIcon.icon` (an Icon Composer file) and compiles it into the bundle.

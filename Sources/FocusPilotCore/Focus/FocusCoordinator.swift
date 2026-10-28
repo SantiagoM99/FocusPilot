@@ -36,6 +36,9 @@ public actor FocusCoordinator {
     var ruleWait: StrictWait<ConfirmedRuleEdit>?
     /// The owner confirmed an exception request during a strict session.
     var exceptionWait: StrictWait<ExceptionRequest>?
+    /// The reason given when `exceptionWait` was confirmed; asking again
+    /// from another profile or the app need not type it again.
+    var exceptionWaitReason: String?
     /// The last queued read-and-record of Herdr's agents; see `oneAgentReadingAtATime`.
     var agentReading: Task<Void, Never>?
     /// Grows with every change, so the app can drop a snapshot older than one it has.

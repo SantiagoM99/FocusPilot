@@ -18,9 +18,11 @@ public enum RuleText {
     }
 
     /// A rule set's status. Rules with only apps say they hide them while
-    /// the rule applies, or show an app exception's time left.
+    /// the rule applies, or show an app exception's time left; site rules
+    /// show a site or page exception's (design 07: "Exception · 1 page · 8 min").
     public static func status(_ rule: BlockRuleSet, at now: Date, sessionRulesApply: Bool,
                               exceptions: [PolicyException] = []) -> String {
+        if let excepted = siteExceptionStatus(rule, at: now, exceptions: exceptions) { return excepted }
         let apps = rule.targets.compactMap { if case .app(let bundleID, _) = $0 { bundleID.lowercased() } else { nil } }
         guard !apps.isEmpty, apps.count == rule.targets.count else {
             return status(rule.activation, at: now, sessionRulesApply: sessionRulesApply)
@@ -34,6 +36,21 @@ public enum RuleText {
         case .schedule(let schedule): schedule.contains(now)
         }
         return applies ? "Hidden when opened" : status(rule.activation, at: now, sessionRulesApply: sessionRulesApply)
+    }
+
+    /// "Exception · whole site · 8 min left", "Exception · 2 pages · 12 min
+    /// left" for running exceptions on the rule's sites; a site exception
+    /// covers its pages, so it is the one shown.
+    private static func siteExceptionStatus(_ rule: BlockRuleSet, at now: Date, exceptions: [PolicyException]) -> String? {
+        let domains = rule.targets.compactMap { if case .site(let domain) = $0 { domain } else { nil } }
+        let running = exceptions.filter { exception in
+            now < exception.expiresAt && exception.scope.siteHost.map { host in domains.contains { SiteDomain.domain(host, isWithin: $0) } } == true
+        }
+        let sites = running.filter { if case .site = $0.scope { true } else { false } }
+        let shown = sites.isEmpty ? running : sites
+        guard let expiry = shown.map(\.expiresAt).max() else { return nil }
+        let what = !sites.isEmpty ? "whole site" : shown.count == 1 ? "1 page" : "\(shown.count) pages"
+        return "Exception · \(what) · \(BlockedAppText.duration(expiry.timeIntervalSince(now))) left"
     }
 
     /// "Blocked now", "During focus sessions", "Ends 18:00", "Starts Mon 08:00".
@@ -116,5 +133,40 @@ extension RuleText {
 
     private static func names(_ rule: BlockRuleSet) -> String {
         rule.targets.map(\.displayName).joined(separator: ", ")
+    }
+}
+
+/// Running site and page exceptions as the menu bar lists them, soonest
+/// expiry first: "Exception · 1 page on youtube.com · 8 min left".
+public enum SiteExceptionText {
+    public static func lines(_ exceptions: [PolicyException], at now: Date) -> [String] {
+        exceptions.filter { now < $0.expiresAt }.sorted { $0.expiresAt < $1.expiresAt }.compactMap { exception in
+            let left = BlockedAppText.duration(exception.expiresAt.timeIntervalSince(now))
+            switch exception.scope {
+            case .app: return nil
+            case .site(let domain): return "Exception · all of \(domain) · \(left) left"
+            case .page(let url): return "Exception · 1 page on \(PageAddress.host(url) ?? url) · \(left) left"
+            }
+        }
+    }
+}
+
+/// The notification for an exception granted from Chrome's blocked page,
+/// so a grant the owner did not ask for does not go unnoticed.
+public struct ExceptionNoticeText: Equatable, Sendable {
+    public var title: String
+    public var body: String
+
+    public static func grantedFromChrome(_ scope: ExceptionScope, until: Date, in timeZone: TimeZone = .current) -> ExceptionNoticeText {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "HH:mm"
+        let what = switch scope {
+        case .app(let bundleID): bundleID
+        case .site(let domain): "All of \(domain)"
+        case .page(let url): "1 page on \(PageAddress.host(url) ?? url)"
+        }
+        return ExceptionNoticeText(title: "Exception allowed from Chrome", body: "\(what) until \(formatter.string(from: until))")
     }
 }

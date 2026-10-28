@@ -2,12 +2,14 @@
 :root {
   --content: #FFFFFF; --win: #ECECEC; --label: rgba(0,0,0,.85); --label2: rgba(0,0,0,.52); --label3: rgba(0,0,0,.28);
   --sep: rgba(0,0,0,.1); --accent: #007AFF; --orange: #FF9500; --gray: #8E8E93; --btn: #FFFFFF; --btnb: rgba(0,0,0,.14);
+  --green: #28CD41; --fill: rgba(0,0,0,.05); --field: #FFFFFF; --sel: #0063E1;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --content: #1E1E1E; --win: #323232; --label: rgba(255,255,255,.86); --label2: rgba(255,255,255,.56); --label3: rgba(255,255,255,.28);
     --sep: rgba(255,255,255,.12); --accent: #0A84FF; --orange: #FF9F0A; --gray: #98989D; --btn: #5C5C5F; --btnb: rgba(255,255,255,.1);
+    --green: #32D74B; --fill: rgba(255,255,255,.07); --field: #1E1E1E; --sel: #0058D0;
   }
 }
 * { box-sizing: border-box; }
@@ -23,6 +25,7 @@ main { flex: 1; display: flex; align-items: center; justify-content: center; pad
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray); }
 .dot.accent { background: var(--accent); }
 .dot.orange { background: var(--orange); }
+.dot.green { background: var(--green); }
 .heading { display: flex; flex-direction: column; gap: 6px; }
 .eyebrow { font-size: 12px; color: var(--label2); }
 h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
@@ -38,8 +41,28 @@ button.secondary { height: 24px; padding: 0 12px; border-radius: 6px; background
 a { font-size: 12px; color: var(--label2); text-decoration: underline; text-underline-offset: 2px; }
 #exception-panel { display: flex; justify-content: center; }
 #exception-panel[hidden], [hidden] { display: none !important; }
-.card { width: 420px; max-width: 100%; border-radius: 10px; background: var(--win); box-shadow: 0 0 0 .5px var(--sep); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.card { width: 440px; max-width: 100%; border-radius: 10px; background: var(--win); box-shadow: 0 0 0 .5px var(--sep); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.card-head { display: flex; align-items: center; justify-content: space-between; }
 .card h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .card p { margin: 0; font-size: 12px; color: var(--label2); }
-.card-actions { display: flex; justify-content: flex-end; }
+.badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--fill); color: var(--label2); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 11px; color: var(--label2); text-transform: uppercase; letter-spacing: .05em; }
+.segmented { display: inline-flex; align-self: flex-start; padding: 2px; border-radius: 7px; background: var(--fill); box-shadow: 0 0 0 .5px var(--btnb); }
+.segmented button { height: 22px; padding: 0 14px; border-radius: 5px; background: transparent; color: var(--label); font-weight: 400; }
+.segmented button[aria-checked="true"] { background: var(--btn); box-shadow: 0 0 0 .5px var(--btnb), 0 1px 2px rgba(0,0,0,.12); font-weight: 500; }
+.scopes { display: flex; flex-direction: column; border-radius: 8px; background: var(--content); box-shadow: 0 0 0 .5px var(--sep); overflow: hidden; }
+.scopes button { height: auto; padding: 8px 12px 8px 34px; border-radius: 0; background: transparent; color: var(--label); text-align: left; font-weight: 400; display: flex; flex-direction: column; gap: 1px; position: relative; }
+.scopes button + button { border-top: .5px solid var(--sep); }
+.scopes button::before { content: ""; position: absolute; left: 12px; top: 10px; width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--btnb); background: var(--field); }
+.scopes button[aria-checked="true"]::before { box-shadow: inset 0 0 0 4px var(--accent); background: #fff; }
+.scopes small { font-size: 11px; color: var(--label2); word-break: break-all; }
+button:disabled { opacity: .45; }
+input[type="text"] { height: 24px; padding: 0 8px; border-radius: 6px; border: 0; box-shadow: 0 0 0 .5px var(--btnb); background: var(--field); color: var(--label); font: inherit; }
+input[type="text"]:focus { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); }
+.card .wait { color: var(--label); font-variant-numeric: tabular-nums; }
+.card .error { color: var(--orange); }
+.card-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.card-actions button { height: 28px; border-radius: 7px; padding: 0 14px; }
+.card-actions button.secondary { height: 28px; }
 footer { padding: 10px 16px; border-top: .5px solid var(--sep); font-size: 11px; color: var(--label3); display: flex; justify-content: space-between; gap: 16px; }

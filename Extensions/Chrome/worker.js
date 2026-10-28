@@ -14,6 +14,8 @@ const BACKUP_MS = 1500;
 // Wakes the worker to reconcile and reconnect when nothing else does, e.g.
 // after the host failed and the worker stopped (alarms: 30 s minimum).
 const SAFETY_ALARM_MINUTES = 1;
+// How long the blocked page waits for FocusPilot to answer an exception request.
+const EXCEPTION_TIMEOUT_MS = 10000;
 const store = chrome.storage.local;
 
 let port = null;
@@ -62,28 +64,47 @@ async function currentDelivery() {
 async function reconcileNow(trigger) {
   const now = Date.now();
   const policy = (await currentDelivery())?.policy ?? null;
-  await applyRules(FocusPolicy.blockedDomains(policy, now));
+  await applyRules(policy, now);
   await chrome.alarms.clear("boundary");
   const next = FocusPolicy.nextBoundary(policy, now);
   if (next !== null) await chrome.alarms.create("boundary", { when: next });
   await sweepTabs(policy, now, trigger);
 }
 
-// New top-level loads go to the blocked page with the URL in the fragment;
-// frames are blocked. Spike S2/S3: dynamic rules persist across restarts.
-async function applyRules(domains) {
+// FocusPolicy.networkRules: blocked sites redirect, frames are blocked,
+// timed exceptions are carved out. A page regex Chrome would refuse (its
+// regex memory is limited) allows the page's path instead; the content
+// script, which checks every parameter, still blocks other pages there.
+// Rewritten only when they change.
+async function applyRules(policy, now) {
+  const blockedPage = chrome.runtime.getURL("blocked.html");
+  const urls = FocusPolicy.pageURLs(policy, now);
+  const pathOnly = new Set();
+  for (const rule of FocusPolicy.networkRules(policy, now, blockedPage)) {
+    if (rule.action.type !== "allowAllRequests") continue;
+    const check = await chrome.declarativeNetRequest.isRegexSupported({ regex: rule.condition.regexFilter, isCaseSensitive: true });
+    if (!check.isSupported) pathOnly.add(urls[rule.id - 10]);
+  }
+  const rules = FocusPolicy.networkRules(policy, now, blockedPage, { pathOnly });
   const existing = await chrome.declarativeNetRequest.getDynamicRules();
-  const current = existing.find((r) => r.id === 1)?.condition.requestDomains ?? [];
-  if (existing.length === (domains.length ? 2 : 0) && current.join() === domains.join()) return;
-  const addRules = domains.length ? [
-    {
-      id: 1, priority: 1,
-      action: { type: "redirect", redirect: { regexSubstitution: chrome.runtime.getURL("blocked.html") + "#\\0" } },
-      condition: { regexFilter: "^.+$", requestDomains: domains, resourceTypes: ["main_frame"] },
-    },
-    { id: 2, priority: 1, action: { type: "block" }, condition: { requestDomains: domains, resourceTypes: ["sub_frame"] } },
-  ] : [];
-  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules });
+  const key = JSON.stringify(rules);
+  const { appliedRules } = await store.get("appliedRules");
+  const ids = existing.map((r) => r.id).sort((a, b) => a - b).join();
+  if (appliedRules === key && ids === rules.map((r) => r.id).sort((a, b) => a - b).join()) return;
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: rules });
+  } catch (error) {
+    // Blocking must survive a refused rule: keep the blocks and site
+    // carve-outs, and let every excepted page through by its path.
+    const fallback = FocusPolicy.networkRules(policy, now, blockedPage, { pathOnly: true });
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: existing.map((r) => r.id), addRules: fallback })
+      .catch(() => chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: existing.map((r) => r.id), addRules: fallback.filter((r) => r.action.type !== "allowAllRequests"),
+      }));
+    await observe("rules-rejected", { error: String(error?.message ?? error) });
+  }
+  // Recorded either way, so a refused set is not retried on every wake.
+  await store.set({ appliedRules: key });
 }
 
 function blockedPage(url, by) {
@@ -136,6 +157,9 @@ function handlePolicy(message) {
       }
       return;
     }
+    // Rules first: the blocked page returns to a newly excepted page as
+    // soon as it sees the policy, and must not meet the old redirect.
+    await reconcileQueue(() => applyRules(incoming.policy, Date.now()));
     await store.set({ delivery: incoming });
     await reconcile("policy");
     await observe("policy-applied", { revision: incoming.policy.revision, checksum: incoming.policy.checksum, source: incoming.source });
@@ -151,7 +175,34 @@ function handleHost(message) {
       reloadIfUpdated(message.extensionBuild);
       break;
     case "ack": outbox.acknowledge(message.seq); break;
+    case "exception-result": pendingExceptions.get(message.id)?.(message); break;
   }
+}
+
+// ---- Exception requests from the blocked page (#14) ----
+
+// The app decides; the blocked page waits for its answer by request id.
+const pendingExceptions = new Map();
+
+function requestException(message, reply) {
+  const scope = message.scope;
+  if (!port) {
+    reply({ outcome: "refused", message: "FocusPilot isn't reachable. Open FocusPilot and try again." });
+    return;
+  }
+  const id = crypto.randomUUID();
+  const done = (result) => {
+    clearTimeout(timer);
+    pendingExceptions.delete(id);
+    observe("exception-answered", { scope: scope?.kind ?? null, outcome: result.outcome });
+    reply(result);
+  };
+  const timer = setTimeout(() => done({ outcome: "refused", message: "FocusPilot is taking long to answer. If it allows it, this page will update." }), EXCEPTION_TIMEOUT_MS);
+  pendingExceptions.set(id, done);
+  post({
+    type: "exception-request", id, scope, durationSeconds: message.durationSeconds,
+    reason: message.reason ?? null, confirmed: message.confirmed === true,
+  });
 }
 
 // An app update refreshed the extension folder: load the new build. Once
@@ -185,6 +236,9 @@ function connect(reason) {
     if (port !== opened) return;
     port = null;
     sender.close();
+    for (const done of [...pendingExceptions.values()]) {
+      done({ outcome: "refused", message: "FocusPilot isn't reachable. Open FocusPilot and try again." });
+    }
     store.set({ appRunning: null, hostError: error });
     observe("host-disconnected", { error });
     reconnectTimer = setTimeout(() => connect("reconnect"), backoffMs);
@@ -201,8 +255,14 @@ chrome.runtime.onMessage.addListener((message, _from, reply) => {
     case "blocked-shown":
       observe("blocked-shown", { domain: message.domain, view: message.view, by: message.by });
       break;
-    case "exception-requested":
-      observe("exception-requested", { domain: message.domain });
+    case "exception-opened":
+      observe("exception-opened", { domain: message.domain });
+      break;
+    case "exception-request":
+      requestException(message, reply);
+      return true;
+    case "exception-cancel":
+      post({ type: "exception-cancel", scope: message.scope });
       break;
     case "open-app":
       post({ type: "open-app" });

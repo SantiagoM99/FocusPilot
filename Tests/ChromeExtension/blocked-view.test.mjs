@@ -149,3 +149,77 @@ test("durations read like the rest of FocusPilot", () => {
   assert.equal(FocusBlockedView.relative(45 * 60), "in 45 min");
   assert.equal(FocusBlockedView.relative(26 * 3600 + 60), "in 1 d 2 h");
 });
+
+// ---- Timed exceptions (design 05B, #14) ----
+
+const videoURL = "https://www.youtube.com/watch?v=3kqW9MabcdEFG&list=PL1";
+const form = (mode, state = {}, extra = {}) => FocusBlockedView.exceptionForm({
+  delivery: delivery({ session: session(mode), focus }), url: videoURL, now, timeZone: "America/Bogota",
+  state: { duration: 600, scope: "page", reason: "", phase: "editing", ...state }, ...extra,
+});
+
+test("the exception form offers 5, 10 or 20 minutes for this page or the whole site", () => {
+  const f = form("normal");
+
+  assert.equal(f.title, "Timed exception");
+  assert.equal(f.note, "Applies in every Chrome profile. Ends at the time shown, not at the session end.");
+  assert.deepEqual(f.durations, [{ seconds: 300, label: "5 min", selected: false }, { seconds: 600, label: "10 min", selected: true }, { seconds: 1200, label: "20 min", selected: false }]);
+  assert.deepEqual(f.scopes.map((s) => [s.id, s.label, s.selected]), [["page", "This page only", true], ["site", "All of youtube.com", false]]);
+  assert.equal(f.scopes[0].detail, "youtube.com/watch?v=3kqW9MabcdEFG&list=…");
+  assert.equal(f.scopes[1].detail, "Every page on the site");
+  assert.equal(f.reason, null, "only strict sessions ask why");
+  assert.deepEqual(f.allow, { label: "Allow for 10 min", disabled: false });
+});
+
+test("the request names the page as it was blocked, or the rule's site", () => {
+  assert.deepEqual(form("normal").request, { scope: { kind: "page", url: videoURL }, durationSeconds: 600, reason: null, confirmed: false });
+  assert.deepEqual(form("normal", { scope: "site", duration: 300 }).request.scope, { kind: "site", domain: "youtube.com" });
+});
+
+test("a strict session asks why, then confirms, then counts down a wait", () => {
+  const editing = form("strict");
+  assert.equal(editing.strict, true);
+  assert.equal(form("normal").strict, false);
+  assert.equal(editing.reason.placeholder, "Why this page is needed for the task");
+  assert.equal(editing.allow.disabled, true, "no reason yet");
+  assert.equal(form("strict", { scope: "site" }).reason.placeholder, "Why this site is needed for the task");
+
+  const withReason = form("strict", { reason: "Lecture for §4.2" });
+  assert.equal(withReason.allow.disabled, false);
+  assert.equal(withReason.request.reason, "Lecture for §4.2");
+
+  const confirming = form("strict", { reason: "Lecture", phase: "confirming" });
+  assert.equal(confirming.waitNote, "A strict session waits 1 minute before allowing it.");
+  assert.deepEqual(confirming.allow, { label: "Start the wait", disabled: false });
+  assert.equal(confirming.request.confirmed, true);
+
+  const waiting = form("strict", { reason: "Lecture", phase: "waiting", availableAt: now + 42000 });
+  assert.equal(waiting.waitNote, "Strict session · Allow becomes available in 0:42");
+  assert.deepEqual(waiting.allow, { label: "Allow in 0:42", disabled: true });
+  assert.equal(waiting.locked, true, "duration, scope and reason stay as confirmed");
+
+  const ready = form("strict", { reason: "Lecture", phase: "waiting", availableAt: now - 1 });
+  assert.deepEqual(ready.allow, { label: "Allow now", disabled: false });
+});
+
+test("while a request is on its way the form waits for FocusPilot", () => {
+  assert.deepEqual(form("normal", { phase: "sending" }).allow, { label: "Allowing…", disabled: true });
+  assert.equal(form("normal", { error: "FocusPilot isn't running." }).error, "FocusPilot isn't running.");
+});
+
+test("an excepted page says until when it is allowed and offers the way back", () => {
+  const d = delivery({ session: session(), focus });
+  d.policy.exceptions = [{ scope: { kind: "page", url: "https://youtube.com/watch?v=3kqW9MabcdEFG" }, expiresAt: "2026-10-14T15:36:52Z" }];
+  const m = view(d, videoURL);
+
+  assert.equal(m.kind, "excepted");
+  assert.deepEqual(m.status, { tone: "green", text: "Timed exception · 10:00 left" });
+  assert.equal(m.title, "youtube.com is allowed for now");
+  assert.equal(m.subtitle, "This page is allowed until 10:36, then it is blocked again.");
+  assert.deepEqual(m.primary, { label: "Go back to youtube.com", action: "go-back" });
+  assert.equal(m.backURL, videoURL);
+  assert.equal(m.exceptionLink, false);
+
+  d.policy.exceptions = [{ scope: { kind: "site", domain: "youtube.com" }, expiresAt: "2026-10-14T15:36:52Z" }];
+  assert.equal(view(d, videoURL).subtitle, "All of youtube.com is allowed until 10:36, then it is blocked again.");
+});

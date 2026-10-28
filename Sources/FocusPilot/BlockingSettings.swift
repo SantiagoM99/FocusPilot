@@ -7,6 +7,7 @@ struct BlockingSettings: View {
     let model: AppModel
     @State private var selection: Int64?
     @State private var editing: RuleEditorSheet.Draft?
+    @State private var excepting: SiteExceptionSheet.Draft?
 
     var body: some View {
         ScrollView {
@@ -14,7 +15,8 @@ struct BlockingSettings: View {
                 StrictRuleEditBanner(model: model)
                 SectionHeader("Blocked sites and apps", note: "Blocked immediately, no check-in")
                 VStack(spacing: 0) {
-                    RuleTable(model: model, selection: $selection, edit: { editing = .init($0) })
+                    RuleTable(model: model, selection: $selection, edit: { editing = .init($0) },
+                              except: { site in excepting = .init(site: site) })
                         .frame(minHeight: 200)
                     Divider()
                     HStack(spacing: 4) {
@@ -24,6 +26,12 @@ struct BlockingSettings: View {
                         }
                         .disabled(selection == nil)
                         Spacer()
+                        Button("Timed Exception…") {
+                            if let site = selectedSite { excepting = .init(site: site) }
+                        }
+                        .labelStyle(.titleOnly)
+                        .disabled(selectedSite == nil)
+                        .help("Allow a blocked site or one of its pages for 5, 10 or 20 minutes")
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
@@ -41,6 +49,20 @@ struct BlockingSettings: View {
         .sheet(item: $editing) { draft in
             RuleEditorSheet(model: model, draft: draft)
         }
+        .sheet(item: $excepting) { draft in
+            SiteExceptionSheet(model: model, draft: draft)
+        }
+    }
+
+    /// The first site of the selected rule, if it blocks any.
+    private var selectedSite: String? {
+        model.ruleSets.first { $0.id == selection }?.firstSite
+    }
+}
+
+extension BlockRuleSet {
+    var firstSite: String? {
+        targets.lazy.compactMap { if case .site(let domain) = $0 { domain } else { nil } }.first
     }
 }
 
@@ -69,6 +91,8 @@ struct RuleTable: View {
     let model: AppModel
     @Binding var selection: Int64?
     let edit: (BlockRuleSet) -> Void
+    /// Opens the timed exception sheet for a site.
+    let except: (String) -> Void
 
     var body: some View {
         Table(model.ruleSets.map(RuleRow.init), selection: $selection) {
@@ -97,6 +121,9 @@ struct RuleTable: View {
         .contextMenu(forSelectionType: Int64.self) { ids in
             if let rule = rule(ids.first) {
                 Button("Edit…") { edit(rule) }
+                if let site = rule.firstSite {
+                    Button("Timed Exception…") { except(site) }
+                }
                 Button("Remove") { Task { await model.deleteRuleSet(rule.id!) } }
             }
         } primaryAction: { ids in

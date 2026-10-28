@@ -77,7 +77,10 @@ final class AppModel {
             let herdr = HerdrCLI()
             coordinator = FocusCoordinator(repository: repository, herdr: herdr, agents: herdr,
                                            publisher: ChromePolicyMailbox(location: location), notices: UserNotices())
-            listenForCommands(location: location, service: CommandService(repository: repository))
+            // Site exceptions come only from the Chrome host in this bundle (#14).
+            let chromeHost = Bundle.main.bundleURL.appending(path: "Contents/Helpers/focuspilot-chrome-host")
+            listenForCommands(location: location, service: CommandService(repository: repository, exceptions: coordinator,
+                                                                          exceptionCaller: .chromeHost(at: chromeHost)))
             setUpChrome(location: location)
         } catch {
             coordinator = nil
@@ -94,8 +97,8 @@ final class AppModel {
     /// was closed: at launch, then every few seconds in case an add was
     /// queued while the app was starting.
     private func listenForCommands(location: StorageLocation, service: CommandService) {
-        let server = CommandSocketServer(path: location.commandSocketPath) { [weak self] request in
-            let response = await service.handle(request)
+        let server = CommandSocketServer(path: location.commandSocketPath) { [weak self] request, peer in
+            let response = await service.handle(request, from: peer)
             if case .added = response { await self?.refresh() }
             return response
         }

@@ -53,6 +53,7 @@ struct MenuBarContent: View {
                     .foregroundStyle(.secondary)
             }
             ProtectionStatusView(model: model, showsDetail: false)
+            SiteExceptionLines(model: model)
             if let error = model.startupError ?? model.sessionError {
                 Text(error)
                     .font(.callout)
@@ -93,6 +94,7 @@ struct MenuBarContent: View {
                 }
             }
             ProtectionStatusView(model: model)
+            SiteExceptionLines(model: model)
             if let error = model.sessionError {
                 Text(error)
                     .font(.callout)
@@ -184,5 +186,18 @@ struct AppProtectionLine: View {
                 .padding(.leading, 22)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Running site and page exceptions with their time left (#14).
+private struct SiteExceptionLines: View {
+    let model: AppModel
+
+    var body: some View {
+        ForEach(SiteExceptionText.lines(model.snapshot.policy?.exceptions ?? [], at: model.now), id: \.self) { line in
+            Label(line, systemImage: "timer")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
     }
 }

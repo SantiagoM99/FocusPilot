@@ -8,19 +8,26 @@ import Foundation
 /// Not thread-safe: the executable drives it from one serial queue.
 public final class ChromeHost {
     public struct Environment: Sendable {
+        /// Sends a request to the running app and calls back with its
+        /// answer, on the host's queue.
+        public typealias Command = @Sendable (CommandRequest, @escaping @Sendable (Result<CommandResponse, CommandSocketClient.Failure>) -> Void) -> Void
+
         public var isAppRunning: @Sendable () -> Bool
         public var openApp: @Sendable () -> Void
         public var now: @Sendable () -> Date
         public var processID: Int32
         public var send: @Sendable (Data) -> Void
+        public var command: Command
 
         public init(isAppRunning: @escaping @Sendable () -> Bool, openApp: @escaping @Sendable () -> Void,
-                    now: @escaping @Sendable () -> Date, processID: Int32, send: @escaping @Sendable (Data) -> Void) {
+                    now: @escaping @Sendable () -> Date, processID: Int32, send: @escaping @Sendable (Data) -> Void,
+                    command: @escaping Command = { _, done in done(.failure(.notRunning)) }) {
             self.isAppRunning = isAppRunning
             self.openApp = openApp
             self.now = now
             self.processID = processID
             self.send = send
+            self.command = command
         }
     }
 
@@ -51,7 +58,50 @@ public final class ChromeHost {
         case "hello": hello(message)
         case "observation": observation(message, body: body)
         case "open-app": environment.openApp()
+        // Only once the extension has said hello, as Chrome's would.
+        case "exception-request" where profileID != nil: exceptionRequest(message)
+        case "exception-cancel" where profileID != nil:
+            if let scope = Self.scope(message["scope"]) { environment.command(.cancelException(scope)) { _ in } }
         default: break
+        }
+    }
+
+    /// The blocked page asks for a site or page exception; the app decides
+    /// (strict-session confirmation and wait included) and the answer goes
+    /// back to that page under its id.
+    private func exceptionRequest(_ message: [String: Any]) {
+        guard let id = message["id"] as? String, !id.isEmpty,
+              let duration = message["durationSeconds"] as? Double,
+              let scope = Self.scope(message["scope"])
+        else { return }
+        let command = ExceptionCommand(scope: scope, duration: duration, reason: message["reason"] as? String,
+                                       confirmed: message["confirmed"] as? Bool ?? false)
+        let send = environment.send
+        environment.command(.exception(command)) { answer in
+            var reply = Self.exceptionResult(answer)
+            reply["type"] = "exception-result"
+            reply["id"] = id
+            if let data = try? JSONSerialization.data(withJSONObject: reply, options: [.sortedKeys, .withoutEscapingSlashes]) { send(data) }
+        }
+    }
+
+    /// A site or page scope from the blocked page; app scopes never come from there.
+    private static func scope(_ object: Any?) -> ExceptionScope? {
+        guard let object, let data = try? JSONSerialization.data(withJSONObject: object),
+              let scope = try? JSONDecoder().decode(ExceptionScope.self, from: data) else { return nil }
+        if case .app = scope { return nil }
+        return scope
+    }
+
+    static func exceptionResult(_ answer: Result<CommandResponse, CommandSocketClient.Failure>) -> [String: Any] {
+        let instant = { (date: Date) in ISO8601DateFormatter().string(from: date) }
+        switch answer {
+        case .success(.exception(.granted(let expiresAt))): return ["outcome": "granted", "expiresAt": instant(expiresAt)]
+        case .success(.exception(.needsConfirmation)): return ["outcome": "needs-confirmation"]
+        case .success(.exception(.waitUntil(let availableAt))): return ["outcome": "wait", "availableAt": instant(availableAt)]
+        case .success(.refused(let message)), .success(.failed(let message)): return ["outcome": "refused", "message": message]
+        case .failure(.notRunning): return ["outcome": "refused", "message": "FocusPilot isn't running. Open it to ask for an exception."]
+        case .success, .failure: return ["outcome": "refused", "message": "FocusPilot didn't answer. Try again."]
         }
     }
 

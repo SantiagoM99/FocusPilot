@@ -25,7 +25,15 @@ public struct ChromeInstaller: Sendable {
     }
 
     /// Chrome's per-user host folder, or nil when Chrome was never run here.
-    public static func chromeManifestDirectory() -> URL? {
+    /// With `FOCUSPILOT_DATA_DIR` (trying a build without touching the
+    /// owner's setup) it is the host folder of a Chrome started with
+    /// `--user-data-dir="$FOCUSPILOT_DATA_DIR/Chrome User Data"`, so the
+    /// owner's Chrome keeps the host of the FocusPilot they use.
+    public static func chromeManifestDirectory(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
+        if let override = environment["FOCUSPILOT_DATA_DIR"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+                .appending(path: "Chrome User Data/NativeMessagingHosts", directoryHint: .isDirectory)
+        }
         let chrome = URL.applicationSupportDirectory.appending(path: "Google/Chrome", directoryHint: .isDirectory)
         guard FileManager.default.fileExists(atPath: chrome.path) else { return nil }
         return chrome.appending(path: "NativeMessagingHosts", directoryHint: .isDirectory)
