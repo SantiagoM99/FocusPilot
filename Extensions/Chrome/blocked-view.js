@@ -14,6 +14,12 @@ var FocusBlockedView = (() => {
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
   }
 
+  // "25 min", rounded up, for Reduce Motion: it changes once a minute, as
+  // SessionText.minutesLeft in the app.
+  function minutes(seconds) {
+    return `${Math.ceil(Math.max(0, seconds) / 60)} min`;
+  }
+
   // "in 45 min", "in 7 h 33 min", "in 1 d 2 h".
   function relative(seconds) {
     const minutes = Math.max(0, Math.floor(seconds / 60));
@@ -61,7 +67,8 @@ var FocusBlockedView = (() => {
     try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
   }
 
-  function model({ delivery, url, now, appRunning, timeZone }) {
+  function model({ delivery, url, now, appRunning, timeZone, reduceMotion = false }) {
+    const left = (seconds) => reduceMotion ? minutes(seconds) : countdown(seconds);
     const policy = delivery?.policy ?? null;
     const decision = FocusPolicy.decide(policy, url, now);
     const offline = appRunning === false;
@@ -73,7 +80,7 @@ var FocusBlockedView = (() => {
       const what = scope.kind === "site" ? `All of ${scope.domain}` : "This page";
       return {
         kind: "excepted", domain: decision.domain,
-        status: { tone: "green", text: `Timed exception · ${countdown((expiresAt - now) / 1000)} left` },
+        status: { tone: "green", text: `Timed exception · ${left((expiresAt - now) / 1000)} left` },
         title: `${host} is allowed for now`,
         subtitle: `${what} is allowed until ${clock(expiresAt, timeZone)}, then it is blocked again.`,
         primary: { label: `Go back to ${host}`, action: "go-back" }, backURL: FocusPolicy.returnURL(policy, url),
@@ -121,8 +128,8 @@ var FocusBlockedView = (() => {
     const offlineHint = offline ? "FocusPilot isn't running. Open it from Applications or Spotlight to request an exception." : null;
 
     if (FocusPolicy.sessionApplies(session, now) && delivery.focus) {
-      const left = Date.parse(session.end) - now;
-      const status = left > 0 ? `Focus session · ${countdown(left / 1000)} left` : "Strict session · past its planned end";
+      const remaining = Date.parse(session.end) - now;
+      const status = remaining > 0 ? `Focus session · ${left(remaining / 1000)} left` : "Strict session · past its planned end";
       return {
         kind: "session", domain, status: { tone: "accent", text: status }, eyebrow: "You're working on",
         title: delivery.focus.title, subtitle: delivery.focus.nextAction ?? delivery.focus.projectTitle ?? null,
@@ -205,7 +212,19 @@ var FocusBlockedView = (() => {
     };
   }
 
-  return { model, exceptionForm, countdown, relative, days, when };
+  // Where an arrow, Home or End key moves the choice in a radio group of
+  // `count`, wrapping around; null for any other key.
+  function nextChoice(index, count, key) {
+    switch (key) {
+      case "ArrowRight": case "ArrowDown": return (index + 1) % count;
+      case "ArrowLeft": case "ArrowUp": return (index - 1 + count) % count;
+      case "Home": return 0;
+      case "End": return count - 1;
+      default: return null;
+    }
+  }
+
+  return { model, exceptionForm, countdown, relative, days, when, nextChoice };
 })();
 
 if (typeof module === "object") module.exports = FocusBlockedView;

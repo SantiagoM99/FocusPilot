@@ -21,8 +21,12 @@ let unreachable = false;
 // The timed exception form (design 05B); null while it is closed.
 let form = null;
 
+// Reduce Motion: the countdowns change once a minute instead of every second.
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+reducedMotion.addEventListener("change", () => render());
+
 function render() {
-  const m = FocusBlockedView.model({ ...state, url: from, now: Date.now() });
+  const m = FocusBlockedView.model({ ...state, url: from, now: Date.now(), reduceMotion: reducedMotion.matches });
   current = m;
   $("dot").className = "dot " + m.status.tone;
   $("status").textContent = m.status.text;
@@ -67,6 +71,26 @@ $("primary").addEventListener("click", async () => {
 
 // ---- Timed exception form ----
 
+// Arrow keys, Home and End pick within a radio group, as native radios do.
+for (const group of [$("x-durations"), $("x-scopes")]) {
+  group.addEventListener("keydown", (event) => {
+    const radios = [...group.querySelectorAll("[role=radio]")];
+    const index = radios.indexOf(document.activeElement);
+    const next = index < 0 ? null : FocusBlockedView.nextChoice(index, radios.length, event.key);
+    if (next === null || radios[next].disabled) return;
+    event.preventDefault();
+    radios[next].click();
+    group.querySelectorAll("[role=radio]")[next]?.focus();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && form) {
+    event.preventDefault();
+    closeForm();
+  }
+});
+
 function openForm() {
   let path = "/";
   try { path = new URL(from).pathname + new URL(from).search; } catch { /* keep the site */ }
@@ -75,6 +99,8 @@ function openForm() {
   $("exception-panel").hidden = false;
   $("page").hidden = true;
   renderForm();
+  // Keyboard focus follows the form; the link that opened it is now hidden.
+  $("x-durations").querySelector("[aria-checked=true]")?.focus();
   chrome.runtime.sendMessage({ type: "exception-opened", domain: current.domain }).catch(() => {});
 }
 
@@ -83,9 +109,11 @@ function closeForm() {
     const { scope } = FocusBlockedView.exceptionForm({ ...state, url: from, now: Date.now(), state: form }).request;
     chrome.runtime.sendMessage({ type: "exception-cancel", scope }).catch(() => {});
   }
+  const hadFocus = $("exception-panel").contains(document.activeElement);
   form = null;
   $("exception-panel").hidden = true;
   $("page").hidden = false;
+  if (hadFocus) ($("exception").hidden ? $("primary") : $("exception")).focus();
 }
 
 function choice(group, { label, detail, selected, disabled }, onPick) {
@@ -93,6 +121,8 @@ function choice(group, { label, detail, selected, disabled }, onPick) {
   button.type = "button";
   button.setAttribute("role", "radio");
   button.setAttribute("aria-checked", String(selected));
+  // One stop per group for Tab; arrow keys move within it.
+  button.tabIndex = selected ? 0 : -1;
   button.disabled = disabled;
   const title = document.createElement("span");
   title.textContent = label;
@@ -127,6 +157,7 @@ function renderForm() {
     if (focused) [...document.querySelectorAll("[role=radio]")].find((b) => b.textContent === focused)?.focus();
   }
   $("x-reason-row").hidden = !f.reason;
+  $("x-reason").required = Boolean(f.reason);
   if (f.reason) {
     $("x-reason").placeholder = f.reason.placeholder;
     $("x-reason").disabled = f.locked;
