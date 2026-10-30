@@ -7,6 +7,7 @@ extension AppModel {
         guard let coordinator else { return }
         do {
             ruleSets = try await coordinator.ruleSets()
+            activityTracker.classify(rules: ruleSets)
             allowed = try await coordinator.allowedActivities()
         } catch {
             rulesError = "Could not load rules: \(error.localizedDescription)"

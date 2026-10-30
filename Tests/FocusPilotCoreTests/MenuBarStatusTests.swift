@@ -37,11 +37,11 @@ struct MenuBarStatusTests {
     }
 
     @Test func observeOnlyWithoutASession() {
-        #expect(status(FocusSnapshot(isObserveOnly: true)).glyph == .observing)
+        #expect(status(FocusSnapshot(observeSince: FocusSession.sampleStart)).glyph == .observing)
     }
 
     @Test func anActiveSessionTakesPrecedenceOverObserveOnly() {
-        let snapshot = FocusSnapshot(session: .sample(phase: .running), isObserveOnly: true)
+        let snapshot = FocusSnapshot(session: .sample(phase: .running), observeSince: FocusSession.sampleStart)
         #expect(status(snapshot).glyph == .focusing)
     }
 
@@ -93,7 +93,7 @@ struct MenuBarStatusTests {
             == "FocusPilot: Paused, Write the essay")
         #expect(status(FocusSnapshot(session: .sample(phase: .onBreak(until: now)))).accessibilityLabel
             == "FocusPilot: On a break, Write the essay")
-        #expect(status(FocusSnapshot(isObserveOnly: true)).accessibilityLabel
+        #expect(status(FocusSnapshot(observeSince: FocusSession.sampleStart)).accessibilityLabel
             == "FocusPilot: Observe only, No current task")
     }
 

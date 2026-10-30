@@ -24,11 +24,15 @@ public struct PolicyDelivery: Hashable, Codable, Sendable {
     /// it is missing. Revisions restart when that database is replaced, so a
     /// delivery from another source counts as newer whatever its revision.
     public var source: String?
+    /// True while observing (#21): the extension reports its front tab's
+    /// domain, and only then. Absent otherwise.
+    public var observe: Bool?
 
-    public init(policy: CompiledPolicy, focus: FocusContext?, source: String? = nil) {
+    public init(policy: CompiledPolicy, focus: FocusContext?, source: String? = nil, observe: Bool? = nil) {
         self.policy = policy
         self.focus = focus
         self.source = source
+        self.observe = observe
     }
 }
 

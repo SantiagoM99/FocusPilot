@@ -59,6 +59,10 @@ final class AppModel {
     var protectionEvidence = ProtectionEvidence()
     /// The browser the owner last had in front, if the last app was one.
     var frontBrowser: FrontBrowser?
+    /// Observe-only mode and pilot metrics (#21); see `AppModel+Observe.swift`.
+    @ObservationIgnored var activityTracker = ActivityTracker(ownBundleID: Bundle.main.bundleIdentifier)
+    var weeklySummary: WeeklySummary?
+    var observeError: String?
     /// Pending reconcile at the next session deadline.
     @ObservationIgnored var reconcileTask: Task<Void, Never>?
     @ObservationIgnored lazy var focusPanel = FocusPanelController(model: self)
@@ -82,6 +86,7 @@ final class AppModel {
             listenForCommands(location: location, service: CommandService(repository: repository, exceptions: coordinator,
                                                                           exceptionCaller: .chromeHost(at: chromeHost)))
             setUpChrome(location: location)
+            followActivity(location: location)
         } catch {
             coordinator = nil
             startupError = "Could not open the database: \(error.localizedDescription)"

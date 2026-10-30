@@ -3,12 +3,22 @@ import SwiftUI
 
 /// Protection status (design 03 and 04, #17): Browsers, then Safari, then
 /// Apps, each its own fact. Nothing here sums them up as "protected".
+/// While observing (#21) nothing is blocked, and that is all it says.
 struct ProtectionStatusView: View {
     let model: AppModel
     var showsDetail = true
     var showsSafari = true
+    var showsWeek = true
 
     var body: some View {
+        if model.snapshot.isObserveOnly {
+            ObservingLine(model: model, showsWeek: showsWeek)
+        } else {
+            lines
+        }
+    }
+
+    private var lines: some View {
         VStack(alignment: .leading, spacing: 6) {
             BrowserStatusLine(status: model.browserProtection, showsDetail: showsDetail)
             if showsSafari {
@@ -92,8 +102,13 @@ struct SidebarProtectionFooter: View {
         let browsers = model.browserProtection
         let apps = model.appProtection
         VStack(alignment: .leading, spacing: 4) {
-            footerLine(browsers.footer, color: browsers.level.color, hollow: browsers.level == .unknown)
-            footerLine(apps.short, color: apps.isProtected ? .green : .secondary, hollow: !apps.isProtected)
+            if model.snapshot.isObserveOnly {
+                // Design 12: a hollow gray dot, never green.
+                footerLine("Observing · nothing is blocked", color: .secondary, hollow: true)
+            } else {
+                footerLine(browsers.footer, color: browsers.level.color, hollow: browsers.level == .unknown)
+                footerLine(apps.short, color: apps.isProtected ? .green : .secondary, hollow: !apps.isProtected)
+            }
         }
         .font(.caption)
         .foregroundStyle(.secondary)

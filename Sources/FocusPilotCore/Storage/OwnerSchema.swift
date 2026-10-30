@@ -215,6 +215,33 @@ enum OwnerSchema {
             }
             try db.create(index: "timedException_on_expiresAt", on: ExceptionRow.databaseTableName, columns: ["expiresAt"])
         }
+        migrator.registerMigration("owner-v11-observe") { db in
+            // Observe-only mode (#21): one row while it is on.
+            try db.create(table: "observeMode") { table in
+                table.primaryKey("id", .integer).check(sql: "id = 1")
+                table.column("since", .datetime).notNull()
+            }
+            // Pilot metrics: append-only, never URLs or content (decision 0003).
+            try db.create(table: PilotEventRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("kind", .text).notNull()
+                table.column("at", .datetime).notNull()
+                table.column("duration", .double)
+                table.column("target", .text)
+                table.column("sessionId", .text)
+                table.column("taskId", .integer)
+            }
+            try db.create(index: "pilotEvent_on_at", on: PilotEventRow.databaseTableName, columns: ["at"])
+            // What was in front, an app or a domain; deleted after 24 hours.
+            try db.create(table: RawActivityRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("kind", .text).notNull().check(sql: "kind IN ('app', 'site')")
+                table.column("target", .text).notNull()
+                table.column("start", .datetime).notNull()
+                table.column("end", .datetime).notNull()
+            }
+            try db.create(index: "rawActivity_on_end", on: RawActivityRow.databaseTableName, columns: ["end"])
+        }
         return migrator
     }
 

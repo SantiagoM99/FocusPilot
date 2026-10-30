@@ -123,15 +123,22 @@ extension FocusCoordinator {
     /// policy Settings shows only moves forward: an edit that interleaved
     /// with a newer one is still published (extensions drop it by revision)
     /// but never replaces the newer one here.
+    ///
+    /// While observing (#21) the policy blocks nothing and hides no app, and
+    /// the delivery asks Chrome to report its front tab's domain.
     func publish(revision: Int, inputs: PolicyInputs, session: SessionPolicy?, at: Date) async {
+        let observing = inputs.observeSince != nil
         let exceptions = inputs.exceptions.filter { $0.expiresAt > at }.map(\.policyException)
-        let rules = PolicyCompiler.compile(rules: inputs.rules, allowed: inputs.allowed, session: session, exceptions: exceptions)
+        let rules = observing
+            ? PolicyCompiler.compile(rules: [], allowed: inputs.allowed, session: nil, exceptions: [])
+            : PolicyCompiler.compile(rules: inputs.rules, allowed: inputs.allowed, session: session, exceptions: exceptions)
         let compiled = CompiledPolicy(revision: revision, effectiveAt: at, rules: rules)
         if compiled.revision > policy?.revision ?? 0 {
             policy = compiled
+            observeSince = inputs.observeSince
         }
         await publisher.publish(PolicyDelivery(policy: compiled, focus: compiled.session == nil ? nil : await focusContext(),
-                                               source: repository.policySource))
+                                               source: repository.policySource, observe: observing ? true : nil))
     }
 
     /// The session's task for the blocked page, with the Now task's next
