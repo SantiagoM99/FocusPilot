@@ -10,10 +10,16 @@ public struct MenuBarStatus: Equatable, Sendable {
     public var isTimeDimmed: Bool
     public var accessibilityLabel: String
 
-    public init(snapshot: FocusSnapshot, now: Date, showsTime: Bool) {
+    /// With `reducesMotion` (Reduce Motion) the time reads in whole minutes,
+    /// "25 min", so it changes once a minute instead of every second.
+    public init(snapshot: FocusSnapshot, now: Date, showsTime: Bool, reducesMotion: Bool = false) {
         let session = snapshot.activeSession
         glyph = Self.glyph(phase: session?.phase, isObserveOnly: snapshot.isObserveOnly)
-        timeText = session.flatMap { showsTime ? Self.format(remaining: $0.plannedEnd.timeIntervalSince(now)) : nil }
+        timeText = session.flatMap { session in
+            guard showsTime else { return nil }
+            let remaining = session.plannedEnd.timeIntervalSince(now)
+            return reducesMotion ? "\(Int((max(0, remaining) / 60).rounded(.up))) min" : Self.format(remaining: remaining)
+        }
         isTimeDimmed = glyph == .paused
 
         let state = Self.spokenState(phase: session?.phase, isObserveOnly: snapshot.isObserveOnly, status: snapshot.statusText)

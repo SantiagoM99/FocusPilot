@@ -46,6 +46,49 @@ public struct ChromeInstaller: Sendable {
             .map { $0.appending(path: "NativeMessagingHosts", directoryHint: .isDirectory) }
     }
 
+    /// What setting up every channel left undone.
+    public struct SetUpReport: Equatable, Sendable {
+        /// Channels whose host manifest could not be written, e.g. "Chrome Beta".
+        public var failedChannels: [String]
+        public var extensionFailed: Bool
+
+        public init(failedChannels: [String], extensionFailed: Bool) {
+            self.failedChannels = failedChannels
+            self.extensionFailed = extensionFailed
+        }
+
+        /// For Settings; nil when everything is set up.
+        public var problem: String? {
+            // English, whatever the system language (the UI is English).
+            let channels = failedChannels.count < 2 ? failedChannels.joined()
+                : failedChannels.dropLast().joined(separator: ", ") + " and " + failedChannels.last!
+            switch (failedChannels.isEmpty, extensionFailed) {
+            case (true, false): return nil
+            case (true, true): return "Could not update the FocusPilot extension folder."
+            case (false, true): return "Could not set up \(channels), and could not update the FocusPilot extension folder."
+            case (false, false): return "Could not set up \(channels). The other Chrome versions are set up."
+            }
+        }
+    }
+
+    /// Writes the host manifest into each folder and refreshes the extension
+    /// once. A failure in one folder is recorded and the rest still run.
+    public static func setUpEverywhere(manifestDirectories: [URL], hostExecutable: URL,
+                                       bundledExtension: URL, extensionDirectory: URL) -> SetUpReport {
+        var report = SetUpReport(failedChannels: [], extensionFailed: false)
+        for directory in manifestDirectories {
+            let installer = ChromeInstaller(manifestDirectory: directory, hostExecutable: hostExecutable,
+                                            bundledExtension: bundledExtension, extensionDirectory: extensionDirectory)
+            do { try installer.installHost() } catch {
+                report.failedChannels.append(directory.deletingLastPathComponent().lastPathComponent)
+            }
+        }
+        let installer = ChromeInstaller(manifestDirectory: extensionDirectory, hostExecutable: hostExecutable,
+                                        bundledExtension: bundledExtension, extensionDirectory: extensionDirectory)
+        do { try installer.syncExtension() } catch { report.extensionFailed = true }
+        return report
+    }
+
     private var manifestURL: URL {
         manifestDirectory.appending(path: "\(ChromeExtension.hostName).json")
     }

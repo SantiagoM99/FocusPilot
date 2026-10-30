@@ -78,6 +78,7 @@ struct MenuBarContent: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(model.nowTask == nil)
+            .accessibilityHint(model.nowTask.map { "Starts a session for \($0.title)" } ?? "")
         }
     }
 
@@ -132,7 +133,8 @@ private struct MenuRow: View {
                 Text(title)
                 Spacer()
                 if let shortcut {
-                    Text(shortcut).foregroundStyle(.tertiary)
+                    // Read as the button's shortcut, not as part of its name.
+                    Text(shortcut).foregroundStyle(.tertiary).accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 10)

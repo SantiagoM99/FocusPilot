@@ -13,6 +13,21 @@ enum DateVocabulary {
     static let unambiguousStarts: Set<String> = Set(fullNames).subtracting(["may"])
         .union(["today", "tomorrow", "hoy", "mañana", "pasado"])
 
+    /// The words of `text`, with "a las" and "a la" kept together as one
+    /// marker, the Spanish "at" before a time ("a las 5pm").
+    static func words(in text: String) -> [Substring] {
+        var words = text.ranges(of: /\S+/).map { text[$0] }
+        var index = words.startIndex
+        while index < words.index(before: words.endIndex) {
+            if normalized(words[index]) == "a", ["la", "las"].contains(normalized(words[index + 1])) {
+                words[index] = text[words[index].startIndex..<words[index + 1].endIndex]
+                words.remove(at: index + 1)
+            }
+            index += 1
+        }
+        return words
+    }
+
     static func isMarker(_ word: Substring) -> Bool {
         DeadlineParser.fillerWords.contains(Substring(normalized(word)))
     }

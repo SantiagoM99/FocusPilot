@@ -60,21 +60,16 @@ extension AppModel {
             setup.problem = "Chrome blocking needs FocusPilot.app (scripts/build-app.sh)."
             return setup
         }
-        // Chrome and its Beta, Dev and Canary channels, each in its own folder.
-        let installers = ChromeInstaller.chromeManifestDirectories().map {
-            ChromeInstaller(manifestDirectory: $0, hostExecutable: host, bundledExtension: bundled,
-                            extensionDirectory: location.chromeExtensionDirectory)
-        }
-        guard let first = installers.first else {
+        // Chrome and its Beta, Dev and Canary channels, each in its own folder;
+        // one that fails does not keep the others or the extension from updating.
+        let directories = ChromeInstaller.chromeManifestDirectories()
+        guard !directories.isEmpty else {
             setup.problem = "Google Chrome isn't installed."
             return setup
         }
-        do {
-            for installer in installers { try installer.installHost() }
-            try first.syncExtension()
-        } catch {
-            setup.problem = "Could not set up Chrome: \(error.localizedDescription)"
-        }
+        setup.problem = ChromeInstaller.setUpEverywhere(manifestDirectories: directories, hostExecutable: host,
+                                                        bundledExtension: bundled,
+                                                        extensionDirectory: location.chromeExtensionDirectory).problem
         return setup
     }
 }

@@ -148,3 +148,64 @@ struct ChromeChannelTests {
         }
     }
 }
+
+/// One channel's folder failing must not cost the other channels their
+/// manifest, nor the extension its refresh (#23).
+@Suite("Setting up every Chrome channel")
+struct ChromeSetUpEverywhereTests {
+    private let root: URL
+    private let bundled: URL
+    private let host: URL
+    private let extensionDirectory: URL
+
+    init() throws {
+        root = try makeTemporaryDirectory()
+        bundled = root.appending(path: "FocusPilot.app/Contents/Resources/ChromeExtension")
+        try FileManager.default.createDirectory(at: bundled, withIntermediateDirectories: true)
+        try Data(#"{"version":"1.0.0"}"#.utf8).write(to: bundled.appending(path: "manifest.json"))
+        host = root.appending(path: "FocusPilot.app/Contents/Helpers/focuspilot-chrome-host")
+        extensionDirectory = root.appending(path: "Data/Chrome Extension")
+    }
+
+    private func manifestExists(in directory: URL) -> Bool {
+        FileManager.default.fileExists(atPath: directory.appending(path: "\(ChromeExtension.hostName).json").path)
+    }
+
+    private func setUp(_ directories: [URL]) -> ChromeInstaller.SetUpReport {
+        ChromeInstaller.setUpEverywhere(manifestDirectories: directories, hostExecutable: host,
+                                        bundledExtension: bundled, extensionDirectory: extensionDirectory)
+    }
+
+    @Test func aChannelThatFailsDoesNotSkipTheOthersOrTheExtension() throws {
+        let chrome = root.appending(path: "Google/Chrome/NativeMessagingHosts")
+        let beta = root.appending(path: "Google/Chrome Beta/NativeMessagingHosts")
+        let canary = root.appending(path: "Google/Chrome Canary/NativeMessagingHosts")
+        // A file where Beta's folder should be: its manifest cannot be written.
+        try FileManager.default.createDirectory(at: beta.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: beta)
+
+        let report = setUp([chrome, beta, canary])
+
+        #expect(manifestExists(in: chrome))
+        #expect(manifestExists(in: canary))
+        #expect(FileManager.default.fileExists(atPath: extensionDirectory.appending(path: "manifest.json").path))
+        #expect(report.failedChannels == ["Chrome Beta"])
+        #expect(report.extensionFailed == false)
+    }
+
+    @Test func everythingWorkingReportsNoProblem() {
+        let report = setUp([root.appending(path: "Google/Chrome/NativeMessagingHosts")])
+        #expect(report.failedChannels.isEmpty)
+        #expect(report.extensionFailed == false)
+        #expect(report.problem == nil)
+    }
+
+    @Test func theProblemNamesTheChannelsThatFailed() {
+        let report = ChromeInstaller.SetUpReport(failedChannels: ["Chrome Beta", "Chrome Dev"], extensionFailed: false)
+        #expect(report.problem == "Could not set up Chrome Beta and Chrome Dev. The other Chrome versions are set up.")
+        let both = ChromeInstaller.SetUpReport(failedChannels: ["Chrome"], extensionFailed: true)
+        #expect(both.problem == "Could not set up Chrome, and could not update the FocusPilot extension folder.")
+        let onlyExtension = ChromeInstaller.SetUpReport(failedChannels: [], extensionFailed: true)
+        #expect(onlyExtension.problem == "Could not update the FocusPilot extension folder.")
+    }
+}

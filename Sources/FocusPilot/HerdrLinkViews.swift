@@ -156,6 +156,8 @@ private struct StatusDotLabelStyle: LabelStyle {
             configuration.icon
                 .font(.system(size: 7))
                 .foregroundStyle(color)
+                .contrastOutline()
+                .accessibilityHidden(true)
             configuration.title
         }
     }

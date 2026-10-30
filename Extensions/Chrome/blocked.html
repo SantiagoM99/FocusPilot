@@ -10,7 +10,7 @@
 <body>
 <main>
   <section id="page">
-    <p class="status"><span class="dot" id="dot"></span><span id="status"></span></p>
+    <p class="status"><span class="dot" id="dot" aria-hidden="true"></span><span id="status"></span></p>
     <div class="heading">
       <span class="eyebrow" id="eyebrow"></span>
       <h1 id="title"></h1>
@@ -20,7 +20,7 @@
     <div class="actions">
       <button id="primary" type="button"></button>
       <p class="hint" id="hint"></p>
-      <a href="#" id="exception">Request a timed exception…</a>
+      <button id="exception" type="button" class="link">Request a timed exception…</button>
     </div>
   </section>
   <section id="exception-panel" hidden>

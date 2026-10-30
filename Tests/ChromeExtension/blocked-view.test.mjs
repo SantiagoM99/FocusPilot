@@ -223,3 +223,28 @@ test("an excepted page says until when it is allowed and offers the way back", (
   d.policy.exceptions = [{ scope: { kind: "site", domain: "youtube.com" }, expiresAt: "2026-10-14T15:36:52Z" }];
   assert.equal(view(d, videoURL).subtitle, "All of youtube.com is allowed until 10:36, then it is blocked again.");
 });
+
+// #23: with Reduce Motion the timers change once a minute, rounded up, as
+// the focus panel does (design 04); the strict wait keeps its seconds.
+test("with Reduce Motion the countdowns read in whole minutes", () => {
+  const d = delivery({ session: session(), focus });
+  assert.equal(view(d, "https://youtube.com/", { reduceMotion: true }).status.text, "Focus session · 25 min left");
+  d.policy.exceptions = [{ scope: { kind: "site", domain: "youtube.com" }, expiresAt: "2026-10-14T15:36:22Z" }];
+  assert.equal(view(d, "https://youtube.com/", { reduceMotion: true }).status.text, "Timed exception · 10 min left");
+  assert.equal(view(d, "https://youtube.com/").status.text, "Timed exception · 9:30 left", "seconds without it");
+});
+
+// #23: the duration and scope choices are radio groups, so arrow keys move
+// the choice and Home/End jump to the ends, wrapping around.
+test("arrow keys move through a radio group", () => {
+  const next = FocusBlockedView.nextChoice;
+  assert.equal(next(0, 3, "ArrowRight"), 1);
+  assert.equal(next(0, 3, "ArrowDown"), 1);
+  assert.equal(next(2, 3, "ArrowRight"), 0);
+  assert.equal(next(0, 3, "ArrowLeft"), 2);
+  assert.equal(next(1, 3, "ArrowUp"), 0);
+  assert.equal(next(1, 3, "Home"), 0);
+  assert.equal(next(0, 3, "End"), 2);
+  assert.equal(next(0, 3, "Tab"), null);
+  assert.equal(next(0, 3, "a"), null);
+});

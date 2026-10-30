@@ -12,6 +12,14 @@
     --green: #32D74B; --fill: rgba(255,255,255,.07); --field: #1E1E1E; --sel: #0058D0;
   }
 }
+/* Increased Contrast (prefers-contrast: more on macOS): stronger secondary
+   text and separators, outlined dots and buttons (design 04). */
+@media (prefers-contrast: more) {
+  :root { --label: #000; --label2: rgba(0,0,0,.75); --label3: rgba(0,0,0,.62); --sep: rgba(0,0,0,.45); --btnb: rgba(0,0,0,.55); --fill: rgba(0,0,0,.08); }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root { --label: #fff; --label2: rgba(255,255,255,.8); --label3: rgba(255,255,255,.66); --sep: rgba(255,255,255,.5); --btnb: rgba(255,255,255,.55); --fill: rgba(255,255,255,.12); }
+}
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body {
@@ -35,10 +43,10 @@ button {
   height: 32px; padding: 0 20px; border-radius: 8px; border: 0; background: var(--accent); color: #fff;
   font: inherit; font-size: 13px; font-weight: 500; cursor: default;
 }
+button.link { height: auto; padding: 0; border-radius: 2px; background: none; color: var(--label2); font-size: 12px; font-weight: 400; text-decoration: underline; text-underline-offset: 2px; }
 button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 2px; }
 button.secondary { height: 24px; padding: 0 12px; border-radius: 6px; background: var(--btn); color: var(--label); box-shadow: 0 0 0 .5px var(--btnb); font-weight: 400; }
 .hint { margin: 0; max-width: 360px; font-size: 12px; color: var(--label2); }
-a { font-size: 12px; color: var(--label2); text-decoration: underline; text-underline-offset: 2px; }
 #exception-panel { display: flex; justify-content: center; }
 #exception-panel[hidden], [hidden] { display: none !important; }
 .card { width: 440px; max-width: 100%; border-radius: 10px; background: var(--win); box-shadow: 0 0 0 .5px var(--sep); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; text-align: left; }
@@ -66,3 +74,13 @@ input[type="text"]:focus { outline: 3px solid color-mix(in srgb, var(--accent) 5
 .card-actions button { height: 28px; border-radius: 7px; padding: 0 14px; }
 .card-actions button.secondary { height: 28px; }
 footer { padding: 10px 16px; border-top: .5px solid var(--sep); font-size: 11px; color: var(--label3); display: flex; justify-content: space-between; gap: 16px; }
+@media (prefers-contrast: more) {
+  .dot { outline: 1px solid var(--label); }
+  h1, .card h2 { font-weight: 700; }
+  .status, .subtitle, .detail, .hint, .card p, .label, footer { font-weight: 500; }
+  .card, .scopes { box-shadow: 0 0 0 1px var(--sep); }
+  button:not(.link) { box-shadow: 0 0 0 1px var(--label); }
+  button.secondary, .segmented, .segmented button[aria-checked="true"], input[type="text"] { box-shadow: 0 0 0 1px var(--btnb); }
+  .segmented button, .scopes button { box-shadow: none; }
+  footer { border-top-width: 1px; }
+}

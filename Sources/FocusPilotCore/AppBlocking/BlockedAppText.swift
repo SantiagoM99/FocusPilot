@@ -8,10 +8,12 @@ public struct BlockedAppText: Sendable {
     public var footer: String
 
     /// `session` is the active session, if any; it is shown whatever rule hid the app.
-    public init(appName: String, reason: AppBlockReason, session: FocusSession?, at now: Date) {
+    /// With `reducesMotion` the time left reads in whole minutes ("25 min left").
+    public init(appName: String, reason: AppBlockReason, session: FocusSession?, at now: Date, reducesMotion: Bool = false) {
         footer = "\(appName) was hidden, not quit. Nothing was closed. Exceptions cover the whole app."
         if let session {
-            headline = "Focus session · \(SessionText(session).timeLeft(at: now)) left"
+            let text = SessionText(session)
+            headline = "Focus session · " + (reducesMotion ? text.minutesLeft(at: now) : text.timeLeft(at: now) + " left")
             detail = "You're working on \(session.action)"
             return
         }

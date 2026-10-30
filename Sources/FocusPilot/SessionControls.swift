@@ -99,9 +99,11 @@ struct SessionHeader: View {
             Circle()
                 .fill(session.phase == .running ? Color.accentColor : Color.secondary)
                 .frame(width: 7, height: 7)
+                .contrastOutline()
                 .accessibilityHidden(true)
             Text(text.phase)
                 .font(.callout.weight(.medium))
+                .contrastEmphasis()
                 .foregroundStyle(.secondary)
             if session.mode == .strict {
                 Label("Strict", systemImage: "lock.fill")

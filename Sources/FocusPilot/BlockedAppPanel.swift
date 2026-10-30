@@ -134,9 +134,11 @@ struct BlockedAppPanelView: View {
 
     private var session: FocusSession? { model.snapshot.activeSession }
     private var isStrict: Bool { session?.mode == .strict }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private func content(_ blocked: BlockedApp) -> some View {
-        let text = BlockedAppText(appName: blocked.name, reason: blocked.reason, session: session, at: model.now)
+        let text = BlockedAppText(appName: blocked.name, reason: blocked.reason, session: session, at: model.now,
+                                  reducesMotion: reduceMotion)
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
@@ -198,7 +200,7 @@ struct BlockedAppPanelView: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.bar)
+                .barBackground()
         }
         .frame(width: 420)
         .clipShape(RoundedRectangle(cornerRadius: 12))

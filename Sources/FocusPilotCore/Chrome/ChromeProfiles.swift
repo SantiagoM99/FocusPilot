@@ -24,7 +24,7 @@ public struct ChromeProfileStatus: Equatable, Sendable, Identifiable {
         switch state {
         case .acknowledged: "Chrome has your latest rules"
         case .syncing: "Chrome is updating…"
-        case .waiting: "Connected · waiting for the policy"
+        case .waiting: "Connected · getting your rules…"
         case .disconnected: "Disconnected"
         }
     }

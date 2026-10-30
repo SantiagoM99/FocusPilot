@@ -57,7 +57,8 @@ struct StatusLine: View {
             Label {
                 Text(text)
             } icon: {
-                Image(systemName: symbol).foregroundStyle(color)
+                // The text says the same; VoiceOver would read the symbol's name.
+                Image(systemName: symbol).foregroundStyle(color).accessibilityHidden(true)
             }
             .font(.callout)
             if let detail {
@@ -123,7 +124,10 @@ struct SidebarProtectionFooter: View {
                 if hollow { Circle().strokeBorder(color, lineWidth: 1) } else { Circle().fill(color) }
             }
             .frame(width: 7, height: 7)
+            .contrastOutline()
+            .accessibilityHidden(true)
             Text(text)
         }
+        .accessibilityElement(children: .combine)
     }
 }

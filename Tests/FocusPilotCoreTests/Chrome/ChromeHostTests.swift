@@ -353,7 +353,7 @@ struct ChromeProfileStatusTests {
 
     @Test func statusTextSaysWhatTheOwnerNeedsToKnow() {
         #expect(ChromeProfileStatus.text(.acknowledged(revision: 41)) == "Chrome has your latest rules")
-        #expect(ChromeProfileStatus.text(.waiting) == "Connected · waiting for the policy")
+        #expect(ChromeProfileStatus.text(.waiting) == "Connected · getting your rules…")
         #expect(ChromeProfileStatus.text(.syncing(acknowledged: 40)) == "Chrome is updating…")
         #expect(ChromeProfileStatus.text(.disconnected(lastSeen: nil)) == "Disconnected")
     }

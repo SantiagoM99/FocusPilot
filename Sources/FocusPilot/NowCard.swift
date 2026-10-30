@@ -84,6 +84,7 @@ struct NowCard: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .help("Start focus (⌘⏎)")
+            .accessibilityHint("Starts a session for \(item.title)")
         }
     }
 }
