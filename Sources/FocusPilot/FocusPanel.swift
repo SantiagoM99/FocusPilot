@@ -80,7 +80,7 @@ struct FocusPanelView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Collapse")
-                    .accessibilityLabel("Collapse focus panel")
+                    .accessibilityLabel("Collapse")
                 }
                 Text(session.action)
                     .font(.headline)
@@ -126,6 +126,7 @@ struct FocusPanelView: View {
         }
         .buttonStyle(.plain)
         .help("Expand")
-        .accessibilityLabel("\(text.phase), \(text.minutesLeft(at: model.now)), \(session.action). Expand focus panel")
+        .accessibilityLabel("\(text.phase), \(text.minutesLeft(at: model.now)), \(session.action)")
+        .accessibilityHint("Expand")
     }
 }
