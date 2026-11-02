@@ -5,17 +5,21 @@ import Foundation
 /// The caller supplies the ID so the engine stays deterministic.
 public struct SessionRequest: Equatable, Sendable {
     public var id: UUID
-    public var taskID: Int64
-    public var action: String
+    /// The task in Now at the start, if any.
+    public var taskID: Int64?
+    public var action: String?
     public var mode: SessionMode
     public var duration: TimeInterval
+    public var scope: SessionScope
 
-    public init(id: UUID, taskID: Int64, action: String, mode: SessionMode, duration: TimeInterval) {
+    public init(id: UUID, taskID: Int64?, action: String?, mode: SessionMode, duration: TimeInterval,
+                scope: SessionScope = .allProjects) {
         self.id = id
         self.taskID = taskID
         self.action = action
         self.mode = mode
         self.duration = duration
+        self.scope = scope
     }
 }
 

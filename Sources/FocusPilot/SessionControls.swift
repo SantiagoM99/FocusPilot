@@ -22,7 +22,7 @@ struct SessionControls: View {
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     // Resuming shows the return cue first (#20).
-                    if showsReturnCue, case .paused = session.phase, let wrapUp = model.task(session.taskID)?.wrapUp {
+                    if showsReturnCue, case .paused = session.phase, let wrapUp = session.taskID.flatMap(model.task)?.wrapUp {
                         ReturnCueView(wrapUp: wrapUp, isCompact: true)
                     }
                     HStack(spacing: 8) {

@@ -19,7 +19,7 @@ struct WrapUpCoordinatorTests {
         let snapshot = await fixture.coordinator.snapshot()
         #expect(snapshot.currentTaskTitle == nil)
         #expect(snapshot.revision > revisionBefore)
-        #expect(try await fixture.coordinator.wrapUpHistory(forTask: ended.taskID).map(\.sessionID) == [ended.id])
+        #expect(try await fixture.coordinator.wrapUpHistory(forTask: #require(ended.taskID)).map(\.sessionID) == [ended.id])
     }
 
     @Test func aSessionStillRunningOrPausedCannotBeWrappedUp() async throws {
@@ -34,7 +34,7 @@ struct WrapUpCoordinatorTests {
                 try await fixture.coordinator.saveWrapUp(wrapUp, after: session)
             }
         }
-        #expect(try await fixture.coordinator.wrapUpHistory(forTask: running.taskID).isEmpty)
+        #expect(try await fixture.coordinator.wrapUpHistory(forTask: #require(running.taskID)).isEmpty)
     }
 
     @Test func anEndedSessionCannotMarkItsTaskDoneWhileANewSessionRunsOnIt() async throws {
@@ -51,9 +51,9 @@ struct WrapUpCoordinatorTests {
             try await fixture.coordinator.saveWrapUp(wrapUp, after: first, markingDone: true)
         }
         #expect(await fixture.coordinator.snapshot().currentTaskTitle != nil)
-        #expect(try await fixture.coordinator.wrapUpHistory(forTask: first.taskID).isEmpty)
+        #expect(try await fixture.coordinator.wrapUpHistory(forTask: #require(first.taskID)).isEmpty)
 
         try await fixture.coordinator.saveWrapUp(wrapUp, after: first)
-        #expect(try await fixture.coordinator.wrapUpHistory(forTask: first.taskID).map(\.sessionID) == [first.id])
+        #expect(try await fixture.coordinator.wrapUpHistory(forTask: #require(first.taskID)).map(\.sessionID) == [first.id])
     }
 }

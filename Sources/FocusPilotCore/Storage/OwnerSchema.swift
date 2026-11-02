@@ -242,6 +242,31 @@ enum OwnerSchema {
             }
             try db.create(index: "rawActivity_on_end", on: RawActivityRow.databaseTableName, columns: ["end"])
         }
+        migrator.registerMigration("owner-v12-project-sessions") { db in
+            // A session covers projects, not one task (#56, decision 0004):
+            // the task in Now may be empty, and the scope is JSON like the
+            // phase. Rebuilt rather than altered, since SQLite cannot drop
+            // NOT NULL; GRDB runs migrations with foreign keys off and checks
+            // them after, so wrap-ups keep pointing at their sessions.
+            // Earlier sessions read as covering all projects.
+            try db.create(table: "new_focusSession") { table in
+                table.primaryKey("id", .text)
+                table.column("taskID", .integer)
+                table.column("action", .text)
+                table.column("mode", .text).notNull().check(sql: "mode IN ('normal', 'strict')")
+                table.column("startedAt", .datetime).notNull()
+                table.column("plannedEnd", .datetime).notNull()
+                table.column("phase", .text).notNull()
+                table.column("scope", .text).notNull().defaults(to: #"{"projects":[]}"#)
+            }
+            try db.execute(sql: """
+                INSERT INTO new_focusSession (rowid, id, taskID, action, mode, startedAt, plannedEnd, phase)
+                SELECT rowid, id, taskID, action, mode, startedAt, plannedEnd, phase FROM focusSession
+                """)
+            try db.drop(table: SessionRow.databaseTableName)
+            try db.rename(table: "new_focusSession", to: SessionRow.databaseTableName)
+            try db.create(index: "focusSession_on_startedAt", on: SessionRow.databaseTableName, columns: ["startedAt"])
+        }
         return migrator
     }
 

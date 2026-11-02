@@ -12,3 +12,13 @@ extension FocusSession {
         )
     }
 }
+
+extension FocusSession {
+    /// A running 25-minute session with `taskID` and `action` in Now, which may be nothing.
+    static func sample(taskID: Int64?, action: String?, scope: SessionScope = .allProjects) -> FocusSession {
+        FocusSession(
+            id: UUID(), taskID: taskID, action: action, mode: .normal, startedAt: sampleStart,
+            plannedEnd: sampleStart.addingTimeInterval(25 * 60), phase: .running, scope: scope
+        )
+    }
+}

@@ -55,7 +55,7 @@ struct TaskCommands: Commands {
             openWindow(id: PlanningView.windowID)
         }
         .keyboardShortcut(.return)
-        .disabled(session != nil || model.nowTask == nil)
+        .disabled(session != nil)
         if case .paused = session?.phase {
             Button("Resume") { Task { await model.resume() } }
                 .keyboardShortcut("p", modifiers: [.command, .option])

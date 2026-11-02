@@ -59,8 +59,9 @@ extension AppModel {
         isStartingFocus = true
     }
 
-    func startSession(minutes: Int, mode: SessionMode) async -> Bool {
-        await run { try await $0.startSession(duration: TimeInterval(minutes * 60), mode: mode) }
+    /// `projects` empty covers all projects (#56).
+    func startSession(minutes: Int, mode: SessionMode, projects: [Int64] = []) async -> Bool {
+        await run { try await $0.startSession(duration: TimeInterval(minutes * 60), mode: mode, projects: projects) }
     }
 
     func pause() async {
@@ -95,6 +96,9 @@ extension AppModel {
             try await command(coordinator)
             sessionError = nil
             return true
+        } catch FocusCoordinator.SessionError.unknownProject {
+            sessionError = "One of the chosen projects was deleted. Choose again."
+            return false
         } catch {
             sessionError = "Could not update the session: \(error.localizedDescription)"
             return false

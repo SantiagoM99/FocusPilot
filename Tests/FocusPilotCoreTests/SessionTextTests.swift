@@ -48,4 +48,21 @@ struct SessionTextTests {
         #expect(SessionText.earlyEnd(availableAt: availableAt, now: start.addingTimeInterval(18)) == "You can end it in 0:42")
         #expect(SessionText.earlyEnd(availableAt: availableAt, now: availableAt) == "You can end it now")
     }
+
+    // #56: what a session covers, as the menu, panel and blocked pages name it.
+    @Test func theScopeNamesItsProjects() {
+        let projects = ["FocusPilot", "NLP report", "Thesis"].enumerated().map { ScopedProject(id: Int64($0), title: $1) }
+
+        #expect(SessionText.scope(.allProjects) == "All projects")
+        #expect(SessionText.scope(SessionScope(projects: Array(projects.prefix(1)))) == "FocusPilot")
+        #expect(SessionText.scope(SessionScope(projects: Array(projects.prefix(2)))) == "FocusPilot and NLP report")
+        #expect(SessionText.scope(SessionScope(projects: projects)) == "FocusPilot, NLP report and Thesis")
+        #expect(SessionText.covers(.allProjects) == "Covers all projects")
+        #expect(SessionText.covers(SessionScope(projects: Array(projects.prefix(2)))) == "Covers FocusPilot and NLP report")
+    }
+
+    @Test func withNothingInNowTheSessionIsNamedByItsScope() {
+        #expect(SessionText(.sample(taskID: 1, action: "Explain baseline results")).subject == "Explain baseline results")
+        #expect(SessionText(.sample(taskID: nil, action: nil)).subject == "All projects")
+    }
 }

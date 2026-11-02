@@ -14,7 +14,7 @@ public struct BlockedAppText: Sendable {
         if let session {
             let text = SessionText(session)
             headline = "Focus session · " + (reducesMotion ? text.minutesLeft(at: now) : text.timeLeft(at: now) + " left")
-            detail = "You're working on \(session.action)"
+            detail = session.action.map { "You're working on \($0)" } ?? "Nothing in Now · " + SessionText.scope(session.scope)
             return
         }
         headline = "No session running"

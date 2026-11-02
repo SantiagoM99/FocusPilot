@@ -82,10 +82,16 @@ struct FocusPanelView: View {
                     .help("Collapse")
                     .accessibilityLabel("Collapse")
                 }
-                Text(session.action)
-                    .font(.headline)
-                    .contrastEmphasis()
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.action ?? "Nothing in Now")
+                        .font(.headline)
+                        .contrastEmphasis()
+                        .lineLimit(2)
+                    Text(SessionText.covers(session.scope))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 ProtectionStatusView(model: model, showsDetail: false, showsSafari: false, showsWeek: false)
             }
             .padding(14)
@@ -113,7 +119,7 @@ struct FocusPanelView: View {
                 Text(reduceMotion ? text.minutesLeft(at: model.now) : text.timeLeft(at: model.now))
                     .font(.callout.weight(.semibold))
                     .monospacedDigit()
-                Text(session.action)
+                Text(text.subject)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -126,7 +132,7 @@ struct FocusPanelView: View {
         }
         .buttonStyle(.plain)
         .help("Expand")
-        .accessibilityLabel("\(text.phase), \(text.minutesLeft(at: model.now)), \(session.action)")
+        .accessibilityLabel("\(text.phase), \(text.minutesLeft(at: model.now)), \(text.subject)")
         .accessibilityHint("Expand")
     }
 }

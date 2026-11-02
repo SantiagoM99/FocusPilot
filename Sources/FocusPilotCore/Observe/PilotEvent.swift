@@ -15,6 +15,8 @@ public struct PilotEvent: Equatable, Sendable {
         /// While blocking: a blocked app hidden as it came forward.
         case blockedVisit
         case exceptionGranted
+        /// A task became Now during a session, at its start or later (#56).
+        case taskTouched
     }
 
     public var kind: Kind

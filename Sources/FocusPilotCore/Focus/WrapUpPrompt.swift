@@ -19,9 +19,11 @@ public struct WrapUpPrompt: Equatable, Sendable, Identifiable {
     ///
     /// Only an end the app saw counts: a session that ended while the app
     /// was quit (no `previous`) asks nothing, nor do starting, pausing,
-    /// resuming, breaks or a different session.
+    /// resuming, breaks or a different session. With nothing in Now at the
+    /// end there is no task to wrap up (#56).
     public static func after(_ previous: FocusSession?, _ current: FocusSession?) -> WrapUpPrompt? {
-        guard let previous, let current, previous.id == current.id, !previous.hasEnded, current.hasEnded else {
+        guard let previous, let current, previous.id == current.id, !previous.hasEnded, current.hasEnded,
+              current.taskID != nil else {
             return nil
         }
         return WrapUpPrompt(session: current)
@@ -35,6 +37,6 @@ public struct WrapUpPrompt: Equatable, Sendable, Identifiable {
     public var detail: String {
         let end: Date = if case .ended(let at, _) = session.phase { at } else { session.startedAt }
         let minutes = Int((end.timeIntervalSince(session.startedAt) / 60).rounded())
-        return "\(session.action) · \(minutes) min"
+        return "\(SessionText(session).subject) · \(minutes) min"
     }
 }

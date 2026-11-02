@@ -41,6 +41,8 @@ public struct WeeklySummary: Equatable, Sendable {
             case .blockedVisit:
                 blockedVisits += 1
                 if event.sessionID != nil { blockedVisitsInSessions += 1 }
+            case .taskTouched:
+                break // Switches per hour arrive with T21.
             }
         }
         medianResume = Self.median(resumeTimes)
