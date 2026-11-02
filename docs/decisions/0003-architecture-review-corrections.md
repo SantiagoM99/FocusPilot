@@ -92,6 +92,7 @@ Second review of the full design set, including decision 0002. Each finding list
 - 2026-10-26: Policy revision numbers, checksums and the compiled policy are diagnostics. The UI shows plain language ("Chrome has your latest rules" / "Chrome is updating…"), and the numbers sit behind a collapsed "Show technical details".
 - 2026-10-26: Exceptions requested from Chrome are trusted only from a parent process signed by Google (Team ID check), not by path. No extra in-app confirmation per request; the strict wait and the notification still apply.
 - 2026-10-26: Observe-only mode records raw activity (front app bundle ID; Chrome front-tab domain, never incognito or full URLs) only while observe-only is on, deleted after about 24 h; pilot events (sessions, resume time, blocked visits, exceptions) are kept. Nothing leaves the Mac. Turning observe-only off restores blocking immediately.
+- 2026-11-02: The iPhone nudge is dropped (not worth the effort). Spike S6 showed the chain works once (Mac turns on a shared Focus; the iPhone automation shows the current action and logs opens back within 1–2 min), but an iCloud Drive file changed on the Mac was not picked up by the iPhone (stale copy; a not-yet-downloaded file fails with "Resource deadlock avoided"), and it depends on the phone being on and nearby. FocusPilot focuses on the Mac. #6 and #22 are closed as won't do; the phone stays covered by the owner's own tools.
 
 ## Sources
 
