@@ -54,4 +54,37 @@ struct AgentWaitTests {
         #expect(try await waits.first?.target == "approval")
         #expect(try await coordinator.reviewQueue().map(\.id) == [item.id], "The approval stays until answered")
     }
+
+    // Review of #65: answered in Herdr, the same agent still in its pane: the
+    // wait counts, marked as answered there.
+    @Test func anApprovalAnsweredInHerdrCountsWithItsOwnSource() async throws {
+        let (task, _, _) = try await queued(.blocked)
+        clock.set(clock.now.addingTimeInterval(9 * 60))
+        herdr.set(.connected(herdrServer, [agent(.working, pane: "w4:p2")]))
+
+        _ = await coordinator.refreshHerdrAgents()
+
+        #expect(try await waits == [PilotEvent(kind: .agentWait, at: clock.now, duration: 9 * 60, target: "approvalInHerdr", taskID: task)])
+    }
+
+    @Test func anApprovalWhosePaneClosedIsNotCounted() async throws {
+        _ = try await queued(.blocked)
+        herdr.set(.connected(herdrServer, []))
+
+        _ = await coordinator.refreshHerdrAgents()
+
+        #expect(try await coordinator.reviewQueue().isEmpty)
+        #expect(try await waits.isEmpty)
+    }
+
+    @Test func anApprovalSwitchedToAndThenAnsweredCountsOnce() async throws {
+        let (task, link, item) = try await queued(.blocked)
+        clock.set(clock.now.addingTimeInterval(2 * 60))
+        _ = try await coordinator.switchTo(task, note: nil, openingAgent: link, handling: .review(item.id))
+        herdr.set(.connected(herdrServer, [agent(.working, pane: "w4:p2")]))
+
+        _ = await coordinator.refreshHerdrAgents()
+
+        #expect(try await waits.map(\.target) == ["approval"])
+    }
 }

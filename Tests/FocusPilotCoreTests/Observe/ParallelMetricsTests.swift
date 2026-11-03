@@ -54,6 +54,40 @@ struct ParallelMetricsTests {
         #expect(WeeklySummary(events: [], now: now).line("Agents waiting for you") == "None yet")
     }
 
+    // Review of #65: a session that began before the 7 days counts only its
+    // part inside them, and its first task was taken up outside them.
+    @Test func aSessionStartedBeforeTheWeekCountsOnlyItsPartInside() {
+        let session = UUID()
+        let weekStart = now.addingTimeInterval(-WeeklySummary.period)
+        let events = [PilotEvent(kind: .taskTouched, at: weekStart.addingTimeInterval(-3600), sessionID: session, taskID: 1),
+                      PilotEvent(kind: .taskTouched, at: weekStart.addingTimeInterval(600), sessionID: session, taskID: 2),
+                      PilotEvent(kind: .taskTouched, at: weekStart.addingTimeInterval(1200), sessionID: session, taskID: 3),
+                      PilotEvent(kind: .sessionEnded, at: weekStart.addingTimeInterval(3600), duration: 3 * 3600, sessionID: session)]
+
+        let summary = WeeklySummary(events: events, now: now)
+
+        #expect(summary.focusTime == 3600)
+        #expect(summary.switches == 2)
+    }
+
+    // Review of #65 and #66's approach: VoiceOver hears units spelled out.
+    @Test func theLinesAreSpokenWithUnitsSpelledOut() {
+        var events = sessions
+        events += [20.0, 44, 300].map { PilotEvent(kind: .backIntoThread, at: ago(minutes: 5), duration: $0, taskID: 1) }
+        events += [4.0, 13, 52].map { PilotEvent(kind: .agentWait, at: ago(minutes: 10), duration: $0 * 60, target: "finished") }
+        events.append(PilotEvent(kind: .sessionEnded, at: ago(minutes: 20), duration: 40 * 60 + 3600 * 4, sessionID: UUID()))
+        let spoken = Dictionary(uniqueKeysWithValues: WeeklySummary(events: events, now: now).lines.map { ($0.label, $0.spoken) })
+
+        #expect(spoken["Switches"] == "0.5 per hour, 4 in 7 hours 40 minutes")
+        #expect(spoken["Back into a thread"] == "median 44 seconds, 3 switches")
+        #expect(spoken["Agents waiting for you"] == "median 13 minutes, longest 52 minutes, 3 results and requests")
+        #expect(WeeklySummary(events: [PilotEvent(kind: .backIntoThread, at: ago(minutes: 5), duration: 150)], now: now)
+            .lines.first { $0.label == "Back into a thread" }?.spoken == "median 2 minutes 30 seconds, 1 switch")
+        #expect(WeeklySummary(events: [], now: now).lines.first { $0.label == "Switches" }?.spoken == "No sessions ended yet")
+        let resume = WeeklySummary(events: [PilotEvent(kind: .resume, at: ago(minutes: 5), duration: 18)], now: now)
+        #expect(resume.lines.first { $0.label == "Resume time" }?.spoken == "median 18 seconds, 1 resume")
+    }
+
     @Test func theNewLinesFollowTheBaselineOnes() {
         #expect(WeeklySummary(events: [], now: now).lines.map(\.label) == [
             "Focus sessions", "Resume time", "Distraction visits", "Blocked visits", "Exceptions",

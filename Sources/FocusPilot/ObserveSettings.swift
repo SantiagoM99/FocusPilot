@@ -30,6 +30,9 @@ struct ObserveSettings: View {
             Section("Last 7 days") {
                 ForEach(model.weeklySummary?.lines ?? [], id: \.label) { line in
                     LabeledContent(line.label, value: line.value)
+                        // "median 44 seconds", not "44 s" (#66's approach).
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(line.label), \(line.spoken)")
                 }
             }
             Section("What is recorded") {
