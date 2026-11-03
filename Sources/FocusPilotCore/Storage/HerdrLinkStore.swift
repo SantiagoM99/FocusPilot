@@ -25,6 +25,7 @@ enum HerdrLinkStore {
             // renumbered by a restart. Import covers those on request.
             try db.execute(sql: "INSERT INTO herdrSeenServer (socketPath, serverStartedAt) VALUES (?, ?)",
                            arguments: [server.socketPath, server.startedAtMilliseconds])
+            try restoreExactLinks(to: workspaces, on: server, in: db)
             for workspace in workspaces { try markSeen(workspace, on: server, in: db) }
             return []
         }
@@ -50,6 +51,26 @@ enum HerdrLinkStore {
         try HerdrLinkRecord.deleteOne(db, key: projectID)
         try HerdrLinkRecord(projectId: projectID, workspace: workspace, server: server).insert(db)
         try markSeen(workspace, on: server, in: db)
+    }
+
+    /// Moves to the restarted server each link from an earlier instance of
+    /// the same session whose workspace ID is open again with the same label
+    /// and the same checkout (decision 0003, 2026-11-03). Any difference, or
+    /// two old links claiming one workspace, leaves the link for the owner
+    /// to relink.
+    private static func restoreExactLinks(to workspaces: [HerdrWorkspace], on server: HerdrServer, in db: Database) throws {
+        let stale = try HerdrLinkRecord
+            .filter(Column("sessionName") == server.sessionName && Column("socketPath") == server.socketPath
+                && Column("serverStartedAt") != server.startedAtMilliseconds)
+            .fetchAll(db)
+        for workspace in workspaces {
+            let matches = stale.filter {
+                $0.workspaceId == workspace.id && $0.label == workspace.label && $0.cwd == workspace.cwd
+            }
+            guard matches.count == 1, var record = matches.first else { continue }
+            record.serverStartedAt = server.startedAtMilliseconds
+            try record.update(db)
+        }
     }
 
     /// A project named after the workspace: when `adoptingUnlinkedNamesake`
