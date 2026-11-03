@@ -98,6 +98,20 @@ public enum AttentionText {
         if minutes < 60 { return "Waiting \(minutes) min" }
         return minutes % 60 == 0 ? "Waiting \(minutes / 60) h" : "Waiting \(minutes / 60) h \(minutes % 60) min"
     }
+
+    /// The item as VoiceOver reads it, one sentence with units spelled out:
+    /// "plots needs your approval, Run ablation, NLP report, waiting 34 minutes".
+    public static func spoken(_ item: AttentionItem, at now: Date) -> String {
+        let minutes = Int(now.timeIntervalSince(item.waitingSince) / 60)
+        let unit = { (count: Int, name: String) in "\(count) \(name)\(count == 1 ? "" : "s")" }
+        let waited = switch (minutes / 60, minutes % 60) {
+        case (0, 0): "just now"
+        case (0, let rest): "waiting " + unit(rest, "minute")
+        case (let hours, 0): "waiting " + unit(hours, "hour")
+        case (let hours, let rest): "waiting " + unit(hours, "hour") + " " + unit(rest, "minute")
+        }
+        return [item.headline, item.taskTitle, item.projectTitle, waited].compactMap(\.self).joined(separator: ", ")
+    }
 }
 
 /// When the app recomputes In flight and the queue as time passes: once a

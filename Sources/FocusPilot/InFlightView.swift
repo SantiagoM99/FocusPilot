@@ -38,6 +38,7 @@ struct InFlightView: View {
                                 } label: {
                                     Text(project.summary)
                                         .fontWeight(.medium)
+                                        .accessibilityLabel(project.summary.replacing(" · ", with: ", "))
                                 }
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
@@ -86,35 +87,42 @@ struct AttentionRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: symbol)
-                .foregroundStyle(color)
-                .frame(width: 18)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: compact ? [item.headline, item.projectTitle].compactMap(\.self).joined(separator: " · ")
-                     : item.headline)
-                    .fontWeight(.medium)
-                    .lineLimit(compact ? 2 : 1)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !compact {
-                    Text(verbatim: item.place)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: symbol)
+                    .foregroundStyle(color)
+                    .frame(width: 18)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: compact ? [item.headline, item.projectTitle].compactMap(\.self).joined(separator: " · ")
+                         : item.headline)
+                        .fontWeight(.medium)
+                        .lineLimit(compact ? 2 : 1)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !compact {
+                        Text(verbatim: item.place)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    WaitedText(item: item, now: model.attentionTime)
                 }
-                WaitedText(item: item, now: model.attentionTime)
             }
+            // One item for VoiceOver, without the middle dots; the buttons
+            // stay separate so each can be reached and pressed.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(AttentionText.spoken(item, at: model.attentionTime))
             Spacer(minLength: 8)
             if !compact {
                 Button(dismissTitle) { Task { await dismiss() } }
                     .buttonStyle(.borderless)
+                    .accessibilityHint(item.kind == .check ? "Removes this check" : "Removes this item from Needs you")
             }
             Button("Switch") { model.requestSwitch(SwitchRequest(item)) }
                 .help("Asks where you left off, then makes this task Now\(item.linkID == nil ? "" : " and opens the agent")")
+                .accessibilityHint("Switch to \(item.taskTitle)")
         }
         .padding(.horizontal, compact ? 0 : 14)
         .padding(.vertical, compact ? 4 : 10)
-        .accessibilityElement(children: .combine)
     }
 
     private var symbol: String {
@@ -173,22 +181,28 @@ private struct ThreadRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            StatusDot(title: stateTitle, color: stateColor, filled: thread.state != .waiting)
-                .frame(width: 96, alignment: .leading)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: thread.label)
-                    .lineLimit(1)
-                Text(verbatim: detail)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            HStack(alignment: .center, spacing: 10) {
+                StatusDot(title: stateTitle, color: stateColor, filled: thread.state != .waiting)
+                    .frame(width: 96, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: thread.label)
+                        .lineLimit(1)
+                    Text(verbatim: detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel([stateTitle, thread.label, detail.replacing(" · ", with: ", ")].joined(separator: ", "))
             Spacer(minLength: 8)
             if case .waiting(let taskID) = thread.id {
                 Button("Stop waiting") { Task { await model.stopWaiting(taskID) } }
                     .buttonStyle(.borderless)
+                    .accessibilityHint("Takes \(thread.taskTitle) out of In flight")
             }
             Button("Switch") { model.requestSwitch(SwitchRequest(thread)) }
+                .accessibilityHint("Switch to \(thread.taskTitle)")
         }
         .padding(.vertical, 6)
         .padding(.leading, 18)

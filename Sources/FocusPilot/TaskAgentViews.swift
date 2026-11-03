@@ -90,6 +90,7 @@ private struct AgentLinkView: View {
                 get: { link.launchOrder != nil },
                 set: { included in Task { await model.setLaunch(.agent(link.id), included: included) } }))
                 .toggleStyle(.checkbox)
+                .accessibilityLabel("\(link.label) opens with context")
                 .font(.caption)
                 .controlSize(.small)
             HStack(spacing: 8) {

@@ -21,6 +21,7 @@ struct WrapUpSheet: View {
 
     private enum Field: Hashable {
         case outcome, remainingWork, returnCue
+        case other(Int64)
     }
 
     var body: some View {
@@ -58,6 +59,8 @@ struct WrapUpSheet: View {
                                     .lineLimit(2)
                                 TextField("Optional", text: otherCue(task.id))
                                     .textFieldStyle(.roundedBorder)
+                                    .focused($focused, equals: .other(task.id))
+                                    .accessibilityLabel("Where you left off on \(task.title)")
                             }
                         }
                     }
@@ -89,7 +92,7 @@ struct WrapUpSheet: View {
         }
         .padding(20)
         .frame(width: 560)
-        .onAppear { focused = hasTask ? .outcome : nil }
+        .onAppear { focused = hasTask ? .outcome : others.first.map { .other($0.id) } }
     }
 
     private var hasTask: Bool { prompt.session.taskID != nil }

@@ -28,6 +28,7 @@ struct SwitchSheet: View {
                     Text("Where did you leave off?")
                     TextField("Optional", text: $note, axis: .vertical)
                         .labelsHidden()
+                        .accessibilityLabel("Where did you leave off?")
                         .lineLimit(1...3)
                         .textFieldStyle(.roundedBorder)
                         .focused($isNoteFocused)
@@ -83,6 +84,7 @@ struct MarkWaitingSheet: View {
                         .foregroundStyle(.secondary)
                     TextField("Optional, for example Ana’s review", text: $waitingOn)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Waiting on")
                 }
                 GridRow {
                     Text("Check again")
