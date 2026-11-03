@@ -22,6 +22,7 @@ extension FocusCoordinator {
         if current?.id != target { try await moveTask(target, to: .now, .top) }
         switch item {
         case .review(let id):
+            try await repository.noteOwnerReached(id)
             if try await repository.reviewQueue().contains(where: { $0.id == id && $0.kind == .finished }) {
                 try await repository.markReviewed(id)
             }

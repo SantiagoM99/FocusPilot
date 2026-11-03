@@ -51,6 +51,12 @@ extension TaskRepository {
         try await ownerDatabase.read { db in try HerdrAgentStore.queue(in: db) }
     }
 
+    /// The owner switched to the item; see `HerdrAgentStore.noteReached`.
+    public func noteOwnerReached(_ id: Int64) async throws {
+        let reachedAt = now()
+        try await ownerDatabase.write { db in try HerdrAgentStore.noteReached(id, at: reachedAt, in: db) }
+    }
+
     public func markReviewed(_ id: Int64) async throws {
         let reviewedAt = now()
         try await ownerDatabase.write { db in try HerdrAgentStore.markReviewed(id, at: reviewedAt, in: db) }

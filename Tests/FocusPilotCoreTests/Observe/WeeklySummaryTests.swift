@@ -48,13 +48,14 @@ struct WeeklySummaryTests {
     @Test func itReadsAsPlainLines() {
         let summary = WeeklySummary(events: events, now: now)
 
-        #expect(summary.lines == [
-            WeeklySummary.Line(label: "Focus sessions", value: "2 started · 1 ended"),
-            WeeklySummary.Line(label: "Resume time", value: "median 12 s · 3 resumes"),
-            WeeklySummary.Line(label: "Distraction visits", value: "2 · 12 min · 1 during sessions"),
-            WeeklySummary.Line(label: "Blocked visits", value: "2 · 1 during sessions"),
-            WeeklySummary.Line(label: "Exceptions", value: "1 granted"),
+        #expect(summary.lines.prefix(5).map { [$0.label, $0.value] } == [
+            ["Focus sessions", "2 started · 1 ended"],
+            ["Resume time", "median 12 s · 3 resumes"],
+            ["Distraction visits", "2 · 12 min · 1 during sessions"],
+            ["Blocked visits", "2 · 1 during sessions"],
+            ["Exceptions", "1 granted"],
         ])
+        #expect(summary.lines[2].spoken == "2, 12 minutes, 1 during sessions")
     }
 
     @Test func anEmptyWeekSaysSo() {

@@ -30,12 +30,15 @@ struct ObserveSettings: View {
             Section("Last 7 days") {
                 ForEach(model.weeklySummary?.lines ?? [], id: \.label) { line in
                     LabeledContent(line.label, value: line.value)
+                        // "median 44 seconds", not "44 s" (#66's approach).
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(line.label), \(line.spoken)")
                 }
             }
             Section("What is recorded") {
                 Group {
                     Text("Only while observing, kept for 24 hours: which app is in front and the domain of Chrome's front tab.")
-                    Text("Kept for the pilot: session starts and ends, how long you took to get back to work, exceptions, and blocked apps you opened; while observing, also visits to sites and apps your rules name. Times and durations, with their session and task.")
+                    Text("Kept for the pilot: session starts and ends, how long you took to get back to work, the tasks you switched to, how long agents waited for you, exceptions, and blocked apps you opened; while observing, also visits to sites and apps your rules name. Times and durations, with their session and task.")
                     Text("Never stored: URLs, page titles or content, keystrokes or screenshots.")
                 }
                 .font(.callout)

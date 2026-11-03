@@ -328,6 +328,13 @@ enum OwnerSchema {
                 table.add(column: "launchOrder", .integer)
             }
         }
+        migrator.registerMigration("owner-v15-parallel-metrics") { db in
+            // #58: when the owner first switched to or reviewed an item, so
+            // its agent's wait is recorded once.
+            try db.alter(table: ReviewItemRow.databaseTableName) { table in
+                table.add(column: "ownerReachedAt", .datetime)
+            }
+        }
         return migrator
     }
 

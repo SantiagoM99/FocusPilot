@@ -59,9 +59,11 @@ enum HerdrAgentStore {
                 try row.update(db)
             }
             // Answered in Herdr: the request no longer needs the owner. An
-            // unknown reading says nothing, so the request stays.
+            // unknown reading says nothing, so the request stays. The same
+            // agent is still in its pane, so the owner answered it: its wait
+            // counts (#58) unless Switch already counted it.
             if agent.status != .blocked && agent.status != .unknown {
-                try clearApprovals(forLink: row.id!, in: db)
+                try clearApprovals(forLink: row.id!, answeredAt: now, in: db)
             }
             guard let kind = AgentTransition.review(from: previous, to: agent.status) else { continue }
             try queued.append(queue(kind, for: row, summary: agent.title, at: now, in: db))
@@ -85,7 +87,23 @@ enum HerdrAgentStore {
         return NewReviewItem(id: item.id!, paneID: row.paneId, server: row.link.server)
     }
 
-    private static func clearApprovals(forLink linkID: Int64, in db: Database) throws {
+    /// With `answeredAt`, each approval the owner had not reached yet records
+    /// its wait as answered in Herdr. Without it (the pane went away, or the
+    /// agent was unlinked) nothing is counted.
+    private static func clearApprovals(forLink linkID: Int64, answeredAt: Date? = nil, in db: Database) throws {
+        if let answeredAt {
+            let open = try Row.fetchAll(db, sql: """
+                SELECT taskId, occurredAt FROM herdrReviewItem
+                WHERE linkId = ? AND kind = ? AND reviewedAt IS NULL AND ownerReachedAt IS NULL
+                """, arguments: [linkID, AgentTransition.Review.approval.rawValue])
+            for row in open {
+                let occurredAt: Date = row["occurredAt"]
+                var event = PilotEventRow(PilotEvent(kind: .agentWait, at: answeredAt,
+                                                     duration: max(0, answeredAt.timeIntervalSince(occurredAt)),
+                                                     target: Self.answeredInHerdr, taskID: row["taskId"]))
+                try event.insert(db)
+            }
+        }
         try ReviewItemRow
             .filter(Column("linkId") == linkID && Column("kind") == AgentTransition.Review.approval.rawValue
                 && Column("reviewedAt") == nil)
@@ -122,7 +140,26 @@ enum HerdrAgentStore {
         }
     }
 
+    /// The `agentWait` target for an approval answered in Herdr without Switch
+    /// or Mark reviewed, so that source stays visible.
+    static let answeredInHerdr = "approvalInHerdr"
+
+    /// The first time the owner switches to or reviews an item, its agent's
+    /// wait ends: recorded once as a pilot event (#58), from when FocusPilot
+    /// saw the agent ask or finish.
+    static func noteReached(_ id: Int64, at now: Date, in db: Database) throws {
+        guard let row = try Row.fetchOne(db, sql: """
+            SELECT taskId, kind, occurredAt FROM herdrReviewItem WHERE id = ? AND ownerReachedAt IS NULL
+            """, arguments: [id]) else { return }
+        try db.execute(sql: "UPDATE herdrReviewItem SET ownerReachedAt = ? WHERE id = ?", arguments: [now, id])
+        let occurredAt: Date = row["occurredAt"]
+        var event = PilotEventRow(PilotEvent(kind: .agentWait, at: now, duration: max(0, now.timeIntervalSince(occurredAt)),
+                                             target: row["kind"], taskID: row["taskId"]))
+        try event.insert(db)
+    }
+
     static func markReviewed(_ id: Int64, at now: Date, in db: Database) throws {
+        try noteReached(id, at: now, in: db)
         try db.execute(sql: "UPDATE herdrReviewItem SET reviewedAt = ? WHERE id = ?", arguments: [now, id])
     }
 }
