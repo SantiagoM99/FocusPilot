@@ -69,3 +69,19 @@ A FocusPilot assistant that takes repetitive coordination work off the owner. Ph
 - T20: In flight by project, attention queue, Switch with a note, and attention items in the floating panel.
 - T21: parallel-work metrics.
 - Phase 2 epic: second in command (level 1, then level 2).
+
+## Scientific interns and the senior researcher (phase 2)
+
+Direction agreed with the owner on 2026-11-02. The details are proposals.
+
+- **Scientific interns**, one per research project: M2-Align, AlignFreeze, Final Project and Observatorio Deserción.
+  - Each keeps the project's SCIENCE.md current: question, claim chain, hypothesis ledger, and what is done and what is missing.
+  - Each gathers data, runs analyses, interprets new results against the hypotheses, and proposes the next experiment or change with its reason and cost.
+  - Interns never change code or launch costly runs without the owner's approval.
+  - Final Project and Observatorio Deserción are ML projects whose experiments can run on the owner's Mac. There, an approved intern may run experiments locally, within limits the owner sets: CPU or time, and whether runs are allowed during focus sessions. M2-Align and AlignFreeze run elsewhere, so their interns propose and analyze.
+- **Senior researcher**, one across all projects.
+  - Challenges the question, its importance and its novelty against published work, and checks whether each experiment actually answers the question. Plays the tough reviewer.
+  - Steps in at key moments: when an important experiment is proposed, or when a result changes the direction. Also gives a weekly review of each active project.
+  - Strict but fair: says so plainly when something holds up.
+- **Interface:** both roles run as Herdr agents. Their reports go into the attention queue (#57), and each project gets a weekly digest: what was done, what is missing, and the senior's open doubts.
+- **Writing:** the communication requirement above applies, plus the owner's scientific-process and scientific-writing skills.
