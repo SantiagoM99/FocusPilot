@@ -73,4 +73,24 @@ struct AccessibilityTextTests {
         let text = BlockedAppText(appName: "Instagram", reason: .always, session: session, at: now, reducesMotion: true)
         #expect(text.headline == "Focus session · 25 min left")
     }
+
+    // MARK: Attention items read as one sentence, with units spelled out
+
+    @Test func anAttentionItemIsOneSentence() {
+        let item = AttentionQueue.items(tasks: [Attention.task(10, "Run ablation", project: Attention.nlp)],
+                                        reviews: [Attention.review(1, link: 1, task: 10, .approval, at: Attention.minutes(-34), agent: "plots")],
+                                        waiting: [], now: Attention.now)[0]
+        #expect(AttentionText.spoken(item, at: Attention.now) == "plots needs your approval, Run ablation, NLP report, waiting 34 minutes")
+        #expect(AttentionText.spoken(item, at: Attention.minutes(-34 + 65)).hasSuffix(", waiting 1 hour 5 minutes"))
+        #expect(AttentionText.spoken(item, at: Attention.minutes(-34 + 1)).hasSuffix(", waiting 1 minute"))
+        #expect(AttentionText.spoken(item, at: Attention.minutes(-34 + 120)).hasSuffix(", waiting 2 hours"))
+        #expect(AttentionText.spoken(item, at: Attention.minutes(-34 + 0.5)).hasSuffix(", just now"))
+    }
+
+    @Test func anAttentionItemWithoutProjectLeavesItOut() {
+        let item = AttentionQueue.items(tasks: [Attention.task(10, "Run ablation")],
+                                        reviews: [Attention.review(1, link: 1, task: 10, .finished, at: Attention.minutes(-5), agent: "ablation")],
+                                        waiting: [], now: Attention.now)[0]
+        #expect(AttentionText.spoken(item, at: Attention.now) == "ablation finished, Run ablation, waiting 5 minutes")
+    }
 }

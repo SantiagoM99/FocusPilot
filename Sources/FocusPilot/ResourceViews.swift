@@ -125,6 +125,10 @@ private struct ResourceRowView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                // One item for VoiceOver: name, path and state, without the middle dots.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel([resource.name, shownPath, detail?.replacing(" · ", with: ", ")]
+                    .compactMap(\.self).joined(separator: ", "))
                 Spacer(minLength: 0)
             }
             if let problem {
@@ -135,6 +139,7 @@ private struct ResourceRowView: View {
                     get: { launchPosition != nil },
                     set: { included in Task { await model.setLaunch(.resource(resource.id), included: included) } }))
                     .toggleStyle(.checkbox)
+                    .accessibilityLabel("\(resource.name) opens with context")
                 if let launchPosition {
                     Text("· \(launchPosition + 1)")
                         .foregroundStyle(.secondary)
@@ -212,10 +217,15 @@ private struct ResourceRowView: View {
         }
         .controlSize(.small)
     }
+}
 
-    private func ordinal(_ number: Int) -> String {
-        NumberFormatter.localizedString(from: number as NSNumber, number: .ordinal)
-    }
+/// "1st", "2nd" (VoiceOver says "first", "second"): the launch position,
+/// in English whatever the system language, as the UI is English.
+private func ordinal(_ number: Int) -> String {
+    let formatter = NumberFormatter()
+    formatter.locale = Locale(identifier: "en_US")
+    formatter.numberStyle = .ordinal
+    return formatter.string(for: number) ?? "\(number)"
 }
 
 /// The project's Herdr workspace: Open context can focus its first tab.
@@ -231,6 +241,11 @@ private struct WorkspaceRowView: View {
         return HerdrLinkState(link, herdr) == .notFound
     }
 
+    private var workspaceDetail: String {
+        isMissing ? "Not found in Herdr · relink it in Projects"
+            : "Herdr workspace · opens at its first tab · all tasks in \(task.projectTitle ?? "the project")"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -241,12 +256,13 @@ private struct WorkspaceRowView: View {
                     Text(verbatim: link.label)
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
-                    Text(isMissing ? "Not found in Herdr · relink it in Projects"
-                         : "Herdr workspace · opens at its first tab · all tasks in \(task.projectTitle ?? "the project")")
+                    Text(workspaceDetail)
                         .font(.caption)
                         .foregroundStyle(isMissing ? Color.orange : .secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(link.label + ", " + workspaceDetail.replacing(" · ", with: ", "))
                 Spacer(minLength: 0)
             }
             HStack {
@@ -254,9 +270,11 @@ private struct WorkspaceRowView: View {
                     get: { launchPosition != nil },
                     set: { included in Task { await model.setLaunch(.workspace(projectID), included: included) } }))
                     .toggleStyle(.checkbox)
+                    .accessibilityLabel("\(link.label) workspace opens with context")
                 if let launchPosition {
                     Text("· \(launchPosition + 1)")
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel("opens \(ordinal(launchPosition + 1))")
                 }
                 Spacer()
                 if launchPosition ?? 0 > 0 {
