@@ -44,7 +44,7 @@ function render() {
   $("exception").hidden = !m.exceptionLink;
   $("footer-left").textContent = m.footer[0];
   $("footer-right").textContent = m.footer[1];
-  document.title = m.kind === "unblocked" || m.kind === "excepted" ? "FocusPilot" : `Blocked · ${m.domain}`;
+  document.title = ["unblocked", "excepted", "linked"].includes(m.kind) ? "FocusPilot" : `Blocked · ${m.domain}`;
   // Granted here or in another profile: back to the page once the policy carries it.
   if (form?.phase === "granted" && m.kind === "excepted" && m.backURL) {
     location.replace(m.backURL);

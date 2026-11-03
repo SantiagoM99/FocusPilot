@@ -151,11 +151,14 @@ struct HerdrCommandAllowlistTests {
         case .agentList: ["agent", "list"]
         case .agentRead(let pane): ["agent", "read", pane, "--source", "visible"]
         case .agentFocus(let pane): ["agent", "focus", pane]
+        case .tabList(let workspace): ["tab", "list", "--workspace", workspace]
+        case .tabFocus(let tab): ["tab", "focus", tab]
         }
     }
 
     private let everyCommand: [HerdrCommand] = [
         .status, .workspaceList, .agentList, .agentRead(paneID: "w4:p2"), .agentFocus(paneID: "w4:p2"),
+        .tabList(workspaceID: "w4"), .tabFocus(tabID: "w4:t1"),
     ]
 
     @Test func everyCommandHasExactlyThePinnedArguments() {
@@ -172,8 +175,9 @@ struct HerdrCommandAllowlistTests {
         }
     }
 
+    /// Open agent, and Open context for a project's workspace (#18).
     @Test func onlyFocusChangesWhatTheOwnerSees() {
-        #expect(everyCommand.filter(\.changesHerdrFocus) == [.agentFocus(paneID: "w4:p2")])
+        #expect(everyCommand.filter(\.changesHerdrFocus) == [.agentFocus(paneID: "w4:p2"), .tabFocus(tabID: "w4:t1")])
     }
 }
 

@@ -324,6 +324,9 @@ enum OwnerSchema {
             try db.alter(table: AgentLinkRow.databaseTableName) { table in
                 table.add(column: "launchOrder", .integer)
             }
+            try db.alter(table: HerdrLinkRecord.databaseTableName) { table in
+                table.add(column: "launchOrder", .integer)
+            }
         }
         return migrator
     }

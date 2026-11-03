@@ -3,6 +3,7 @@ import GRDB
 
 /// A linked web page's site, for the session's allowed list (decision 0004).
 public struct ContextSite: Equatable, Sendable {
+    public var url: String
     public var domain: String
     /// The task it is linked to, or the project's tasks.
     public var owner: ResourceOwner
@@ -50,7 +51,8 @@ extension TaskRepository {
             guard included else { return try Self.setLaunchOrder(nil, of: item, db) }
             guard try Self.launchOrder(of: item, db) == nil else { return }
             let last = try Int.fetchOne(db, sql: """
-                SELECT MAX(o) FROM (SELECT MAX(launchOrder) AS o FROM resource UNION ALL SELECT MAX(launchOrder) FROM herdrAgentLink)
+                SELECT MAX(o) FROM (SELECT MAX(launchOrder) AS o FROM resource UNION ALL SELECT MAX(launchOrder) FROM herdrAgentLink
+                                    UNION ALL SELECT MAX(launchOrder) FROM herdrLink)
                 """) ?? 0
             try Self.setLaunchOrder(last + 1, of: item, db)
         }
@@ -67,7 +69,8 @@ extension TaskRepository {
         }
     }
 
-    /// The task's launch set in order: its resources, its project's and its agents.
+    /// The task's launch set in order: its resources, its project's, its
+    /// agents and its project's workspace.
     public func launchSet(forTask taskID: Int64) async throws -> [ContextItem] {
         try await ownerDatabase.read { db in try Self.launchSet(forTask: taskID, db).map(\.item) }
     }
@@ -82,13 +85,18 @@ extension TaskRepository {
     private static func launchSet(forTask taskID: Int64, _ db: Database) throws -> [(item: ContextItem, order: Int)] {
         let resources = try resources(forTask: taskID, db).compactMap { r in r.launchOrder.map { (ContextItem.resource(r.id), $0) } }
         let agents = try HerdrAgentStore.links(forTask: taskID, in: db).compactMap { l in l.launchOrder.map { (ContextItem.agent(l.id), $0) } }
-        return (resources + agents).sorted { $0.1 < $1.1 }.map { (item: $0.0, order: $0.1) }
+        let projectID = try Int64.fetchOne(db, sql: "SELECT projectId FROM task WHERE id = ?", arguments: [taskID])
+        let workspace = try projectID.flatMap { id in
+            try HerdrLinkRecord.fetchOne(db, key: id)?.launchOrder.map { (ContextItem.workspace(id), $0) }
+        }
+        return (resources + agents + [workspace].compactMap { $0 }).sorted { $0.1 < $1.1 }.map { (item: $0.0, order: $0.1) }
     }
 
     private static func launchOrder(of item: ContextItem, _ db: Database) throws -> Int? {
         switch item {
         case .resource(let id): try Int.fetchOne(db, sql: "SELECT launchOrder FROM resource WHERE id = ?", arguments: [id])
         case .agent(let id): try Int.fetchOne(db, sql: "SELECT launchOrder FROM herdrAgentLink WHERE id = ?", arguments: [id])
+        case .workspace(let id): try Int.fetchOne(db, sql: "SELECT launchOrder FROM herdrLink WHERE projectId = ?", arguments: [id])
         }
     }
 
@@ -96,6 +104,7 @@ extension TaskRepository {
         switch item {
         case .resource(let id): try db.execute(sql: "UPDATE resource SET launchOrder = ? WHERE id = ?", arguments: [order, id])
         case .agent(let id): try db.execute(sql: "UPDATE herdrAgentLink SET launchOrder = ? WHERE id = ?", arguments: [order, id])
+        case .workspace(let id): try db.execute(sql: "UPDATE herdrLink SET launchOrder = ? WHERE projectId = ?", arguments: [order, id])
         }
     }
 
@@ -103,7 +112,8 @@ extension TaskRepository {
     /// policy compiled in the same write.
     static func contextSites(_ db: Database) throws -> (sites: [ContextSite], taskProjects: [Int64: Int64]) {
         let sites = try ResourceRow.filter(Column("kind") == "webPage").order(Column("id")).fetchAll(db).map { row in
-            ContextSite(domain: WebPageLink(stored: row.url ?? "").domain, owner: row.resource.owner)
+            let page = WebPageLink(stored: row.url ?? "")
+            return ContextSite(url: page.url, domain: page.domain, owner: row.resource.owner)
         }
         let pairs = try Row.fetchAll(db, sql: "SELECT id, projectId FROM task WHERE projectId IS NOT NULL")
             .map { (row: Row) -> (Int64, Int64) in (row["id"], row["projectId"]) }

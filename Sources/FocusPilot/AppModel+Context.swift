@@ -81,6 +81,9 @@ extension AppModel {
             case .agent(let linkID):
                 let label = agentLinks.first { $0.id == linkID }?.label ?? "agent"
                 if case .opened = await coordinator.openAgent(linkID) { opened += 1 } else { broken.append(label) }
+            case .workspace(let projectID):
+                let label = projects.first { $0.id == projectID }?.herdrLink?.label ?? "workspace"
+                if await coordinator.openWorkspace(ofProject: projectID) == .opened { opened += 1 } else { broken.append(label) }
             }
         }
         contextNotice = ResourceText.launchResult(opened: opened, needingRepair: broken, moved: plan.moved)

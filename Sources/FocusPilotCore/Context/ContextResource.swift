@@ -39,11 +39,13 @@ public struct ContextResource: Equatable, Sendable, Identifiable {
     }
 }
 
-/// Something that can be in a task's launch set: a resource, or a Herdr
-/// agent linked to the task.
+/// Something that can be in a task's launch set: a resource, a Herdr agent
+/// linked to the task, or the Herdr workspace linked to its project.
 public enum ContextItem: Hashable, Sendable {
     case resource(Int64)
     case agent(Int64)
+    /// The project's workspace, by project ID; opened at its first tab.
+    case workspace(Int64)
 }
 
 /// A resource as the task's Resources section shows it.
@@ -71,11 +73,14 @@ public enum LaunchStep: Equatable, Sendable {
     case webPage(Int64, URL)
     /// Focused through Herdr, which revalidates the agent first.
     case agent(Int64)
+    /// The project's workspace, checked against Herdr first, then its first tab focused.
+    case workspace(Int64)
 
     public var item: ContextItem {
         switch self {
         case .folder(let id, _), .webPage(let id, _): .resource(id)
         case .agent(let id): .agent(id)
+        case .workspace(let id): .workspace(id)
         }
     }
 }

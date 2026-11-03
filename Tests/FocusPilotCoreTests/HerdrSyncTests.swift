@@ -5,8 +5,16 @@ import Testing
 /// A Herdr whose answer each test sets.
 final class FakeHerdr: HerdrWorkspaceSource, @unchecked Sendable {
     var current: HerdrConnection
+    /// Workspaces whose first tab was focused, in order.
+    private(set) var focused: [String] = []
+    var focusSucceeds = true
     init(_ current: HerdrConnection) { self.current = current }
     func connection() async -> HerdrConnection { current }
+
+    func focusFirstTab(ofWorkspace workspaceID: String, on server: HerdrServer) async -> Bool {
+        focused.append(workspaceID)
+        return focusSucceeds
+    }
 }
 
 @Suite("Herdr sync through the coordinator")

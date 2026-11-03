@@ -27,22 +27,23 @@ struct ResourceTextTests {
         #expect(ResourceText.moved(to: "/Users/owner/Projects/figures-v2", home: home) == "Moved to ~/Projects/figures-v2")
     }
 
-    @Test func aPageOnABlockedSiteSaysItStaysBlocked() {
+    // Owner decision (0003, 2026-11-03).
+    @Test func aPageOnABlockedSiteOpensInNormalSessionsOnly() {
         let rules = [BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly)]
 
         #expect(ResourceText.sessionNote(for: try! WebPageLink("youtube.com/watch?v=1"), rules: rules)
-            == "Blocked by your rules, also in this project’s sessions")
+            == "This page opens in normal sessions · Blocked in strict sessions — ask for an exception")
         #expect(ResourceText.sessionNote(for: try! WebPageLink("m.youtube.com/watch?v=1"), rules: rules)
-            == "Blocked by your rules, also in this project’s sessions")
+            == "This page opens in normal sessions · Blocked in strict sessions — ask for an exception")
         #expect(ResourceText.sessionNote(for: try! WebPageLink("arxiv.org/abs/1"), rules: rules)
             == "Allowed in this project’s sessions")
     }
 
-    @Test func linkingABlockedPageSaysHowToReachIt() {
+    @Test func linkingABlockedPageSaysWhatOpensAndWhen() {
         let rules = [BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly)]
 
         #expect(ResourceText.blockedPageHelp(for: try! WebPageLink("youtube.com/watch?v=1"), rules: rules)
-            == "Linking it doesn’t unblock it. When you need it during a session, ask for a timed exception on the blocked page.")
+            == "youtube.com is blocked by your rules. In normal sessions that cover this project, this exact page opens; other pages on the site stay blocked. In strict sessions it stays blocked: ask for an exception, and the usual wait applies.")
         #expect(ResourceText.blockedPageHelp(for: try! WebPageLink("arxiv.org"), rules: rules) == nil)
     }
 

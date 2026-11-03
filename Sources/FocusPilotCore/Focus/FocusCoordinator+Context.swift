@@ -61,6 +61,8 @@ extension FocusCoordinator {
             switch item {
             case .agent(let id):
                 plan.steps.append(.agent(id))
+            case .workspace(let id):
+                plan.steps.append(.workspace(id))
             case .resource(let id):
                 guard let resource = resources[id] else { continue }
                 let (current, check) = try await revalidated(resource)
@@ -80,6 +82,21 @@ extension FocusCoordinator {
         return plan
     }
 
+    /// The owner clicked Open context: checks the project's workspace is
+    /// still the one linked, then focuses its first tab.
+    public func openWorkspace(ofProject projectID: Int64) async -> OpenWorkspaceResult {
+        guard let herdr, let link = try? await repository.projects().first(where: { $0.id == projectID })?.herdrLink else {
+            return .notFound
+        }
+        let connection = await herdr.connection()
+        switch HerdrLinkState(link, connection) {
+        case .live:
+            return await herdr.focusFirstTab(ofWorkspace: link.workspaceID, on: link.server) ? .opened : .herdrUnavailable
+        case .notFound: return .notFound
+        case .unknown: return .herdrUnavailable
+        }
+    }
+
     private func add(_ target: ResourceTarget, to owner: ResourceOwner) async throws -> ContextResource {
         let (resource, change) = try await repository.addResource(target, to: owner)
         await publish(change)
@@ -96,4 +113,12 @@ extension FocusCoordinator {
         current.target = .folder(refreshed)
         return (current, check)
     }
+}
+
+/// What opening a project's workspace did.
+public enum OpenWorkspaceResult: Equatable, Sendable {
+    case opened
+    /// Gone from Herdr, or Herdr restarted and its IDs were reissued.
+    case notFound
+    case herdrUnavailable
 }

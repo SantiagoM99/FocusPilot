@@ -19,7 +19,7 @@ public actor FocusCoordinator {
         case sessionStillActive
     }
 
-    private let herdr: (any HerdrWorkspaceSource)?
+    let herdr: (any HerdrWorkspaceSource)?
     let agents: (any HerdrAgentSource)?
     let folders: any FolderAccess
 

@@ -38,13 +38,19 @@ public struct SessionBlock: Hashable, Codable, Sendable {
     public var end: Date
     public var resumesAt: Date?
     public var targets: PolicyTargets
+    /// Pages linked to the session's projects on blocked sites, canonical
+    /// (`PageAddress`): each opens, that exact page only, while a normal
+    /// session's rules apply (owner decision 0003, 2026-11-03). Never in a
+    /// strict session. Left out of the JSON when there are none.
+    public var allowedPages: [String]?
 
-    public init(_ session: SessionPolicy, targets: PolicyTargets) {
+    public init(_ session: SessionPolicy, targets: PolicyTargets, allowedPages: [String] = []) {
         sessionID = session.sessionID
         mode = session.mode
         end = session.end
         resumesAt = session.resumesAt
         self.targets = targets
+        self.allowedPages = allowedPages.isEmpty ? nil : allowedPages
     }
 }
 

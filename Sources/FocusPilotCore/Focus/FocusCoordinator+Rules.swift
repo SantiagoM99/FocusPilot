@@ -129,10 +129,11 @@ extension FocusCoordinator {
     func publish(revision: Int, inputs: PolicyInputs, session: SessionPolicy?, at: Date) async {
         let observing = inputs.observeSince != nil
         let exceptions = inputs.exceptions.filter { $0.expiresAt > at }.map(\.policyException)
-        let allowed = inputs.allowed + ContextAllowance.entries(inputs, sessionTaskID: session == nil ? nil : self.session?.taskID)
+        let context = ContextAllowance.compute(inputs, session: session == nil ? nil : self.session)
         let rules = observing
             ? PolicyCompiler.compile(rules: [], allowed: inputs.allowed, session: nil, exceptions: [])
-            : PolicyCompiler.compile(rules: inputs.rules, allowed: allowed, session: session, exceptions: exceptions)
+            : PolicyCompiler.compile(rules: inputs.rules, allowed: inputs.allowed + context.allowed, session: session,
+                                     exceptions: exceptions, allowedPages: context.pages)
         let compiled = CompiledPolicy(revision: revision, effectiveAt: at, rules: rules)
         if compiled.revision > policy?.revision ?? 0 {
             policy = compiled

@@ -1,27 +1,40 @@
-/// Which linked pages the session allows (decision 0004: the resources of
-/// every task in scope are allowed). Until sessions can cover several
-/// projects, the scope is the session task's project, or the task alone.
+/// Which linked pages a session lets through (decision 0004: the
+/// resources of every project in scope are allowed; #60: the scope's
+/// projects, every project when none were chosen, plus the Now task's
+/// project when it sits outside them).
 ///
-/// A page on a site a rule blocks is left out. Chrome does not unblock an
-/// allowed domain, and the two lists must never contradict each other, so
-/// linking a page never weakens blocking, strict sessions included.
+/// A page on a site no rule blocks joins the allowed list. A page on a
+/// blocked site is allowed as that exact page, only in a normal session
+/// (owner decision 0003, 2026-11-03); in a strict session it stays blocked
+/// and the owner asks for an exception, with the usual wait.
 enum ContextAllowance {
-    static func entries(_ inputs: PolicyInputs, sessionTaskID: Int64?) -> [AllowedActivity] {
-        guard let sessionTaskID else { return [] }
-        let project = inputs.taskProjects[sessionTaskID]
+    struct Result: Equatable {
+        var allowed: [AllowedActivity] = []
+        var pages: [String] = []
+    }
+
+    static func compute(_ inputs: PolicyInputs, session: FocusSession?) -> Result {
+        guard let session else { return Result() }
         let blocked = inputs.rules.flatMap(\.targets)
         var taken = inputs.allowed.map(\.target)
-        var entries: [AllowedActivity] = []
-        for site in inputs.contextSites {
-            let inScope = switch site.owner {
-            case .task(let id): id == sessionTaskID || (project != nil && inputs.taskProjects[id] == project)
-            case .project(let id): id == project
-            }
+        var result = Result()
+        for site in inputs.contextSites where covers(session.scope, site.owner, inputs.taskProjects) {
             let target = ActivityTarget.site(domain: site.domain)
-            guard inScope, !blocked.contains(where: target.overlaps), !taken.contains(where: target.overlaps) else { continue }
-            taken.append(target)
-            entries.append(AllowedActivity(name: site.domain, target: target))
+            if blocked.contains(where: target.overlaps) {
+                if session.mode == .normal, let page = PageAddress.canonical(site.url) { result.pages.append(page) }
+            } else if !taken.contains(where: target.overlaps) {
+                taken.append(target)
+                result.allowed.append(AllowedActivity(name: site.domain, target: target))
+            }
         }
-        return entries
+        return result
+    }
+
+    private static func covers(_ scope: SessionScope, _ owner: ResourceOwner, _ taskProjects: [Int64: Int64]) -> Bool {
+        let projectID: Int64? = switch owner {
+        case .task(let id): taskProjects[id]
+        case .project(let id): id
+        }
+        return scope.covers(projectID: projectID) || scope.alsoAllowed.contains { $0.id == projectID }
     }
 }

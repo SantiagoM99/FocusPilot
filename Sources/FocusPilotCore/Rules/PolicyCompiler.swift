@@ -6,7 +6,7 @@ import Foundation
 /// same rules and checksum.
 public enum PolicyCompiler {
     public static func compile(rules: [BlockRuleSet], allowed: [AllowedActivity], session: SessionPolicy?,
-                               exceptions: [PolicyException] = []) -> PolicyRules {
+                               exceptions: [PolicyException] = [], allowedPages: [String] = []) -> PolicyRules {
         var always: [ActivityTarget] = [], sessionOnly: [ActivityTarget] = []
         var scheduled: [WeeklySchedule: [ActivityTarget]] = [:]
         for rule in rules {
@@ -23,7 +23,8 @@ public enum PolicyCompiler {
         let content = Content(
             always: PolicyTargets(always),
             scheduled: blocks,
-            session: session.map { SessionBlock($0, targets: PolicyTargets(sessionOnly)) },
+            session: session.map { SessionBlock($0, targets: PolicyTargets(sessionOnly),
+                                                allowedPages: $0.mode == .normal ? Array(Set(allowedPages)).sorted() : []) },
             allowed: AllowedTargets(domains: allowedTargets.domains, apps: allowedTargets.apps, tools: tools.sorted()),
             exceptions: exceptions.sorted { sortKey($0) < sortKey($1) }
         )

@@ -33,6 +33,10 @@ struct TaskResourcesSection: View {
                     ResourceRowView(model: model, task: task, status: status,
                                     launchPosition: context.launchSet.firstIndex(of: .resource(status.id)))
                 }
+                if let projectID = task.projectID, let link = workspaceLink {
+                    WorkspaceRowView(model: model, task: task, projectID: projectID, link: link,
+                                     launchPosition: context.launchSet.firstIndex(of: .workspace(projectID)))
+                }
             }
         }
         .sheet(isPresented: $isLinking) {
@@ -43,12 +47,18 @@ struct TaskResourcesSection: View {
         }
     }
 
+    /// The Herdr workspace linked to the task's project, if any.
+    private var workspaceLink: HerdrLink? {
+        task.projectID.flatMap { id in model.projects.first { $0.id == id }?.herdrLink }
+    }
+
     /// The launch set's names in order, for the line under Open context.
     private func launchNames(_ context: TaskContext) -> [String] {
         context.launchSet.compactMap { item in
             switch item {
             case .resource(let id): context.resources.first { $0.id == id }?.resource.name
             case .agent(let id): context.agents.first { $0.id == id }.map { "\($0.label) in Herdr" }
+            case .workspace: workspaceLink.map { "the \($0.label) workspace in Herdr" }
             }
         }
     }
@@ -205,6 +215,61 @@ private struct ResourceRowView: View {
 
     private func ordinal(_ number: Int) -> String {
         NumberFormatter.localizedString(from: number as NSNumber, number: .ordinal)
+    }
+}
+
+/// The project's Herdr workspace: Open context can focus its first tab.
+private struct WorkspaceRowView: View {
+    let model: AppModel
+    let task: TodayItem
+    let projectID: Int64
+    let link: HerdrLink
+    let launchPosition: Int?
+
+    private var isMissing: Bool {
+        guard let herdr = model.herdr else { return false }
+        return HerdrLinkState(link, herdr) == .notFound
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "rectangle.split.3x1")
+                    .foregroundStyle(isMissing ? Color.orange : .secondary)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: link.label)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                    Text(isMissing ? "Not found in Herdr · relink it in Projects"
+                         : "Herdr workspace · opens at its first tab · all tasks in \(task.projectTitle ?? "the project")")
+                        .font(.caption)
+                        .foregroundStyle(isMissing ? Color.orange : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            HStack {
+                Toggle("Opens with context", isOn: Binding(
+                    get: { launchPosition != nil },
+                    set: { included in Task { await model.setLaunch(.workspace(projectID), included: included) } }))
+                    .toggleStyle(.checkbox)
+                if let launchPosition {
+                    Text("· \(launchPosition + 1)")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if launchPosition ?? 0 > 0 {
+                    Button("Open Earlier") { Task { await model.moveEarlier(.workspace(projectID), forTask: task.id) } }
+                        .buttonStyle(.link)
+                }
+            }
+            .font(.caption)
+            .controlSize(.small)
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 8))
+        .contrastBorder(cornerRadius: 8)
     }
 }
 

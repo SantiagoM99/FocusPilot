@@ -10,6 +10,7 @@ private struct ContextFixture {
     let clock = SettableClock(wednesdayMorningInBogota)
     let publisher = RecordingPolicyPublisher()
     let herdr = FakeHerdrAgents(.connected(herdrServer, [agent(.working)]))
+    let workspaces = FakeHerdr(.connected(herdrServer, [nlpWorkspace]))
     let coordinator: FocusCoordinator
     /// "Explain baseline results" in project "NLP report", pinned as Now.
     let task: Int64
@@ -18,7 +19,7 @@ private struct ContextFixture {
     init() async throws {
         location = StorageLocation(directory: try makeTemporaryDirectory())
         folders = URL(fileURLWithPath: FolderContainment.canonical(try makeTemporaryDirectory().path)!)
-        coordinator = try Self.coordinator(location, clock, publisher, herdr)
+        coordinator = try Self.coordinator(location, clock, publisher, herdr, workspaces)
         try await coordinator.capture(NewTask(title: "Explain baseline results", projectName: "NLP report"))
         let item = try await coordinator.todayTasks()[0]
         task = item.id
@@ -27,13 +28,13 @@ private struct ContextFixture {
     }
 
     func relaunched() throws -> FocusCoordinator {
-        try Self.coordinator(location, clock, publisher, herdr)
+        try Self.coordinator(location, clock, publisher, herdr, workspaces)
     }
 
     private static func coordinator(_ location: StorageLocation, _ clock: SettableClock, _ publisher: RecordingPolicyPublisher,
-                                    _ herdr: FakeHerdrAgents) throws -> FocusCoordinator {
+                                    _ herdr: FakeHerdrAgents, _ workspaces: FakeHerdr) throws -> FocusCoordinator {
         let now: @Sendable () -> Date = { clock.now }
-        return FocusCoordinator(repository: try TaskRepository(location: location, now: now), agents: herdr,
+        return FocusCoordinator(repository: try TaskRepository(location: location, now: now), herdr: workspaces, agents: herdr,
                                 publisher: publisher, now: now)
     }
 
@@ -237,35 +238,159 @@ struct LaunchSetTests {
     }
 }
 
-@Suite("Context resources in the session's allowed list (decision 0004)")
+@Suite("A project's Herdr workspace in the launch set")
+struct LaunchWorkspaceTests {
+    private func linked() async throws -> ContextFixture {
+        let fixture = try await ContextFixture()
+        try await fixture.coordinator.linkProject(fixture.project, to: nlpWorkspace, on: herdrServer)
+        return fixture
+    }
+
+    @Test func theWorkspaceOpensInItsPlaceInTheLaunchSet() async throws {
+        let fixture = try await linked()
+        let page = try await fixture.coordinator.linkWebPage("overleaf.com", to: .task(fixture.task))
+        try await fixture.coordinator.setLaunch(.resource(page.id), included: true)
+        try await fixture.coordinator.setLaunch(.workspace(fixture.project), included: true)
+
+        #expect(try await fixture.coordinator.context(forTask: fixture.task).launchSet == [.resource(page.id), .workspace(fixture.project)])
+        #expect(try await fixture.coordinator.prepareLaunch(forTask: fixture.task).steps.map(\.item)
+            == [.resource(page.id), .workspace(fixture.project)])
+        #expect(fixture.workspaces.focused.isEmpty, "preparing a launch focuses nothing")
+    }
+
+    @Test func everyTaskInTheProjectOpensTheWorkspace() async throws {
+        let fixture = try await linked()
+        let other = try await fixture.otherTask(project: "NLP report")
+        try await fixture.coordinator.setLaunch(.workspace(fixture.project), included: true)
+
+        #expect(try await fixture.coordinator.prepareLaunch(forTask: other).steps.map(\.item) == [.workspace(fixture.project)])
+    }
+
+    @Test func openingFocusesTheLinkedWorkspaceAfterCheckingIt() async throws {
+        let fixture = try await linked()
+
+        #expect(await fixture.coordinator.openWorkspace(ofProject: fixture.project) == .opened)
+        #expect(fixture.workspaces.focused == ["w4"])
+    }
+
+    @Test func aWorkspaceGoneFromHerdrIsReportedNotFocused() async throws {
+        let fixture = try await linked()
+        fixture.workspaces.current = .connected(herdrServer, [thesisWorkspace])
+
+        #expect(await fixture.coordinator.openWorkspace(ofProject: fixture.project) == .notFound)
+        #expect(fixture.workspaces.focused.isEmpty)
+    }
+
+    @Test func aRestartedHerdrIsReportedNotFocused() async throws {
+        let fixture = try await linked()
+        fixture.workspaces.current = .connected(restartedHerdrServer, [nlpWorkspace])
+
+        #expect(await fixture.coordinator.openWorkspace(ofProject: fixture.project) == .notFound)
+        #expect(fixture.workspaces.focused.isEmpty)
+    }
+
+    @Test func anUnreachableHerdrIsReported() async throws {
+        let fixture = try await linked()
+        fixture.workspaces.current = .disconnected(.notRunning)
+
+        #expect(await fixture.coordinator.openWorkspace(ofProject: fixture.project) == .herdrUnavailable)
+    }
+
+    @Test func relinkingTheProjectKeepsItsPlace() async throws {
+        let fixture = try await linked()
+        try await fixture.coordinator.setLaunch(.workspace(fixture.project), included: true)
+
+        try await fixture.coordinator.linkProject(fixture.project, to: thesisWorkspace, on: herdrServer)
+
+        #expect(try await fixture.coordinator.context(forTask: fixture.task).launchSet == [.workspace(fixture.project)])
+    }
+
+    @Test func unlinkingTheWorkspaceTakesItOutOfTheLaunchSet() async throws {
+        let fixture = try await linked()
+        try await fixture.coordinator.setLaunch(.workspace(fixture.project), included: true)
+
+        try await fixture.coordinator.unlinkProject(fixture.project)
+
+        #expect(try await fixture.coordinator.context(forTask: fixture.task).launchSet.isEmpty)
+    }
+}
+
+@Suite("Context resources in the session's allowed list (decision 0004, #60)")
 struct ContextAllowanceTests {
     private func allowedDomains(_ fixture: ContextFixture) async -> [String] {
         await fixture.publisher.published.last?.allowed.domains ?? []
     }
 
-    @Test func theProjectsPagesAreAllowedOnlyWhileItsSessionRuns() async throws {
+    private func allowedPages(_ fixture: ContextFixture) async -> [String] {
+        await fixture.publisher.published.last?.session?.allowedPages ?? []
+    }
+
+    /// A second project with a linked page, and its ID.
+    private func applications(_ fixture: ContextFixture, page: String = "arxiv.org") async throws -> Int64 {
+        let other = try await fixture.otherTask(project: "Applications")
+        try await fixture.coordinator.linkWebPage(page, to: .task(other))
+        return try #require(try await fixture.coordinator.todayTasks().first { $0.id == other }?.projectID)
+    }
+
+    @Test func pagesAreAllowedOnlyWhileTheSessionRuns() async throws {
         let fixture = try await ContextFixture()
         try await fixture.coordinator.linkWebPage("docs.google.com/document/d/1", to: .project(fixture.project))
-        try await fixture.coordinator.linkWebPage("arxiv.org/abs/1", to: .task(fixture.task))
-        #expect(await !allowedDomains(fixture).contains("arxiv.org"))
+        try await fixture.coordinator.linkWebPage("overleaf.com/project/1", to: .task(fixture.task))
+        #expect(await !allowedDomains(fixture).contains("docs.google.com"))
+
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+        #expect(await allowedDomains(fixture).contains("docs.google.com"))
+
+        _ = try await fixture.coordinator.complete()
+        #expect(await !allowedDomains(fixture).contains("docs.google.com"))
+    }
+
+    @Test func aSessionOnAllProjectsAllowsEveryProjectsPages() async throws {
+        let fixture = try await ContextFixture()
+        _ = try await applications(fixture)
+        try await fixture.coordinator.capture(NewTask(title: "Read without a project"))
+        let loose = try await fixture.coordinator.todayTasks().first { $0.title == "Read without a project" }!.id
+        try await fixture.coordinator.linkWebPage("jstor.org", to: .task(loose))
 
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
 
         #expect(await allowedDomains(fixture).contains("arxiv.org"))
-        #expect(await allowedDomains(fixture).contains("docs.google.com"))
+        #expect(await allowedDomains(fixture).contains("jstor.org"))
+    }
 
-        _ = try await fixture.coordinator.complete()
+    @Test func aSessionOnChosenProjectsAllowsOnlyTheirPages() async throws {
+        let fixture = try await ContextFixture()
+        _ = try await applications(fixture)
+        try await fixture.coordinator.linkWebPage("docs.google.com", to: .project(fixture.project))
+
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal, projects: [fixture.project])
+
+        #expect(await allowedDomains(fixture).contains("docs.google.com"))
         #expect(await !allowedDomains(fixture).contains("arxiv.org"))
     }
 
-    @Test func otherProjectsPagesAreNotAllowed() async throws {
+    // #60: the Now task's project counts when it sits outside the scope.
+    @Test func theNowTasksProjectCountsWhenOutsideTheScope() async throws {
         let fixture = try await ContextFixture()
-        let other = try await fixture.otherTask(project: "Applications")
-        try await fixture.coordinator.linkWebPage("arxiv.org", to: .task(other))
+        let applicationsID = try await applications(fixture)
+        try await fixture.coordinator.linkWebPage("docs.google.com", to: .project(fixture.project))
 
-        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal, projects: [applicationsID])
 
+        #expect(await allowedDomains(fixture).contains("arxiv.org"))
+        #expect(await allowedDomains(fixture).contains("docs.google.com"))
+    }
+
+    @Test func pinningATaskFromAnotherProjectMidSessionAllowsItsPages() async throws {
+        let fixture = try await ContextFixture()
+        let applicationsID = try await applications(fixture)
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal, projects: [fixture.project])
         #expect(await !allowedDomains(fixture).contains("arxiv.org"))
+
+        let other = try #require(try await fixture.coordinator.todayTasks().first { $0.projectID == applicationsID })
+        try await fixture.coordinator.moveTask(other.id, to: .now, .top)
+
+        #expect(await allowedDomains(fixture).contains("arxiv.org"))
     }
 
     @Test func aPageLinkedDuringTheSessionIsAllowedRightAway() async throws {
@@ -277,20 +402,6 @@ struct ContextAllowanceTests {
         #expect(await allowedDomains(fixture).contains("arxiv.org"))
     }
 
-    // Linking never weakens blocking: Chrome does not unblock allowed
-    // domains, and the lists must not contradict each other.
-    @Test func aPageOnABlockedSiteStaysBlocked() async throws {
-        let fixture = try await ContextFixture()
-        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
-        try await fixture.coordinator.linkWebPage("youtube.com/watch?v=lecture", to: .task(fixture.task))
-
-        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
-
-        let policy = try #require(await fixture.publisher.published.last)
-        #expect(!policy.allowed.domains.contains("youtube.com"))
-        #expect(policy.session?.targets.domains == ["youtube.com"])
-    }
-
     @Test func aPageAlreadyAllowedIsNotListedTwice() async throws {
         let fixture = try await ContextFixture()
         try await fixture.coordinator.linkWebPage("www.overleaf.com/project/1", to: .task(fixture.task))
@@ -298,5 +409,63 @@ struct ContextAllowanceTests {
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
 
         #expect(await allowedDomains(fixture).filter { $0 == "overleaf.com" }.count == 1)
+    }
+
+    // Owner decision (0003, 2026-11-03): in a normal session that covers the
+    // project, a linked page on a blocked site opens, that exact page only.
+    @Test func aNormalSessionAllowsTheExactLinkedPageOnABlockedSite() async throws {
+        let fixture = try await ContextFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "reddit.com")], activation: .always))
+        try await fixture.coordinator.linkWebPage("https://www.youtube.com/watch?v=lecture7&t=30", to: .task(fixture.task))
+        try await fixture.coordinator.linkWebPage("reddit.com/r/MachineLearning/comments/abc", to: .project(fixture.project))
+
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+
+        let policy = try #require(await fixture.publisher.published.last)
+        #expect(policy.session?.allowedPages == ["https://reddit.com/r/MachineLearning/comments/abc",
+                                                 "https://youtube.com/watch?v=lecture7"])
+        #expect(policy.session?.targets.domains == ["youtube.com"])
+        #expect(!policy.allowed.domains.contains("youtube.com"))
+        #expect(policy.always.domains == ["reddit.com"])
+    }
+
+    @Test func aStrictSessionKeepsLinkedPagesOnBlockedSitesBlocked() async throws {
+        let fixture = try await ContextFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
+        try await fixture.coordinator.linkWebPage("youtube.com/watch?v=lecture7", to: .task(fixture.task))
+
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
+
+        #expect(await allowedPages(fixture).isEmpty)
+        #expect(await !allowedDomains(fixture).contains("youtube.com"))
+    }
+
+    @Test func aBlockedPageOutsideTheScopeStaysBlocked() async throws {
+        let fixture = try await ContextFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly))
+        _ = try await applications(fixture, page: "youtube.com/watch?v=other")
+
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal, projects: [fixture.project])
+
+        #expect(await allowedPages(fixture).isEmpty)
+    }
+
+    @Test func withoutASessionNoBlockedPageIsAllowed() async throws {
+        let fixture = try await ContextFixture()
+        try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "reddit.com")], activation: .always))
+        try await fixture.coordinator.linkWebPage("reddit.com/r/MachineLearning", to: .task(fixture.task))
+
+        let policy = try #require(await fixture.publisher.published.last)
+        #expect(policy.session == nil)
+        #expect(policy.always.domains == ["reddit.com"])
+    }
+
+    @Test func aPolicyWithoutAllowedPagesKeepsItsJSON() throws {
+        let rules = PolicyCompiler.compile(rules: [], allowed: [], session: SessionPolicy(sessionID: UUID(), mode: .normal,
+                                                                                            end: wednesdayMorningInBogota))
+        let json = String(decoding: try CompiledPolicy(revision: 1, effectiveAt: wednesdayMorningInBogota, rules: rules).json(), as: UTF8.self)
+
+        #expect(!json.contains("allowedPages"))
     }
 }

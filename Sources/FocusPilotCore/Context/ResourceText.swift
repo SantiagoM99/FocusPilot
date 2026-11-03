@@ -22,20 +22,23 @@ public enum ResourceText {
         "Moved to \(path(newPath, home: home))"
     }
 
-    /// Whether the page's site is allowed in sessions, or stays blocked.
+    /// When the page opens: a blocked site's page only in normal sessions
+    /// (owner decision 0003, 2026-11-03).
     public static func sessionNote(for page: WebPageLink, rules: [BlockRuleSet]) -> String {
-        isBlocked(page, rules) ? "Blocked by your rules, also in this project’s sessions" : "Allowed in this project’s sessions"
+        blockingRule(page, rules) == nil ? "Allowed in this project’s sessions"
+            : "This page opens in normal sessions · Blocked in strict sessions — ask for an exception"
     }
 
     /// Shown while linking a page a rule blocks.
     public static func blockedPageHelp(for page: WebPageLink, rules: [BlockRuleSet]) -> String? {
-        isBlocked(page, rules)
-            ? "Linking it doesn’t unblock it. When you need it during a session, ask for a timed exception on the blocked page."
-            : nil
+        blockingRule(page, rules).map { site in
+            "\(site) is blocked by your rules. In normal sessions that cover this project, this exact page opens; other pages on the site stay blocked. In strict sessions it stays blocked: ask for an exception, and the usual wait applies."
+        }
     }
 
-    private static func isBlocked(_ page: WebPageLink, _ rules: [BlockRuleSet]) -> Bool {
-        rules.flatMap(\.targets).contains(where: ActivityTarget.site(domain: page.domain).overlaps)
+    /// The blocked site the page is on, as the rule names it.
+    private static func blockingRule(_ page: WebPageLink, _ rules: [BlockRuleSet]) -> String? {
+        rules.flatMap(\.targets).first(where: ActivityTarget.site(domain: page.domain).overlaps)?.displayName
     }
 
     public static func launchResult(opened: Int, needingRepair names: [String], moved: [MovedFolder] = [],
