@@ -176,6 +176,162 @@ struct HerdrProjectsTests {
         #expect(try await titles() == ["NLP report"])
     }
 
+    // MARK: Restored links after a restart
+
+    /// Links both workspaces on the old server, then lets Herdr restart.
+    private func linkBeforeRestart(_ workspaces: [HerdrWorkspace]) async throws {
+        try await repository.importHerdrWorkspaces(workspaces, on: herdrServer)
+        try await repository.syncHerdrWorkspaces(workspaces, on: herdrServer)
+    }
+
+    @Test func aWorkspaceWithTheSameIDAndLabelIsRelinkedAfterARestart() async throws {
+        try await linkBeforeRestart([nlpWorkspace, thesisWorkspace])
+
+        let created = try await repository.syncHerdrWorkspaces([nlpWorkspace, thesisWorkspace], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report", "Thesis"])
+        #expect(try await project("NLP report").herdrLink
+            == HerdrLink(server: restartedHerdrServer, workspaceID: "w4", label: "NLP report", cwd: nlpWorkspace.cwd))
+        #expect(try await project("Thesis").herdrLink
+            == HerdrLink(server: restartedHerdrServer, workspaceID: "w5", label: "Thesis", cwd: nil))
+    }
+
+    @Test func aRenamedWorkspaceStaysNotFoundAfterARestart() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        let renamed = HerdrWorkspace(id: "w4", label: "NLP final report", cwd: nlpWorkspace.cwd, isLinkedWorktree: false)
+
+        let created = try await repository.syncHerdrWorkspaces([renamed], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report"])
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+    }
+
+    @Test func anIDNowHoldingAnotherWorkspaceStaysNotFoundAfterARestart() async throws {
+        try await linkBeforeRestart([nlpWorkspace, thesisWorkspace])
+        let reused = HerdrWorkspace(id: "w4", label: "Thesis", cwd: nil, isLinkedWorktree: false)
+
+        let created = try await repository.syncHerdrWorkspaces([reused], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report", "Thesis"])
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+        #expect(try await project("Thesis").herdrLink?.server == herdrServer)
+    }
+
+    @Test func aWorkspaceOnAnotherFolderStaysNotFoundAfterARestart() async throws {
+        let inRepo = HerdrWorkspace(id: "w5", label: "Thesis", cwd: "/Users/owner/Projects/Thesis", isLinkedWorktree: false)
+        try await linkBeforeRestart([nlpWorkspace, inRepo])
+        let moved = HerdrWorkspace(id: "w4", label: "NLP report", cwd: "/tmp/other", isLinkedWorktree: false)
+        let lostFolder = HerdrWorkspace(id: "w5", label: "Thesis", cwd: nil, isLinkedWorktree: false)
+
+        let created = try await repository.syncHerdrWorkspaces([moved, lostFolder], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+        #expect(try await project("Thesis").herdrLink?.server == herdrServer)
+    }
+
+    @Test func aMissingWorkspaceStaysNotFoundAfterARestart() async throws {
+        try await linkBeforeRestart([nlpWorkspace, thesisWorkspace])
+
+        let created = try await repository.syncHerdrWorkspaces([thesisWorkspace], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+        #expect(try await project("Thesis").herdrLink?.server == restartedHerdrServer)
+    }
+
+    @Test func aRestartCreatesNoProjectsAndAdoptsNoUnlinkedOnes() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        _ = try await repository.addTask(NewTask(title: "Draft chapter", projectName: "Thesis"))
+        let newOne = HerdrWorkspace(id: "w8", label: "Slides", cwd: nil, isLinkedWorktree: false)
+
+        let created = try await repository.syncHerdrWorkspaces([nlpWorkspace, thesisWorkspace, newOne],
+                                                               on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report", "Thesis"])
+        #expect(try await project("Thesis").herdrLink == nil)
+        #expect(try await project("NLP report").herdrLink?.server == restartedHerdrServer)
+    }
+
+    @Test func aRestartOnAnotherSessionRelinksNothing() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        let otherSession = HerdrServer(sessionName: "work", socketPath: herdrServer.socketPath,
+                                       startedAt: restartedHerdrServer.startedAt)
+
+        try await repository.syncHerdrWorkspaces([nlpWorkspace], on: otherSession)
+
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+    }
+
+    @Test func twoOldLinksClaimingOneWorkspaceAreLeftForTheOwner() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        let middle = HerdrServer(sessionName: "default", socketPath: herdrServer.socketPath,
+                                 startedAt: instant("2026-10-01T08:00:00-05:00"))
+        _ = try await repository.addTask(NewTask(title: "Draft chapter", projectName: "Copy"))
+        try await repository.linkProject(try #require(try await project("Copy").id), to: nlpWorkspace, on: middle)
+
+        try await repository.syncHerdrWorkspaces([nlpWorkspace], on: restartedHerdrServer)
+
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+        #expect(try await project("Copy").herdrLink?.server == middle)
+    }
+
+    @Test func aLinkThatWentStaleOnAnEarlierSyncIsRestoredLater() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        try await repository.syncHerdrWorkspaces([], on: restartedHerdrServer)
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+
+        let created = try await repository.syncHerdrWorkspaces([nlpWorkspace], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report"])
+        #expect(try await project("NLP report").herdrLink
+            == HerdrLink(server: restartedHerdrServer, workspaceID: "w4", label: "NLP report", cwd: nlpWorkspace.cwd))
+    }
+
+    @Test func aWorkspaceAlreadyLinkedOnTheNewServerKeepsItsLink() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        let other = HerdrWorkspace(id: "w4", label: "Other", cwd: nlpWorkspace.cwd, isLinkedWorktree: false)
+        try await repository.syncHerdrWorkspaces([], on: restartedHerdrServer)
+        #expect(try await repository.syncHerdrWorkspaces([other], on: restartedHerdrServer) == ["Other"])
+
+        let created = try await repository.syncHerdrWorkspaces([nlpWorkspace, thesisWorkspace], on: restartedHerdrServer)
+
+        #expect(created == ["Thesis"])
+        #expect(try await project("Other").herdrLink?.server == restartedHerdrServer)
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+    }
+
+    @Test func aWorkspaceTheOwnerRelinkedToAnotherProjectKeepsThatLink() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        _ = try await repository.addTask(NewTask(title: "Draft chapter", projectName: "Copy"))
+        let copy = try #require(try await project("Copy").id)
+        try await repository.syncHerdrWorkspaces([], on: restartedHerdrServer)
+        try await repository.linkProject(copy, to: nlpWorkspace, on: restartedHerdrServer)
+
+        let created = try await repository.syncHerdrWorkspaces([nlpWorkspace, thesisWorkspace], on: restartedHerdrServer)
+
+        #expect(created == ["Thesis"])
+        #expect(try await project("Copy").herdrLink?.server == restartedHerdrServer)
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+    }
+
+    @Test func anUnlinkedProjectIsNotRelinkedAfterARestart() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        try await repository.unlinkProject(try #require(try await project("NLP report").id))
+
+        try await repository.syncHerdrWorkspaces([nlpWorkspace], on: restartedHerdrServer)
+        let created = try await repository.syncHerdrWorkspaces([nlpWorkspace], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report"])
+        #expect(try await project("NLP report").herdrLink == nil)
+    }
+
     // MARK: Link and unlink
 
     @Test func unlinkingKeepsTheProjectAndItsTasks() async throws {

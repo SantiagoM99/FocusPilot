@@ -1,9 +1,12 @@
 import Foundation
 import GRDB
+import os
 
 /// The Herdr link writes. Each function runs inside the caller's single
 /// write, so a project and its link always commit together.
 enum HerdrLinkStore {
+    private static let log = Logger(subsystem: "com.santiagom99.FocusPilot", category: "herdr")
+
     /// Links each workspace that has no project yet; already linked ones are
     /// left alone, so importing twice changes nothing.
     static func importWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer, in db: Database) throws {
@@ -19,6 +22,7 @@ enum HerdrLinkStore {
     /// linked projects, and returns their titles. It never links an existing
     /// project: one the owner unlinked stays unlinked.
     static func syncWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer, in db: Database) throws -> [String] {
+        try restoreExactLinks(to: workspaces, on: server, in: db)
         guard try isSeen(server, in: db) else {
             // The first sight of a server instance: what is open now was
             // opened before FocusPilot was watching, or is the same work
@@ -50,6 +54,36 @@ enum HerdrLinkStore {
         try HerdrLinkRecord.deleteOne(db, key: projectID)
         try HerdrLinkRecord(projectId: projectID, workspace: workspace, server: server).insert(db)
         try markSeen(workspace, on: server, in: db)
+    }
+
+    /// Moves to the current server each link from an earlier instance of the
+    /// same session whose workspace ID is open again with the same label and
+    /// the same checkout (decision 0003, 2026-11-03). It runs on every sync,
+    /// so links that went stale before this check existed recover too. Any
+    /// difference, or two old links claiming one workspace, leaves the link
+    /// for the owner to relink, as does a workspace already linked on the
+    /// current server. An unlinked project has no row, so it is never
+    /// touched.
+    private static func restoreExactLinks(to workspaces: [HerdrWorkspace], on server: HerdrServer, in db: Database) throws {
+        let stale = try HerdrLinkRecord
+            .filter(Column("sessionName") == server.sessionName && Column("socketPath") == server.socketPath
+                && Column("serverStartedAt") != server.startedAtMilliseconds)
+            .fetchAll(db)
+        for workspace in workspaces {
+            let matches = stale.filter {
+                $0.workspaceId == workspace.id && $0.label == workspace.label && $0.cwd == workspace.cwd
+            }
+            guard matches.count == 1, var record = matches.first,
+                  try linkedProjectID(workspace, on: server, in: db) == nil else { continue }
+            record.serverStartedAt = server.startedAtMilliseconds
+            do {
+                try record.update(db)
+            } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
+                // SQLite undoes only the failed statement, so the other links
+                // and the rest of the sync still commit.
+                log.error("Herdr link for project \(record.projectId) not restored: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// A project named after the workspace: when `adoptingUnlinkedNamesake`

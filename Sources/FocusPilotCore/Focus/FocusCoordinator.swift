@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 
 /// Owns FocusPilot's state transitions and is the UI's single entry point.
@@ -140,6 +141,8 @@ public actor FocusCoordinator {
 
     // MARK: Herdr workspaces
 
+    private static let herdrLog = Logger(subsystem: "com.santiagom99.FocusPilot", category: "herdr")
+
     /// Reads Herdr's workspaces and links the new ones to projects. Nothing
     /// is written while Herdr is unreachable, and a failed write is retried
     /// on the next refresh, since unseen workspaces stay unseen.
@@ -147,7 +150,11 @@ public actor FocusCoordinator {
         guard let herdr else { return .disconnected(.binaryNotFound) }
         let connection = await herdr.connection()
         if case .connected(let server, let workspaces) = connection {
-            _ = try? await repository.syncHerdrWorkspaces(workspaces, on: server)
+            do {
+                try await repository.syncHerdrWorkspaces(workspaces, on: server)
+            } catch {
+                Self.herdrLog.error("Herdr sync failed, retrying on the next refresh: \(error.localizedDescription)")
+            }
         }
         return connection
     }
