@@ -85,3 +85,9 @@ Direction agreed with the owner on 2026-11-02. The details are proposals.
   - Strict but fair: says so plainly when something holds up.
 - **Interface:** both roles run as Herdr agents. Their reports go into the attention queue (#57), and each project gets a weekly digest: what was done, what is missing, and the senior's open doubts.
 - **Writing:** the communication requirement above applies, plus the owner's scientific-process and scientific-writing skills.
+
+## Phase 2 start (owner decisions, 2026-11-03)
+
+- **Agent reports (T22).** Helper agents (second in command, interns, seniors) post reports to FocusPilot with `focuspilot report`. A report holds a plain summary, its project, and an optional proposal: the exact message to send to a named Herdr agent. Reports appear in the attention queue. **Accept** sends that exact text to that agent with `herdr agent prompt`, and only on the owner's click; **Dismiss** discards it. Nothing is ever sent automatically. This is the only Herdr write FocusPilot performs, and it is a deliberate owner-approved exception to the default in AGENTS.md.
+- **First job for the second in command:** Bowling PR reviews.
+- **Local experiment runs** for the Final Project and Observatorio Deserción interns: allowed at any time at low (background) priority, including during focus sessions. Starting a run still follows the propose-and-approve rule.
