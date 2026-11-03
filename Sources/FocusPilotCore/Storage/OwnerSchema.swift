@@ -267,6 +267,34 @@ enum OwnerSchema {
             try db.rename(table: "new_focusSession", to: SessionRow.databaseTableName)
             try db.create(index: "focusSession_on_startedAt", on: SessionRow.databaseTableName, columns: ["startedAt"])
         }
+        migrator.registerMigration("owner-v13-attention") { db in
+            // #57 (decision 0004). Tasks the owner marked waiting, with an
+            // optional time to check on them; owner-authored, so durable.
+            try db.create(table: "taskWaiting") { table in
+                table.primaryKey("taskId", .integer).references(TaskRecord.databaseTableName, onDelete: .cascade)
+                table.column("waitingOn", .text)
+                table.column("since", .datetime).notNull()
+                table.column("checkAt", .datetime)
+            }
+            // A return cue saved on Switch outside a session has no session:
+            // rebuilt so sessionId may be empty, keeping ids and so the order.
+            try db.create(table: "new_wrapUp") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("taskId", .integer).notNull().references(TaskRecord.databaseTableName, onDelete: .cascade)
+                table.column("sessionId", .text).references(SessionRow.databaseTableName)
+                table.column("savedAt", .datetime).notNull()
+                table.column("outcome", .text)
+                table.column("remainingWork", .text)
+                table.column("returnCue", .text)
+            }
+            try db.execute(sql: """
+                INSERT INTO new_wrapUp (id, taskId, sessionId, savedAt, outcome, remainingWork, returnCue)
+                SELECT id, taskId, sessionId, savedAt, outcome, remainingWork, returnCue FROM wrapUp
+                """)
+            try db.drop(table: WrapUpRecord.databaseTableName)
+            try db.rename(table: "new_wrapUp", to: WrapUpRecord.databaseTableName)
+            try db.create(index: "wrapUp_on_taskId", on: WrapUpRecord.databaseTableName, columns: ["taskId"])
+        }
         return migrator
     }
 

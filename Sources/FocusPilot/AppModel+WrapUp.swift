@@ -13,12 +13,18 @@ extension AppModel {
     /// Called with every newer snapshot, before it replaces the shown one.
     func noticeWrapUp(from previous: FocusSession?, to current: FocusSession?) {
         guard let prompt = WrapUpPrompt.after(previous, current) else { return }
-        wrapUp = PendingWrapUp.receiving(prompt, replacing: wrapUp, task: prompt.session.taskID.flatMap(task))
         // A few seconds covers the snapshot arriving after the command; a
         // command that failed must not make a later automatic end steal focus.
-        if let asked = ownerCompletedAt, Date.now.timeIntervalSince(asked) < 5 {
-            ownerCompletedAt = nil
-            planningWindowRequests += 1
+        let ownerCompleted = ownerCompletedAt.map { Date.now.timeIntervalSince($0) < 5 } ?? false
+        if ownerCompleted { ownerCompletedAt = nil }
+        let task = prompt.session.taskID.flatMap(task)
+        // The sheet lists the session's other tasks too (#57), read from storage.
+        Task {
+            let others = (try? await coordinator?.tasksTouched(by: prompt.session)) ?? []
+            let pending = PendingWrapUp.receiving(prompt, replacing: wrapUp, task: task, others: others)
+            guard pending.isNeeded else { return }
+            wrapUp = pending
+            if ownerCompleted { planningWindowRequests += 1 }
         }
     }
 
@@ -34,7 +40,9 @@ extension AppModel {
         let markingDone = pending.draft.marksTaskDone
         guard let coordinator else { return startupError }
         do {
-            try await coordinator.saveWrapUp(pending.draft.wrapUp, after: pending.prompt.session, markingDone: markingDone)
+            let others = pending.draft.otherCues.filter { cue in pending.others.contains { $0.id == cue.key } }
+            try await coordinator.saveWrapUp(pending.draft.wrapUp, after: pending.prompt.session, markingDone: markingDone,
+                                             others: others)
         } catch FocusCoordinator.SessionError.sessionStillActive where markingDone {
             return "A session on this task is still running. Save without marking it complete, or end that session first."
         } catch {

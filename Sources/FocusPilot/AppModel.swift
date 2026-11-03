@@ -22,6 +22,12 @@ final class AppModel {
     private(set) var herdrAgents: HerdrAgents?
     private(set) var agentLinks: [TaskAgentLink] = []
     private(set) var reviewItems: [ReviewItem] = []
+    /// Tasks the owner marked waiting (#57).
+    private(set) var waiting: [TaskWaiting] = []
+    /// A Switch the owner clicked, shown as a sheet until confirmed or cancelled.
+    var switchRequest: SwitchRequest?
+    /// The task whose Mark as waiting sheet is open.
+    var markingWaiting: Int64?
     /// Why the last Open agent did nothing, shown where it was clicked.
     var agentNotice: String?
     /// Set when a session command fails; shown by the session surfaces.
@@ -170,13 +176,15 @@ final class AppModel {
     }
 
     // Advances `now` once a second while a session is active (its time is
-    // on screen in the popover and panel), so an idle app is not redrawn
+    // on screen in the popover and panel) or something waits on the owner
+    // (waiting times and due checks, #57), so an idle app is not redrawn
     // every second.
     private func tickWhileTimeIsShown() {
         Task { [weak self] in
             while let self {
                 try? await Task.sleep(for: .seconds(1))
-                if snapshot.activeSession != nil || menuBarStatus().timeText != nil {
+                if snapshot.activeSession != nil || menuBarStatus().timeText != nil || !reviewItems.isEmpty
+                    || waiting.contains(where: { $0.checkAt != nil }) {
                     now = .now
                 }
             }
@@ -211,6 +219,7 @@ final class AppModel {
             }
             agentLinks = try await coordinator.agentLinks()
             reviewItems = try await coordinator.reviewQueue()
+            waiting = try await coordinator.waitingTasks()
             taskError = nil
         } catch {
             taskError = "Could not load tasks: \(error.localizedDescription)"
@@ -292,21 +301,26 @@ final class AppModel {
     /// previous one afterwards.
     func openAgent(_ linkID: Int64) async {
         guard let coordinator else { return }
-        agentNotice = switch await coordinator.openAgent(linkID) {
+        agentNotice = Self.notice(await coordinator.openAgent(linkID))
+        await refresh()
+    }
+
+    /// Why Open agent did nothing, or nil when it opened.
+    static func notice(_ result: FocusCoordinator.OpenAgentResult) -> String? {
+        switch result {
         case .opened: nil
         case .renamed(let name): "This agent’s name changed in Herdr to “\(name)”. Relink it to keep following it."
         case .replaced: "That pane now runs a different agent. Unlink it, or link the new one."
         case .notFound: "The agent is no longer in Herdr. It may have closed, or Herdr restarted."
         case .herdrUnavailable: "Herdr isn’t available, so the agent couldn’t be opened."
         }
-        await refresh()
     }
 
     func unlinkProject(_ projectID: Int64) async {
         await perform("Could not unlink the workspace") { try await $0.unlinkProject(projectID) }
     }
 
-    private func perform(_ failure: String, _ change: (FocusCoordinator) async throws -> Void) async {
+    func perform(_ failure: String, _ change: (FocusCoordinator) async throws -> Void) async {
         guard let coordinator else { return }
         do {
             try await change(coordinator)

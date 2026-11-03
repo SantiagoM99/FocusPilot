@@ -8,15 +8,16 @@ struct WrapUpRecord: Codable, FetchableRecord, PersistableRecord {
 
     var id: Int64?
     var taskId: Int64
-    var sessionId: String
+    /// Nil for a return cue saved on Switch outside a session (#57).
+    var sessionId: String?
     var savedAt: Date
     var outcome: String?
     var remainingWork: String?
     var returnCue: String?
 
-    init(_ wrapUp: WrapUp, task: Int64, session: UUID, at savedAt: Date) {
+    init(_ wrapUp: WrapUp, task: Int64, session: UUID?, at savedAt: Date) {
         taskId = task
-        sessionId = session.uuidString
+        sessionId = session?.uuidString
         self.savedAt = savedAt
         outcome = wrapUp.outcome
         remainingWork = wrapUp.remainingWork
@@ -25,7 +26,7 @@ struct WrapUpRecord: Codable, FetchableRecord, PersistableRecord {
 
     var taskWrapUp: TaskWrapUp {
         TaskWrapUp(WrapUp(outcome: outcome, remainingWork: remainingWork, returnCue: returnCue),
-                   session: UUID(uuidString: sessionId)!, at: savedAt)
+                   session: sessionId.flatMap(UUID.init(uuidString:)), at: savedAt)
     }
 
     /// The latest wrap-up of each of `tasks` that has one, by task id.

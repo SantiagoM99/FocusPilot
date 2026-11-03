@@ -98,6 +98,17 @@ struct FocusPanelView: View {
                     }
                 }
                 ProtectionStatusView(model: model, showsDetail: false, showsSafari: false, showsWeek: false)
+                // Decision 0004: the top one or two items that need the owner,
+                // each with Switch. Never switches by itself; no sound or motion.
+                if !model.attention.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Needs you")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(model.attention.prefix(2)) { AttentionRow(model: model, item: $0, compact: true) }
+                    }
+                }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)

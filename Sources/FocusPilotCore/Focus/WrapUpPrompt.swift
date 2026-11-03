@@ -19,11 +19,10 @@ public struct WrapUpPrompt: Equatable, Sendable, Identifiable {
     ///
     /// Only an end the app saw counts: a session that ended while the app
     /// was quit (no `previous`) asks nothing, nor do starting, pausing,
-    /// resuming, breaks or a different session. With nothing in Now at the
-    /// end there is no task to wrap up (#56).
+    /// resuming, breaks or a different session. Whether there is anything to
+    /// wrap up with nothing in Now is `PendingWrapUp.isNeeded`'s call (#57).
     public static func after(_ previous: FocusSession?, _ current: FocusSession?) -> WrapUpPrompt? {
-        guard let previous, let current, previous.id == current.id, !previous.hasEnded, current.hasEnded,
-              current.taskID != nil else {
+        guard let previous, let current, previous.id == current.id, !previous.hasEnded, current.hasEnded else {
             return nil
         }
         return WrapUpPrompt(session: current)

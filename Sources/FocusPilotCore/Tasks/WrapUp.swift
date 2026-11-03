@@ -15,15 +15,16 @@ public struct WrapUp: Equatable, Sendable {
     }
 }
 
-/// A wrap-up saved on a task: what was written, after which session, and when.
+/// A wrap-up saved on a task: what was written, after which session (none
+/// for a return cue saved on Switch outside a session), and when.
 public struct TaskWrapUp: Equatable, Sendable {
     public var outcome: String?
     public var remainingWork: String?
     public var returnCue: String?
-    public var sessionID: UUID
+    public var sessionID: UUID?
     public var savedAt: Date
 
-    public init(_ wrapUp: WrapUp, session sessionID: UUID, at savedAt: Date) {
+    public init(_ wrapUp: WrapUp, session sessionID: UUID?, at savedAt: Date) {
         outcome = wrapUp.outcome
         remainingWork = wrapUp.remainingWork
         returnCue = wrapUp.returnCue
