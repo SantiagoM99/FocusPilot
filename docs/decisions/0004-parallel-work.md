@@ -60,7 +60,8 @@ A FocusPilot assistant that takes repetitive coordination work off the owner. Ph
   - No filler, hype or AI-style phrasing.
   - Every message states what happened, what it means and what the owner should do.
   - Summaries are judged on this before anything else.
-- **Open:** the owner will list three or four real repetitive tasks to scope level 1 and level 2.
+- **First use cases (owner, 2026-11-02):** PR reviews in the Bowling project; diagnosing GitHub Actions pipeline failures; investigating data and web-app errors that the team reports in WhatsApp, using the parquet data in the Observatory Data Flow project. WhatsApp cannot be read by a program, so the owner shares or pastes each report.
+- **Architecture direction:** the assistant runs as its own Herdr agent with runbooks for these jobs. FocusPilot is the cockpit (attention queue and one-click approval). Data access is read-only.
 
 ## Tickets
 
