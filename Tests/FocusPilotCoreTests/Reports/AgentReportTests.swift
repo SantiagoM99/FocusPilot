@@ -110,8 +110,8 @@ struct ReportReceivingTests {
     }
 
     @Test(arguments: [
-        ("nobody", "FocusPilot couldn’t find an agent named “nobody” in Herdr when the report arrived."),
-        ("w9:p9", "FocusPilot couldn’t find an agent named “w9:p9” in Herdr when the report arrived."),
+        ("nobody", "“nobody” not found in Herdr"),
+        ("w9:p9", "“w9:p9” not found in Herdr"),
     ])
     func aTargetThatCannotBeFoundIsKeptWithTheProblem(to: String, problem: String) async throws {
         let fixture = try await ReportFixture()
@@ -130,7 +130,7 @@ struct ReportReceivingTests {
 
         #expect(stored.proposal?.target == nil)
         #expect(stored.proposal?.targetProblem
-            == "More than one agent in Herdr is named “ablation”. Ask for the report again with the pane ID, such as w4:p2.")
+            == "Several agents are named “ablation”")
     }
 
     @Test func aReportFromAnotherHerdrServerGetsNoTarget() async throws {
@@ -140,7 +140,7 @@ struct ReportReceivingTests {
         let stored = try await fixture.received(report(caller: old))
 
         #expect(stored.proposal?.target == nil)
-        #expect(stored.proposal?.targetProblem == "The report came from a Herdr session that is no longer running, so its target can’t be trusted.")
+        #expect(stored.proposal?.targetProblem == "From a Herdr session that has ended")
     }
 
     @Test func theSameReportIsStoredOnce() async throws {
@@ -166,6 +166,17 @@ struct ReportReceivingTests {
         _ = try await fixture.coordinator.importInbox(inbox)
 
         #expect(try await fixture.coordinator.reports().count == 20)
+    }
+
+    // Decision 0003 (2026-11-03): the row reports state only.
+    @Test func refusalsAreShortStatusLines() {
+        #expect(AcceptRefusal.blocked(name: "ablation").text == "Not sent: ablation is waiting for an approval")
+        #expect(AcceptRefusal.gone(name: "ablation").text == "Not sent: ablation isn’t in Herdr")
+        #expect(AcceptRefusal.renamed(from: "ablation", to: "plots").text == "Not sent: ablation is now named “plots”")
+        #expect(AcceptRefusal.replaced(name: "ablation").text == "Not sent: a different program is in ablation’s pane")
+        #expect(AcceptRefusal.herdrUnavailable.text == "Not sent: Herdr isn’t reachable")
+        #expect(AcceptRefusal.changed.text == "Not sent: the report changed after it was shown")
+        #expect(AcceptRefusal.outcomeUnknown(name: "ablation").text == "Outcome unknown: ablation may have the message")
     }
 
     @Test func reportsSurviveARelaunch() async throws {

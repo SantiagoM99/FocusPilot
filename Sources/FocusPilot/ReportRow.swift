@@ -6,7 +6,8 @@ import SwiftUI
 /// sends that text to that agent, after FocusPilot checks the agent again;
 /// Dismiss discards the report. Report text is plain text, never markup.
 /// The floating panel shows only the headline: Accept needs the full text
-/// on screen, so it lives in In flight.
+/// on screen, so it lives in In flight. Labels, data and status only, no
+/// explanations (decision 0003, 2026-11-03).
 struct ReportRow: View {
     let model: AppModel
     let item: AttentionItem
@@ -32,7 +33,6 @@ struct ReportRow: View {
                     model.requestedPage = .inFlight
                     model.planningWindowRequests += 1
                 }
-                .help("Opens In flight, where you can read the report and accept or dismiss it")
             }
             .padding(.vertical, 4)
         } else {
@@ -88,7 +88,6 @@ struct ReportRow: View {
             HStack {
                 Spacer()
                 Button("Dismiss") { Task { await model.dismissReport(report.id) } }
-                    .help("Discards the report. Nothing is sent.")
                 if let proposal = report.proposal, let target = proposal.target, !report.outcomeUnknown {
                     // The same values the box above renders, passed as they are.
                     let shownMessage = proposal.message, shownTarget = proposal.target
@@ -96,7 +95,6 @@ struct ReportRow: View {
                         Task { await model.acceptReport(report.id, shownMessage: shownMessage, shownTarget: shownTarget) }
                     }
                     .buttonStyle(.borderedProminent)
-                    .help("Sends the message above to \(target.label) in Herdr, exactly as shown, after checking it’s still the same agent")
                 }
             }
         }
@@ -107,8 +105,7 @@ struct ReportRow: View {
 
     private func proposalView(_ proposal: ReportProposal) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: proposal.target.map { "Accept sends this message to \($0.label) in Herdr, exactly as written:" }
-                 ?? "Proposed message for \(proposal.targetAsGiven):")
+            Text(verbatim: "Message for \(proposal.target?.label ?? proposal.targetAsGiven)")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Text(verbatim: proposal.message)
@@ -121,7 +118,7 @@ struct ReportRow: View {
                 .contrastBorder(cornerRadius: 6)
                 .accessibilityLabel("Message: \(proposal.message)")
             if let problem = proposal.targetProblem {
-                Label(problem + " It can’t be accepted; dismiss it or ask for a new report.", systemImage: "exclamationmark.triangle.fill")
+                Label(problem, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)

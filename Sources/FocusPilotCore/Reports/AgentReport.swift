@@ -96,6 +96,7 @@ public enum ReportTargetProblem: Error, Equatable, Sendable {
     case otherServer
     case herdrUnavailable
 
+    /// For the agent's CLI reply: what is wrong and what to do.
     public var text: String {
         switch self {
         case .notFound(let given): "FocusPilot couldn’t find an agent named “\(given)” in Herdr when the report arrived."
@@ -103,6 +104,16 @@ public enum ReportTargetProblem: Error, Equatable, Sendable {
             "More than one agent in Herdr is named “\(given)”. Ask for the report again with the pane ID, such as \(example)."
         case .otherServer: "The report came from a Herdr session that is no longer running, so its target can’t be trusted."
         case .herdrUnavailable: "Herdr wasn’t reachable when the report arrived, so its target couldn’t be checked."
+        }
+    }
+
+    /// For the owner's screen: the state only (decision 0003, 2026-11-03).
+    public var status: String {
+        switch self {
+        case .notFound(let given): "“\(given)” not found in Herdr"
+        case .ambiguous(let given, _): "Several agents are named “\(given)”"
+        case .otherServer: "From a Herdr session that has ended"
+        case .herdrUnavailable: "Herdr wasn’t reachable"
         }
     }
 }
@@ -179,31 +190,31 @@ public enum AcceptRefusal: Error, Equatable, Sendable {
     /// FocusPilot couldn't record that it was about to send, so it didn't.
     case failed
 
-    /// Plain words for the attention row: what happened and what to do.
+    /// The row's status line: what happened, no advice (decision 0003, 2026-11-03).
     public var text: String {
         switch self {
-        case .gone(let name): "Not sent. \(name) isn’t in Herdr anymore, or Herdr restarted. Dismiss this report, or ask for a new one."
-        case .renamed(let old, let new): "Not sent. The agent \(old) is now named “\(new)” in Herdr. Check it’s the same agent, then ask for a new report."
-        case .replaced(let name): "Not sent. A different program is running in \(name)’s pane now."
-        case .blocked(let name): "Not sent. \(name) is waiting for an approval in Herdr. Answer it there first, then accept again."
-        case .herdrUnavailable: "Not sent. Herdr isn’t reachable right now. Try again when it’s running."
-        case .noTarget: "Not sent. This proposal has no agent that FocusPilot could check."
-        case .changed: "Not sent. The report changed after it was shown. Look at it again before accepting."
-        case .alreadyHandled: "This report was already handled."
+        case .gone(let name): "Not sent: \(name) isn’t in Herdr"
+        case .renamed(let old, let new): "Not sent: \(old) is now named “\(new)”"
+        case .replaced(let name): "Not sent: a different program is in \(name)’s pane"
+        case .blocked(let name): "Not sent: \(name) is waiting for an approval"
+        case .herdrUnavailable: "Not sent: Herdr isn’t reachable"
+        case .noTarget: "Not sent: no agent to send to"
+        case .changed: "Not sent: the report changed after it was shown"
+        case .alreadyHandled: "Already handled"
         case .outcomeUnknown(let name): AcceptRefusal.outcomeUnknownText(name)
-        case .failed: "Not sent. FocusPilot couldn’t save that it was about to send, so it sent nothing. Try again."
+        case .failed: "Not sent: FocusPilot couldn’t save the attempt"
         }
+    }
+}
+
+extension AcceptRefusal {
+    /// The row's note once a report is locked.
+    public static func outcomeUnknownText(_ name: String) -> String {
+        "Outcome unknown: \(name) may have the message"
     }
 }
 
 /// A report that breaks `ReportRules`; it is never stored.
 public struct ReportRefused: Error, Equatable {
     public var reason: String
-}
-
-extension AcceptRefusal {
-    /// The row's note once a report is locked.
-    public static func outcomeUnknownText(_ name: String) -> String {
-        "Outcome unknown. FocusPilot may have sent the message to \(name). Check the agent in Herdr before sending it again. This report can only be dismissed."
-    }
 }

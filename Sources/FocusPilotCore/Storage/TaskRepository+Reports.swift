@@ -37,13 +37,14 @@ extension TaskRepository {
                 row.targetName = target.name
                 row.targetKind = target.kind
             case .failure(let problem)?:
-                row.targetProblem = problem.text
+                row.targetProblem = problem.status
             case nil:
                 break
             }
             try row.insert(db)
+            let problem: String? = if case .failure(let problem)? = target { problem.text } else { nil }
             return ReportReceipt(wasAlreadyReceived: false, projectTitle: try Self.projectTitle(projectID, db),
-                                 targetProblem: row.targetProblem, notes: notes)
+                                 targetProblem: problem, notes: notes)
         }
     }
 

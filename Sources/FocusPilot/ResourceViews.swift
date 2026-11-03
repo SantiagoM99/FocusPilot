@@ -19,12 +19,11 @@ struct TaskResourcesSection: View {
                     .buttonStyle(.borderless)
                     .controlSize(.small)
                     .labelStyle(.iconOnly)
-                    .help("Link a folder, web page or Herdr agent")
             }
             OpenContextButton(model: model, taskID: task.id, launchSet: context.map(launchNames) ?? [])
             if let context {
                 if context.resources.isEmpty {
-                    Text("No folders or pages yet. Link the ones you work with; Open context opens those you tick.")
+                    Text("No resources")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -76,12 +75,12 @@ struct OpenContextButton: View {
                 Label("Open context", systemImage: "arrow.up.forward.app")
             }
             .disabled(launchSet.isEmpty)
-            .help("Opens the ticked resources, checking each one first. Nothing is created.")
-            Text(launchSet.isEmpty ? "Tick “Opens with context” on the resources to open in one click."
-                 : "Opens " + launchSet.joined(separator: ", then "))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !launchSet.isEmpty {
+                Text(verbatim: launchSet.joined(separator: ", then "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let notice = model.contextNotice, !model.contextNoticeOnNowCard {
                 Text(notice)
                     .font(.callout)
@@ -207,10 +206,8 @@ private struct ResourceRowView: View {
             Button("Relink…") {
                 Task { await model.relinkFolder(resource.id, near: resource.folderBookmark?.path ?? NSHomeDirectory()) }
             }
-            .help("Choose the folder again")
             if case .replaced = problem {
                 Button("Use This Folder") { Task { await model.useFolderNowAtPath(resource.id) } }
-                    .help("Keep the link on the folder now at this path")
             }
             Button("Unlink") { Task { await model.unlinkResource(resource.id) } }
                 .buttonStyle(.link)
@@ -242,8 +239,8 @@ private struct WorkspaceRowView: View {
     }
 
     private var workspaceDetail: String {
-        isMissing ? "Not found in Herdr · relink it in Projects"
-            : "Herdr workspace · opens at its first tab · all tasks in \(task.projectTitle ?? "the project")"
+        isMissing ? "Not found in Herdr"
+            : "Herdr workspace · All tasks in \(task.projectTitle ?? "the project")"
     }
 
     var body: some View {
@@ -387,10 +384,6 @@ struct LinkResourceSheet: View {
                         .truncationMode(.middle)
                 }
             }
-            Text("FocusPilot saves a link to the folder; nothing is copied or moved. If the folder moves, the link follows it, and anything it can’t follow shows as needing repair.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -402,25 +395,15 @@ struct LinkResourceSheet: View {
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { if page != nil { link() } }
             if let page {
-                Text(verbatim: "Opens \(page.url)")
+                Text(verbatim: page.url)
                     .font(.callout)
                 Text(ResourceText.sessionNote(for: page, rules: model.ruleSets))
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                if let help = ResourceText.blockedPageHelp(for: page, rules: model.ruleSets) {
-                    Text(help)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             } else if !address.trimmingCharacters(in: .whitespaces).isEmpty {
                 Text(WebPageLinkError.invalid.message)
                     .font(.callout)
                     .foregroundStyle(.orange)
-            } else {
-                Text("Opens in your default browser.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
             }
         }
     }

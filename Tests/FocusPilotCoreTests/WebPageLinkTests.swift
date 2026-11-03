@@ -23,7 +23,7 @@ struct WebPageLinkTests {
     }
 
     @Test func theInvalidMessageSaysWhatToType() {
-        #expect(WebPageLinkError.invalid.message == "Not a valid URL. Include a domain, e.g. overleaf.com/project/nlp-report")
+        #expect(WebPageLinkError.invalid.message == "Not a valid URL")
     }
 
     @Test func aLinkShowsItsHostPathAndQuery() throws {

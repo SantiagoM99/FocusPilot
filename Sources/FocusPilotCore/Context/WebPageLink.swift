@@ -29,6 +29,6 @@ public enum WebPageLinkError: Error, Equatable {
     case invalid
 
     public var message: String {
-        "Not a valid URL. Include a domain, e.g. overleaf.com/project/nlp-report"
+        "Not a valid URL"
     }
 }
