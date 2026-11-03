@@ -43,9 +43,6 @@ struct NowCard: View {
                         }
                     }
                 }
-                if let model {
-                    session(for: item, model)
-                }
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No current task")
@@ -53,6 +50,9 @@ struct NowCard: View {
                     Text("Pick one from Next and press ⌘1, or capture a new one.")
                         .foregroundStyle(.secondary)
                 }
+            }
+            if let model {
+                session(model)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,21 +62,26 @@ struct NowCard: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// Start focus, or the session already running.
+    /// Start focus, or the session already running. A session covers
+    /// projects, not this one task (#56), so it stays when Now changes.
     @ViewBuilder
-    private func session(for item: TodayItem, _ model: AppModel) -> some View {
+    private func session(_ model: AppModel) -> some View {
         if let session = model.snapshot.activeSession {
-            if session.taskID == item.id {
-                VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
                     SessionHeader(session: session, now: model.now, timeFont: .title3.weight(.semibold))
-                    SessionControls(model: model, showsReturnCue: false)
+                    Text(SessionText.covers(session.scope))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    if let note = model.outsideNote {
+                        Text(note)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .frame(maxWidth: 360)
-            } else {
-                Text("A session is running on “\(session.action)”.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                SessionControls(model: model, showsReturnCue: false)
             }
+            .frame(maxWidth: 360)
         } else {
             Button { model.requestStartFocus() } label: {
                 Label("Start focus", systemImage: "play.fill")
@@ -84,7 +89,7 @@ struct NowCard: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .help("Start focus (⌘⏎)")
-            .accessibilityHint("Starts a session for \(item.title)")
+            .accessibilityHint("Opens Start focus")
         }
     }
 }

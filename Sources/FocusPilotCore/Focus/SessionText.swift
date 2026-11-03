@@ -22,6 +22,29 @@ public struct SessionText: Sendable {
         self.session = session
     }
 
+    /// The task in Now, or with nothing in Now what the session covers.
+    public var subject: String {
+        session.action ?? Self.scope(session.scope)
+    }
+
+    /// "All projects", "FocusPilot", "FocusPilot and NLP report",
+    /// "FocusPilot, NLP report and Thesis".
+    public static func scope(_ scope: SessionScope) -> String {
+        let titles = scope.projects.map(\.title)
+        guard let last = titles.last else { return "All projects" }
+        return titles.count == 1 ? last : titles.dropLast().joined(separator: ", ") + " and " + last
+    }
+
+    /// "Covers all projects" or "Covers FocusPilot and NLP report".
+    public static func covers(_ scope: SessionScope) -> String {
+        "Covers " + (scope.isAllProjects ? "all projects" : Self.scope(scope))
+    }
+
+    /// The quiet note under a Now task the session does not cover.
+    public static func outsideNote(_ scope: SessionScope, projectID: Int64?) -> String? {
+        scope.covers(projectID: projectID) ? nil : "Outside this session's projects"
+    }
+
     public var phase: String {
         switch session.phase {
         case .running: "Focusing"

@@ -13,7 +13,7 @@ extension AppModel {
     /// Called with every newer snapshot, before it replaces the shown one.
     func noticeWrapUp(from previous: FocusSession?, to current: FocusSession?) {
         guard let prompt = WrapUpPrompt.after(previous, current) else { return }
-        wrapUp = PendingWrapUp.receiving(prompt, replacing: wrapUp, task: task(prompt.session.taskID))
+        wrapUp = PendingWrapUp.receiving(prompt, replacing: wrapUp, task: prompt.session.taskID.flatMap(task))
         // A few seconds covers the snapshot arriving after the command; a
         // command that failed must not make a later automatic end steal focus.
         if let asked = ownerCompletedAt, Date.now.timeIntervalSince(asked) < 5 {

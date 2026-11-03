@@ -52,7 +52,8 @@ public enum FocusEngine {
         guard request.duration > 0 else { throw .nonPositiveDuration }
         let started = FocusSession(
             id: request.id, taskID: request.taskID, action: request.action, mode: request.mode,
-            startedAt: now, plannedEnd: now.addingTimeInterval(request.duration), phase: .running
+            startedAt: now, plannedEnd: now.addingTimeInterval(request.duration), phase: .running,
+            scope: request.scope
         )
         return changed(to: started)
     }

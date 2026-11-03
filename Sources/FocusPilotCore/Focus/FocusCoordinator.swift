@@ -5,13 +5,15 @@ import Foundation
 ///
 /// The UI reads snapshots from here and sends requests here; the coordinator
 /// talks to the repository. The current task is the one the owner pinned as
-/// Now; nothing else changes it. Focus sessions are driven by `FocusEngine`
+/// Now; nothing else changes it. A session follows Now (#56). Focus sessions are driven by `FocusEngine`
 /// (see `FocusCoordinator+Sessions.swift`); every change is pushed to
 /// `snapshots()` subscribers, so the menu bar stays current without the
 /// planning window.
 public actor FocusCoordinator {
     public enum SessionError: Error, Equatable {
         case noCurrentTask
+        /// A project chosen for a session is no longer there.
+        case unknownProject
         /// A wrap-up was asked for a session that is still running or paused.
         case sessionStillActive
     }
@@ -41,6 +43,8 @@ public actor FocusCoordinator {
     /// The reason given when `exceptionWait` was confirmed; asking again
     /// from another profile or the app need not type it again.
     var exceptionWaitReason: String?
+    /// The last queued session step; see `oneSessionStepAtATime`.
+    var sessionStep: Task<Void, Never>?
     /// The last queued read-and-record of Herdr's agents; see `oneAgentReadingAtATime`.
     var agentReading: Task<Void, Never>?
     /// Grows with every change, so the app can drop a snapshot older than one it has.
@@ -106,6 +110,7 @@ public actor FocusCoordinator {
 
     public func capture(_ newTask: NewTask) async throws {
         _ = try await repository.addTask(newTask)
+        await followNowAfterTaskChange()
         await broadcast()
     }
 
@@ -121,6 +126,7 @@ public actor FocusCoordinator {
     /// Only called for the owner's own actions.
     public func moveTask(_ id: Int64, to status: TaskStatus, _ placement: TaskPlacement) async throws {
         try await repository.moveTask(id, to: status, placement)
+        await followNowAfterTaskChange()
         await broadcast()
     }
 
@@ -165,14 +171,17 @@ public actor FocusCoordinator {
     public func undoHerdrAdd(_ taskID: Int64) async throws {
         if let active = await snapshot().activeSession, active.taskID == taskID { throw HerdrTaskError.inRunningSession }
         try await repository.undoHerdrAdd(taskID)
+        await followNowAfterTaskChange()
     }
 
     /// Imports the adds queued while FocusPilot was closed. Returns how many
     /// were handed to the repository; already stored ones are not repeated.
     public func importInbox(_ inbox: TaskInbox) async throws -> Int {
         let repository = repository
-        return try await inbox.drain(isPermanent: TaskRepository.isPermanentAddFailure) {
+        let imported = try await inbox.drain(isPermanent: TaskRepository.isPermanentAddFailure) {
             _ = try await repository.addFromHerdr($0)
         }.imported
+        await followNowAfterTaskChange()
+        return imported
     }
 }

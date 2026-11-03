@@ -1,8 +1,9 @@
 import FocusPilotCore
 import SwiftUI
 
-/// Starts a session on the Now task (design 11): duration, mode, and the
-/// planned end, and the pre-flight Browsers and Apps rows (#17).
+/// Starts a session (design 11): duration, mode, the projects it covers
+/// (all by default, #56) and the planned end, and the pre-flight Browsers
+/// and Apps rows (#17). Nothing needs to be in Now.
 struct StartFocusSheet: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -14,6 +15,8 @@ struct StartFocusSheet: View {
     @State private var duration = Duration.minutes(50)
     @State private var customMinutes = 30
     @State private var mode = SessionMode.normal
+    @State private var coversAll = true
+    @State private var chosen: Set<Int64> = []
     @State private var isStarting = false
 
     private var minutes: Int {
@@ -36,6 +39,9 @@ struct StartFocusSheet: View {
                         Text(nextAction)
                             .foregroundStyle(.secondary)
                     }
+                } else {
+                    Text("Nothing in Now. You can pin a task during the session.")
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -68,6 +74,10 @@ struct StartFocusSheet: View {
                     }
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
+                }
+                GridRow {
+                    label("Projects")
+                    projectsChoice
                 }
                 if model.snapshot.isObserveOnly {
                     GridRow {
@@ -107,12 +117,61 @@ struct StartFocusSheet: View {
                 Button(model.browserProtection.level == .protected || model.snapshot.isObserveOnly
                        ? "Start focus" : "Start anyway", action: start)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(model.nowTask == nil || isStarting)
+                    .disabled(isStarting || (!coversAll && chosen.isEmpty))
                     .accessibilityHint(model.nowTask.map { "Starts a session for \($0.title)" } ?? "")
             }
         }
         .padding(20)
         .frame(width: 560)
+    }
+
+    /// Projects listed with their titles; "No project" has no id and is never chosen.
+    private var choosable: [ProjectSummary] {
+        model.projects.filter { $0.id != nil }
+    }
+
+    @ViewBuilder
+    private var projectsChoice: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if choosable.isEmpty {
+                Text("All projects")
+            } else {
+                Picker("Projects", selection: $coversAll) {
+                    Text("All projects").tag(true)
+                    Text("Chosen projects").tag(false)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                if !coversAll {
+                    // Long lists scroll, so the sheet keeps its buttons on screen.
+                    if choosable.count > 6 {
+                        ScrollView { projectToggles }
+                            .frame(height: 150)
+                    } else {
+                        projectToggles
+                    }
+                }
+            }
+            Text("Moving between your own tasks never counts as a distraction. Only block rules do.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var projectToggles: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(choosable, id: \.id) { project in
+                Toggle(project.title, isOn: Binding(
+                    get: { project.id.map(chosen.contains) ?? false },
+                    set: { isOn in
+                        guard let id = project.id else { return }
+                        if isOn { chosen.insert(id) } else { chosen.remove(id) }
+                    }))
+            }
+        }
+        .padding(.leading, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func label(_ text: String) -> some View {
@@ -135,7 +194,7 @@ struct StartFocusSheet: View {
     private func start() {
         isStarting = true
         Task {
-            if await model.startSession(minutes: minutes, mode: mode) {
+            if await model.startSession(minutes: minutes, mode: mode, projects: coversAll ? [] : Array(chosen)) {
                 dismiss()
             }
             isStarting = false

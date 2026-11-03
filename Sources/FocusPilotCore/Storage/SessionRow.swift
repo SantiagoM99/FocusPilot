@@ -6,12 +6,13 @@ struct SessionRow: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "focusSession"
 
     var id: String
-    var taskID: Int64
-    var action: String
+    var taskID: Int64?
+    var action: String?
     var mode: String
     var startedAt: Date
     var plannedEnd: Date
     var phase: String
+    var scope: String
 
     init(_ session: FocusSession) throws {
         id = session.id.uuidString
@@ -21,6 +22,7 @@ struct SessionRow: Codable, FetchableRecord, PersistableRecord {
         startedAt = session.startedAt
         plannedEnd = session.plannedEnd
         phase = String(decoding: try JSONEncoder().encode(session.phase), as: UTF8.self)
+        scope = String(decoding: try JSONEncoder().encode(session.scope), as: UTF8.self)
     }
 
     func session() throws -> FocusSession {
@@ -28,6 +30,7 @@ struct SessionRow: Codable, FetchableRecord, PersistableRecord {
             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Unreadable session row \(id)"))
         }
         return FocusSession(id: uuid, taskID: taskID, action: action, mode: mode, startedAt: startedAt,
-                            plannedEnd: plannedEnd, phase: try JSONDecoder().decode(SessionPhase.self, from: Data(phase.utf8)))
+                            plannedEnd: plannedEnd, phase: try JSONDecoder().decode(SessionPhase.self, from: Data(phase.utf8)),
+                            scope: try JSONDecoder().decode(SessionScope.self, from: Data(scope.utf8)))
     }
 }

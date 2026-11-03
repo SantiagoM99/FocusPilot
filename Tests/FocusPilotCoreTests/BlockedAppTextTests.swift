@@ -7,13 +7,23 @@ struct BlockedAppTextTests {
     private let now = wednesdayMorningInBogota
     private let workdays = WeeklySchedule(days: [.mon, .tue, .wed, .thu, .fri], from: ClockTime(8, 0), to: ClockTime(18, 0), timeZone: bogota)
 
+    // #56: a session with nothing in Now names what it covers.
+    @Test func aSessionWithNothingInNowNamesItsProjects() {
+        let session = FocusSession.sample(taskID: nil, action: nil,
+                                          scope: SessionScope(projects: [ScopedProject(id: 3, title: "NLP report")]))
+
+        let text = BlockedAppText(appName: "Instagram", reason: .always, session: session, at: FocusSession.sampleStart)
+
+        #expect(text.detail == "Nothing in Now · NLP report")
+    }
+
     @Test func duringASessionItShowsTheTimeLeftAndTheTask() {
         var session = FocusSession.sample(phase: .running)
         session.plannedEnd = now.addingTimeInterval(24 * 60 + 8)
         let text = BlockedAppText(appName: "Instagram", reason: .always, session: session, at: now)
 
         #expect(text.headline == "Focus session · 24:08 left")
-        #expect(text.detail == "You're working on \(session.action)")
+        #expect(text.detail == "You're working on Write the essay")
         #expect(text.footer == "Instagram was hidden, not quit. Nothing was closed. Exceptions cover the whole app.")
     }
 

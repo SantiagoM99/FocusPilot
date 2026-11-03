@@ -48,7 +48,7 @@ struct MenuBarContent: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.nowTask?.title ?? "No current task")
                     .font(.headline)
-                Text(model.nowTask?.projectTitle ?? (model.nowTask == nil ? "Pin a task as Now to start a session." : "No project"))
+                Text(model.nowTask?.projectTitle ?? (model.nowTask == nil ? "You can start a session and pin a task later." : "No project"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -63,7 +63,7 @@ struct MenuBarContent: View {
             // on its own; its wrap-up waits here.
             if let wrapUp = model.wrapUp {
                 Button { openPlanning() } label: {
-                    Label("Wrap up “\(wrapUp.prompt.session.action)”…", systemImage: "square.and.pencil")
+                    Label("Wrap up “\(SessionText(wrapUp.prompt.session).subject)”…", systemImage: "square.and.pencil")
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                 }
@@ -77,8 +77,7 @@ struct MenuBarContent: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(model.nowTask == nil)
-            .accessibilityHint(model.nowTask.map { "Starts a session for \($0.title)" } ?? "")
+            .accessibilityHint("Opens Start focus")
         }
     }
 
@@ -86,10 +85,18 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 12) {
             SessionHeader(session: session, now: model.now)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.action)
+                Text(session.action ?? "Nothing in Now")
                     .font(.headline)
                 if let project = model.nowTask.flatMap({ $0.id == session.taskID ? $0.projectTitle : nil }) {
                     Text(project)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Text(SessionText.covers(session.scope))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                if let note = model.outsideNote {
+                    Text(note)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }

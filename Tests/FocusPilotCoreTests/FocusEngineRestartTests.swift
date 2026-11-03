@@ -94,6 +94,29 @@ struct FocusSessionGoldenJSONTests {
             == .ended(at: instant(800_001_200), reason: .completed))
     }
 
+    // #56: sessions saved before scopes existed covered their one task; they read as all projects.
+    @Test func aSessionSavedBeforeScopesCoversAllProjects() throws {
+        #expect(try decode(phase: #"{"kind":"running"}"#).scope == .allProjects)
+    }
+
+    @Test func theScopeAndAnEmptyNowAreStoredByName() throws {
+        let json = """
+        {"id":"0B7A3C2E-5D41-4F6A-9E8B-1C2D3E4F5A6B","mode":"normal","startedAt":800000000,
+         "plannedEnd":800001500,"phase":{"kind":"running"},"scope":{"projects":[{"id":3,"title":"NLP report"}]}}
+        """
+
+        let session = try JSONDecoder().decode(FocusSession.self, from: Data(json.utf8))
+
+        #expect(session.taskID == nil && session.action == nil)
+        #expect(session.scope == SessionScope(projects: [ScopedProject(id: 3, title: "NLP report")]))
+        #expect(session.scope.alsoAllowed.isEmpty, "Scopes saved before alsoAllowed have none")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let thesis = SessionScope(projects: [], alsoAllowed: [ScopedProject(id: 4, title: "Thesis")])
+        #expect(String(decoding: try encoder.encode(thesis), as: UTF8.self)
+            == #"{"alsoAllowed":[{"id":4,"title":"Thesis"}],"projects":[]}"#)
+    }
+
     @Test func normalModeIsStoredByName() throws {
         let json = try JSONEncoder().encode(SessionMode.normal)
 

@@ -4,14 +4,6 @@ import Testing
 
 @Suite("Focus sessions through the coordinator")
 struct FocusSessionCoordinatorTests {
-    @Test func startingNeedsAPinnedNowTask() async throws {
-        let coordinator = FocusCoordinator(repository: try TaskRepository(location: StorageLocation(directory: makeTemporaryDirectory())))
-
-        await #expect(throws: FocusCoordinator.SessionError.noCurrentTask) {
-            try await coordinator.startSession(duration: 25 * 60, mode: .normal)
-        }
-    }
-
     @Test func startingRunsTheNowTaskAndPublishesAWrappedPolicy() async throws {
         let fixture = try await SessionFixture()
 

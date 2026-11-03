@@ -27,18 +27,23 @@ public enum SessionPhase: Equatable, Sendable {
 ///
 /// Every time is an absolute instant, so a session restored after a crash or
 /// sleep is judged against the wall clock rather than a timer that stopped.
+///
+/// A session covers projects, not one task (#56, decision 0004): `taskID`
+/// and `action` are the task in Now, which can change while the session
+/// runs, and are nil while nothing is in Now.
 public struct FocusSession: Codable, Equatable, Sendable {
     public var id: UUID
-    public var taskID: Int64
-    public var action: String
+    public var taskID: Int64?
+    public var action: String?
     public var mode: SessionMode
     public var startedAt: Date
     public var plannedEnd: Date
     public var phase: SessionPhase
+    public var scope: SessionScope
 
     public init(
-        id: UUID, taskID: Int64, action: String, mode: SessionMode,
-        startedAt: Date, plannedEnd: Date, phase: SessionPhase
+        id: UUID, taskID: Int64?, action: String?, mode: SessionMode,
+        startedAt: Date, plannedEnd: Date, phase: SessionPhase, scope: SessionScope = .allProjects
     ) {
         self.id = id
         self.taskID = taskID
@@ -47,11 +52,31 @@ public struct FocusSession: Codable, Equatable, Sendable {
         self.startedAt = startedAt
         self.plannedEnd = plannedEnd
         self.phase = phase
+        self.scope = scope
     }
 
     // Spelled out so renaming a property cannot silently change stored JSON.
     enum CodingKeys: String, CodingKey {
-        case id, taskID, action, mode, startedAt, plannedEnd, phase
+        case id, taskID, action, mode, startedAt, plannedEnd, phase, scope
+    }
+
+    /// Sessions saved before #56 have no scope and read as all projects.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try container.decode(UUID.self, forKey: .id),
+                  taskID: try container.decodeIfPresent(Int64.self, forKey: .taskID),
+                  action: try container.decodeIfPresent(String.self, forKey: .action),
+                  mode: try container.decode(SessionMode.self, forKey: .mode),
+                  startedAt: try container.decode(Date.self, forKey: .startedAt),
+                  plannedEnd: try container.decode(Date.self, forKey: .plannedEnd),
+                  phase: try container.decode(SessionPhase.self, forKey: .phase),
+                  scope: try container.decodeIfPresent(SessionScope.self, forKey: .scope) ?? .allProjects)
+    }
+
+    /// The task now in Now, or none.
+    public mutating func follow(now task: (id: Int64, title: String)?) {
+        taskID = task?.id
+        action = task?.title
     }
 
     public var hasEnded: Bool {

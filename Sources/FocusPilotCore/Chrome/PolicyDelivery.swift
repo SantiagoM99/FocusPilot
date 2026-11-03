@@ -6,11 +6,15 @@ public struct FocusContext: Hashable, Codable, Sendable {
     public var title: String
     public var nextAction: String?
     public var projectTitle: String?
+    /// Only with nothing in Now: what the session covers, "Covers all
+    /// projects", shown under the title "Nothing in Now" (#56).
+    public var covers: String?
 
-    public init(title: String, nextAction: String? = nil, projectTitle: String? = nil) {
+    public init(title: String, nextAction: String? = nil, projectTitle: String? = nil, covers: String? = nil) {
         self.title = title
         self.nextAction = nextAction
         self.projectTitle = projectTitle
+        self.covers = covers
     }
 }
 

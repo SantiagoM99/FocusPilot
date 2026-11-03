@@ -8,11 +8,13 @@ extension FocusCoordinator {
     /// 2026-10-17), so one for the session still running or paused is refused,
     /// as is marking the task done while a later session on it is active.
     public func saveWrapUp(_ wrapUp: WrapUp, after ended: FocusSession, markingDone: Bool = false) async throws {
+        guard let taskID = ended.taskID else { throw SessionError.noCurrentTask }
         if let current = session, !current.hasEnded,
            current.id == ended.id || (markingDone && current.taskID == ended.taskID) {
             throw SessionError.sessionStillActive
         }
-        try await repository.saveWrapUp(wrapUp, forTask: ended.taskID, session: ended.id, markingDone: markingDone)
+        try await repository.saveWrapUp(wrapUp, forTask: taskID, session: ended.id, markingDone: markingDone)
+        await followNowAfterTaskChange()
         await broadcast()
     }
 

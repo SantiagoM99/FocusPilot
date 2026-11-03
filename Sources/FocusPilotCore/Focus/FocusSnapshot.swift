@@ -59,6 +59,6 @@ public struct FocusSnapshot: Equatable, Sendable {
 
     /// The state line shown inside the menu and the planning window.
     public var statusText: String {
-        activeSession?.action ?? currentTaskTitle ?? "No current task"
+        activeSession.map { SessionText($0).subject } ?? currentTaskTitle ?? "No current task"
     }
 }
