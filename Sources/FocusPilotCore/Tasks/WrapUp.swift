@@ -23,8 +23,21 @@ public struct TaskWrapUp: Equatable, Sendable {
     public var returnCue: String?
     public var sessionID: UUID?
     public var savedAt: Date
+    /// A "Where did you leave off?" note saved on Switch (#57), not a session wrap-up.
+    public var isFromSwitch: Bool
 
-    public init(_ wrapUp: WrapUp, session sessionID: UUID?, at savedAt: Date) {
+    /// How the return cue is labeled where it is shown first.
+    public var cueTitle: String {
+        isFromSwitch ? "Where you left off" : "Start with"
+    }
+
+    /// The caption over a next action that is this return cue.
+    public var nextActionCaption: String {
+        isFromSwitch ? "Next action · where you left off" : "Next action · return cue from last session"
+    }
+
+    public init(_ wrapUp: WrapUp, session sessionID: UUID?, at savedAt: Date, isFromSwitch: Bool = false) {
+        self.isFromSwitch = isFromSwitch
         outcome = wrapUp.outcome
         remainingWork = wrapUp.remainingWork
         returnCue = wrapUp.returnCue

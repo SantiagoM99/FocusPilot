@@ -35,11 +35,12 @@ extension TaskRepository {
     }
 
     /// Appends one row and makes its return cue the task's next action.
-    private static func append(_ wrapUp: WrapUp, forTask id: Int64, session: UUID?, at savedAt: Date, _ db: Database) throws {
+    static func append(_ wrapUp: WrapUp, forTask id: Int64, session: UUID?, at savedAt: Date, fromSwitch: Bool = false,
+                       _ db: Database) throws {
         try db.execute(sql: "UPDATE task SET nextAction = ?, revision = revision + 1, updatedAt = ? WHERE id = ?",
                        arguments: [wrapUp.returnCue, savedAt, id])
         guard db.changesCount == 1 else { throw WrapUpError.taskNotFound }
-        try WrapUpRecord(wrapUp, task: id, session: session, at: savedAt).insert(db)
+        try WrapUpRecord(wrapUp, task: id, session: session, at: savedAt, fromSwitch: fromSwitch).insert(db)
     }
 
     /// Every wrap-up saved on the task, newest first.

@@ -26,6 +26,9 @@ public struct InFlightThread: Equatable, Sendable, Identifiable {
     public var since: Date
     /// The agent to open on Switch, for agent threads.
     public var linkID: Int64?
+    /// The queued result or approval behind a finished or needs-you agent
+    /// thread, so Switch from In flight handles it as the queue does.
+    public var reviewID: Int64?
     /// When the owner wants to check on a waiting thread.
     public var checkAt: Date?
 }
@@ -75,21 +78,27 @@ public enum InFlight {
         let pending = reviews.filter { $0.linkID == link.id }
         let state: ThreadState
         var since = link.statusChangedAt
+        var review: ReviewItem?
         switch link.lastStatus {
         case .blocked:
+            // As the queue: only an approval still waiting needs the owner. One
+            // cleared because its pane went away leaves the link blocked.
+            guard let approval = pending.first(where: { $0.kind == .approval }) else { return nil }
             state = .needsYou
-            since = pending.first { $0.kind == .approval }?.occurredAt ?? since
+            review = approval
         case .working:
             state = .working
         case .idle, .done:
-            guard let result = pending.filter({ $0.kind == .finished }).map(\.occurredAt).max() else { return nil }
+            guard let result = pending.filter({ $0.kind == .finished }).max(by: { $0.occurredAt < $1.occurredAt })
+            else { return nil }
             state = .finished
-            since = result
+            review = result
         case .unknown, nil:
             return nil
         }
+        since = review?.occurredAt ?? since
         return InFlightThread(id: .agent(link.id), taskID: task.id, taskTitle: task.title, label: link.label,
-                              state: state, since: since, linkID: link.id)
+                              state: state, since: since, linkID: link.id, reviewID: review?.id)
     }
 
     private static func thread(_ mark: TaskWaiting, _ task: TodayItem, _ now: Date) -> InFlightThread {

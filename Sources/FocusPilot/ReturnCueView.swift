@@ -11,7 +11,7 @@ struct ReturnCueView: View {
         VStack(alignment: .leading, spacing: 6) {
             if let cue = wrapUp.returnCue {
                 VStack(alignment: .leading, spacing: 2) {
-                    Label("Start with", systemImage: "arrow.uturn.forward")
+                    Label(wrapUp.cueTitle, systemImage: "arrow.uturn.forward")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(cue)

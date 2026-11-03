@@ -99,3 +99,14 @@ public enum AttentionText {
         return minutes % 60 == 0 ? "Waiting \(minutes / 60) h" : "Waiting \(minutes / 60) h \(minutes % 60) min"
     }
 }
+
+/// When the app recomputes In flight and the queue as time passes: once a
+/// minute while anything waits, since waiting times and due checks change by
+/// the minute. Session countdowns keep their own one-second clock.
+public enum AttentionClock {
+    public static let interval: TimeInterval = 60
+
+    public static func isDue(at now: Date, last: Date, somethingWaits: Bool) -> Bool {
+        somethingWaits && now.timeIntervalSince(last) >= interval
+    }
+}

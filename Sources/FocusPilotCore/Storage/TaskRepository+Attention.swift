@@ -36,7 +36,10 @@ extension TaskRepository {
 
     /// Appends a return cue to the task's wrap-up history, as Switch does.
     public func saveReturnCue(_ cue: String, forTask taskID: Int64, session: UUID?) async throws {
-        try await saveWrapUp(WrapUp(returnCue: cue), forTask: taskID, session: session)
+        let savedAt = now()
+        try await ownerDatabase.write { db in
+            try Self.append(WrapUp(returnCue: cue), forTask: taskID, session: session, at: savedAt, fromSwitch: true, db)
+        }
     }
 
     /// The open tasks that became Now during `session`, other than `excluding`,

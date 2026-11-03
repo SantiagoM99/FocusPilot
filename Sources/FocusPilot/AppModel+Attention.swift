@@ -2,18 +2,10 @@ import Foundation
 import FocusPilotCore
 
 /// In flight, the attention queue and Switch as the views use them (#57,
-/// decision 0004). Both lists are worked out from what `refresh` loaded and
-/// the current time; nothing here changes Now or opens an agent except
+/// decision 0004). Both lists are worked out in `recomputeAttention`;
+/// nothing here changes Now or opens an agent except
 /// `confirmSwitch`, which runs only for the owner's click in the Switch sheet.
 extension AppModel {
-    var attention: [AttentionItem] {
-        AttentionQueue.items(tasks: today, reviews: reviewItems, waiting: waiting, now: now)
-    }
-
-    var inFlight: [InFlightProject] {
-        InFlight.projects(tasks: today, links: agentLinks, reviews: reviewItems, waiting: waiting, now: now)
-    }
-
     func waiting(for taskID: Int64) -> TaskWaiting? {
         waiting.first { $0.taskID == taskID }
     }

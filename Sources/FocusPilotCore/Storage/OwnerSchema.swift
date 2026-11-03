@@ -278,6 +278,7 @@ enum OwnerSchema {
             }
             // A return cue saved on Switch outside a session has no session:
             // rebuilt so sessionId may be empty, keeping ids and so the order.
+            // `kind` tells a Switch note from a session wrap-up.
             try db.create(table: "new_wrapUp") { table in
                 table.autoIncrementedPrimaryKey("id")
                 table.column("taskId", .integer).notNull().references(TaskRecord.databaseTableName, onDelete: .cascade)
@@ -286,6 +287,7 @@ enum OwnerSchema {
                 table.column("outcome", .text)
                 table.column("remainingWork", .text)
                 table.column("returnCue", .text)
+                table.column("kind", .text).notNull().defaults(to: "session").check(sql: "kind IN ('session', 'switch')")
             }
             try db.execute(sql: """
                 INSERT INTO new_wrapUp (id, taskId, sessionId, savedAt, outcome, remainingWork, returnCue)

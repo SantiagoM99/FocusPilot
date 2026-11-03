@@ -102,7 +102,7 @@ struct AttentionRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                WaitedText(item: item, now: model.now)
+                WaitedText(item: item, now: model.attentionTime)
             }
             Spacer(minLength: 8)
             if !compact {

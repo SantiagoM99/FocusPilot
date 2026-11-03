@@ -30,7 +30,7 @@ struct OwnerMigrationV13Tests {
 
         let history = try await repository.wrapUpHistory(forTask: 7)
         #expect(history.map(\.outcome) == ["Second", "First"])
-        #expect(history.allSatisfy { $0.sessionID == UUID(uuidString: session) })
+        #expect(history.allSatisfy { $0.sessionID == UUID(uuidString: session) && !$0.isFromSwitch })
         #expect(try await repository.waitingTasks().isEmpty)
         #expect(OwnerSchema.migrator.migrations.last == "owner-v13-attention")
     }

@@ -84,3 +84,17 @@ struct WaitingCheckTests {
                                                       "Tomorrow at 9:00"])
     }
 }
+
+// Review of #63: waiting times change by the minute, so the app recomputes
+// them once a minute; only a countdown on screen ticks every second.
+@Suite("Attention clock")
+struct AttentionClockTests {
+    private let start = wednesdayMorningInBogota
+
+    @Test func waitingTimesAdvanceOnceAMinute() {
+        #expect(!AttentionClock.isDue(at: start.addingTimeInterval(30), last: start, somethingWaits: true))
+        #expect(AttentionClock.isDue(at: start.addingTimeInterval(60), last: start, somethingWaits: true))
+        #expect(!AttentionClock.isDue(at: start.addingTimeInterval(600), last: start, somethingWaits: false),
+                "Nothing waiting, nothing to redraw")
+    }
+}

@@ -12,7 +12,8 @@ struct InFlightTests {
         let tasks = [A.task(10, "Run ablation", project: A.nlp)]
         let links = [A.link(1, task: 10, "ablation", .working), A.link(2, task: 10, "plots", .blocked),
                      A.link(3, task: 10, "tables", .done), A.link(4, task: 10, "idle", .idle)]
-        let reviews = [A.review(7, link: 3, task: 10, .finished, at: A.minutes(-5))]
+        let reviews = [A.review(7, link: 3, task: 10, .finished, at: A.minutes(-5)),
+                       A.review(8, link: 2, task: 10, .approval, at: A.minutes(-2))]
 
         let projects = InFlight.projects(tasks: tasks, links: links, reviews: reviews, waiting: [], now: A.now)
 
@@ -20,6 +21,7 @@ struct InFlightTests {
         #expect(states?.map(\.0) == ["plots", "tables", "ablation"], "Needs you, finished, then working")
         #expect(states?.map(\.1) == [.needsYou, .finished, .working])
         #expect(projects.first?.threads.first { $0.label == "tables" }?.since == A.minutes(-5))
+        #expect(projects.first?.threads.map(\.reviewID) == [8, 7, nil])
     }
 
     // An agent ready again after the owner saw its result is not moving.
@@ -46,8 +48,9 @@ struct InFlightTests {
                      A.task(12, "Call the bank")]
         let links = [A.link(1, task: 10, "a", .working), A.link(2, task: 10, "b", .blocked), A.link(3, task: 10, "c", .blocked),
                      A.link(4, task: 11, "d", .working), A.link(5, task: 12, "e", .working)]
+        let approvals = [A.review(1, link: 2, task: 10, .approval, at: A.now), A.review(2, link: 3, task: 10, .approval, at: A.now)]
 
-        let projects = InFlight.projects(tasks: tasks, links: links, reviews: [], waiting: [], now: A.now)
+        let projects = InFlight.projects(tasks: tasks, links: links, reviews: approvals, waiting: [], now: A.now)
 
         #expect(projects.map(\.title) == ["FocusPilot", "NLP report", "No project"])
         #expect(projects.map(\.summary) == ["FocusPilot · 1 thread", "NLP report · 3 threads · 2 need you",
@@ -61,8 +64,9 @@ struct InFlightTests {
         let links = tasks.enumerated().map { index, task in
             A.link(Int64(index + 1), task: task.id, "agent \(index + 1)", index % 5 == 0 ? .blocked : .working)
         }
+        let approvals = links.filter { $0.lastStatus == .blocked }.map { A.review($0.id, link: $0.id, task: $0.taskID, .approval, at: A.now) }
 
-        let grouped = InFlight.projects(tasks: tasks, links: links, reviews: [], waiting: [], now: A.now)
+        let grouped = InFlight.projects(tasks: tasks, links: links, reviews: approvals, waiting: [], now: A.now)
 
         #expect(grouped.count == 6)
         #expect(grouped.map(\.threads.count).reduce(0, +) == 35)
@@ -74,5 +78,15 @@ struct InFlightTests {
                                          waiting: [TaskWaiting(taskID: 11, on: nil, since: A.now, checkAt: nil)], now: A.now)
 
         #expect(projects.isEmpty)
+    }
+
+    // Review of #63: an approval cleared (its pane went away) leaves the link
+    // blocked; In flight agrees with the queue and does not ask for the owner.
+    @Test func aBlockedLinkWithNoApprovalWaitingIsNotInFlight() {
+        let projects = InFlight.projects(tasks: [A.task(10, "Run ablation")], links: [A.link(1, task: 10, "plots", .blocked)],
+                                         reviews: [], waiting: [], now: A.now)
+
+        #expect(projects.isEmpty)
+        #expect(AttentionQueue.items(tasks: [A.task(10, "Run ablation")], reviews: [], waiting: [], now: A.now).isEmpty)
     }
 }

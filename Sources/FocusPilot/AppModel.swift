@@ -24,6 +24,12 @@ final class AppModel {
     private(set) var reviewItems: [ReviewItem] = []
     /// Tasks the owner marked waiting (#57).
     private(set) var waiting: [TaskWaiting] = []
+    /// What needs the owner and what is in flight, worked out on each refresh
+    /// and once a minute (see `AttentionClock`), never on every redraw.
+    private(set) var attention: [AttentionItem] = []
+    private(set) var inFlight: [InFlightProject] = []
+    /// The time waiting times are shown for; moves once a minute.
+    private(set) var attentionTime = Date.now
     /// A Switch the owner clicked, shown as a sheet until confirmed or cancelled.
     var switchRequest: SwitchRequest?
     /// The task whose Mark as waiting sheet is open.
@@ -176,16 +182,17 @@ final class AppModel {
     }
 
     // Advances `now` once a second while a session is active (its time is
-    // on screen in the popover and panel) or something waits on the owner
-    // (waiting times and due checks, #57), so an idle app is not redrawn
-    // every second.
+    // on screen in the popover and panel), so an idle app is not redrawn
+    // every second. Waiting times and due checks (#57) move once a minute.
     private func tickWhileTimeIsShown() {
         Task { [weak self] in
             while let self {
                 try? await Task.sleep(for: .seconds(1))
-                if snapshot.activeSession != nil || menuBarStatus().timeText != nil || !reviewItems.isEmpty
-                    || waiting.contains(where: { $0.checkAt != nil }) {
+                if snapshot.activeSession != nil || menuBarStatus().timeText != nil {
                     now = .now
+                }
+                if AttentionClock.isDue(at: .now, last: attentionTime, somethingWaits: !reviewItems.isEmpty || !waiting.isEmpty) {
+                    recomputeAttention()
                 }
             }
         }
@@ -220,10 +227,18 @@ final class AppModel {
             agentLinks = try await coordinator.agentLinks()
             reviewItems = try await coordinator.reviewQueue()
             waiting = try await coordinator.waitingTasks()
+            recomputeAttention()
             taskError = nil
         } catch {
             taskError = "Could not load tasks: \(error.localizedDescription)"
         }
+    }
+
+    /// Works out the attention queue and In flight from what `refresh` loaded (#57).
+    func recomputeAttention() {
+        attentionTime = .now
+        attention = AttentionQueue.items(tasks: today, reviews: reviewItems, waiting: waiting, now: attentionTime)
+        inFlight = InFlight.projects(tasks: today, links: agentLinks, reviews: reviewItems, waiting: waiting, now: attentionTime)
     }
 
     func showProject(_ id: ProjectSummary.ID) async {

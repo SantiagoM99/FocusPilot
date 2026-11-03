@@ -136,4 +136,57 @@ struct SwitchTests {
 
         #expect(try await coordinator.waitingTasks().isEmpty)
     }
+
+    // Review of #63: a Switch note replaces only the return cue; what remains
+    // and what got done stay from the last session wrap-up.
+    @Test func aSwitchNoteKeepsTheLastWrapUpsRemainingWorkAndOutcome() async throws {
+        let current = try await task("Write intro", now: true)
+        let target = try await task("Run ablation")
+        try await coordinator.startSession(duration: 25 * 60, mode: .normal)
+        try await coordinator.complete()
+        let ended = try #require(await coordinator.snapshot().session)
+        try await coordinator.saveWrapUp(WrapUp(outcome: "Drafted §1", remainingWork: "Cite the 2019 paper",
+                                                returnCue: "Start §2"), after: ended)
+
+        _ = try await coordinator.switchTo(target, note: "Halfway through §2", openingAgent: nil)
+
+        let latest = try #require(try await coordinator.todayTasks().first { $0.id == current }?.wrapUp)
+        #expect(latest.returnCue == "Halfway through §2" && latest.isFromSwitch)
+        #expect(latest.remainingWork == "Cite the 2019 paper" && latest.outcome == "Drafted §1")
+        #expect(latest.cueTitle == "Where you left off")
+        #expect(try await coordinator.wrapUpHistory(forTask: current).map(\.isFromSwitch) == [true, false])
+    }
+
+    // A later session wrap-up that leaves What remains empty means nothing remains.
+    @Test func aLaterSessionWrapUpStandsOnItsOwn() async throws {
+        let id = try await task("Write intro", now: true)
+        for remaining in ["Cite the 2019 paper", nil] {
+            try await coordinator.startSession(duration: 25 * 60, mode: .normal)
+            try await coordinator.complete()
+            let ended = try #require(await coordinator.snapshot().session)
+            try await coordinator.saveWrapUp(WrapUp(remainingWork: remaining, returnCue: "Next"), after: ended)
+        }
+
+        let latest = try #require(try await coordinator.todayTasks().first { $0.id == id }?.wrapUp)
+        #expect(latest.remainingWork == nil && !latest.isFromSwitch && latest.cueTitle == "Start with")
+    }
+
+    // Review of #63: from In flight, Switch on a finished thread reviews its result too.
+    @Test func switchingFromAFinishedThreadMarksItsResultReviewed() async throws {
+        _ = try await task("Write intro", now: true)
+        let target = try await task("Run ablation")
+        _ = try await coordinator.linkAgent(agent(.working, pane: "w4:p2"), on: herdrServer, workspaceLabel: nil, toTask: target)
+        herdr.set(.connected(herdrServer, [agent(.done, pane: "w4:p2")]))
+        _ = await coordinator.refreshHerdrAgents()
+        let thread = try #require(InFlight.projects(tasks: try await coordinator.todayTasks(),
+                                                    links: try await coordinator.agentLinks(),
+                                                    reviews: try await coordinator.reviewQueue(), waiting: [],
+                                                    now: clock.now).first?.threads.first)
+        let request = SwitchRequest(thread)
+
+        _ = try await coordinator.switchTo(request.taskID, note: nil, openingAgent: request.linkID, handling: request.item)
+
+        #expect(thread.state == .finished)
+        #expect(try await coordinator.reviewQueue().isEmpty)
+    }
 }
