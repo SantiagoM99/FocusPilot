@@ -280,14 +280,29 @@ struct HerdrProjectsTests {
         #expect(try await project("Copy").herdrLink?.server == middle)
     }
 
-    @Test func aRelinkedWorkspaceIsNotRelinkedOnLaterSyncs() async throws {
+    @Test func aLinkThatWentStaleOnAnEarlierSyncIsRestoredLater() async throws {
         try await linkBeforeRestart([nlpWorkspace])
         try await repository.syncHerdrWorkspaces([], on: restartedHerdrServer)
+        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
 
         let created = try await repository.syncHerdrWorkspaces([nlpWorkspace], on: restartedHerdrServer)
 
         #expect(created.isEmpty)
-        #expect(try await project("NLP report").herdrLink?.server == herdrServer)
+        #expect(try await titles() == ["NLP report"])
+        #expect(try await project("NLP report").herdrLink
+            == HerdrLink(server: restartedHerdrServer, workspaceID: "w4", label: "NLP report", cwd: nlpWorkspace.cwd))
+    }
+
+    @Test func anUnlinkedProjectIsNotRelinkedAfterARestart() async throws {
+        try await linkBeforeRestart([nlpWorkspace])
+        try await repository.unlinkProject(try #require(try await project("NLP report").id))
+
+        try await repository.syncHerdrWorkspaces([nlpWorkspace], on: restartedHerdrServer)
+        let created = try await repository.syncHerdrWorkspaces([nlpWorkspace], on: restartedHerdrServer)
+
+        #expect(created.isEmpty)
+        #expect(try await titles() == ["NLP report"])
+        #expect(try await project("NLP report").herdrLink == nil)
     }
 
     // MARK: Link and unlink

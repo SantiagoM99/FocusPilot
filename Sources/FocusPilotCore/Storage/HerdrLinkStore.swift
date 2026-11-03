@@ -19,13 +19,13 @@ enum HerdrLinkStore {
     /// linked projects, and returns their titles. It never links an existing
     /// project: one the owner unlinked stays unlinked.
     static func syncWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer, in db: Database) throws -> [String] {
+        try restoreExactLinks(to: workspaces, on: server, in: db)
         guard try isSeen(server, in: db) else {
             // The first sight of a server instance: what is open now was
             // opened before FocusPilot was watching, or is the same work
             // renumbered by a restart. Import covers those on request.
             try db.execute(sql: "INSERT INTO herdrSeenServer (socketPath, serverStartedAt) VALUES (?, ?)",
                            arguments: [server.socketPath, server.startedAtMilliseconds])
-            try restoreExactLinks(to: workspaces, on: server, in: db)
             for workspace in workspaces { try markSeen(workspace, on: server, in: db) }
             return []
         }
@@ -53,11 +53,13 @@ enum HerdrLinkStore {
         try markSeen(workspace, on: server, in: db)
     }
 
-    /// Moves to the restarted server each link from an earlier instance of
-    /// the same session whose workspace ID is open again with the same label
-    /// and the same checkout (decision 0003, 2026-11-03). Any difference, or
-    /// two old links claiming one workspace, leaves the link for the owner
-    /// to relink.
+    /// Moves to the current server each link from an earlier instance of the
+    /// same session whose workspace ID is open again with the same label and
+    /// the same checkout (decision 0003, 2026-11-03). It runs on every sync,
+    /// so links that went stale before this check existed recover too. Any
+    /// difference, or two old links claiming one workspace, leaves the link
+    /// for the owner to relink. An unlinked project has no row, so it is
+    /// never touched.
     private static func restoreExactLinks(to workspaces: [HerdrWorkspace], on server: HerdrServer, in db: Database) throws {
         let stale = try HerdrLinkRecord
             .filter(Column("sessionName") == server.sessionName && Column("socketPath") == server.socketPath
