@@ -79,15 +79,17 @@ public struct HerdrCLI: Sendable {
         guard HerdrPaneID.isValid(paneID) else { return .notFound }
         guard ReportRules.messageProblem(text) == nil else { return .refused }
         guard case .success(let (binary, current)) = await reach(), current == server else { return .notFound }
+        // From here Herdr may have the text: only its own two refusals say
+        // for certain that nothing reached the agent.
         guard let output = try? await runner.run(executable: binary, arguments: HerdrCommand.agentPrompt(paneID: paneID, text: text).arguments,
-                                                 environment: environment, outputLimit: nil) else { return .failed }
+                                                 environment: environment, outputLimit: nil) else { return .unknown }
         if output.status == 0 { return .sent }
         let code = (try? JSONSerialization.jsonObject(with: output.standardOutput) as? [String: Any])
             .flatMap { $0["error"] as? [String: Any] }?["code"] as? String
         return switch code {
         case "agent_blocked": .blocked
         case "agent_not_found": .notFound
-        default: .failed
+        default: .unknown
         }
     }
 
@@ -199,8 +201,10 @@ public enum PromptResult: Equatable, Sendable {
     case notFound
     /// The text could not be sent exactly as shown; nothing was run.
     case refused
-    /// Herdr is unreachable or failed.
-    case failed
+    /// Herdr ran but ended without saying it refused: a timeout, an
+    /// over-size or unreadable reply, or another error. The agent may have
+    /// the text.
+    case unknown
 }
 
 /// Workspace and tab IDs are passed to `tab list` and `tab focus` as

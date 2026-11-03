@@ -53,6 +53,12 @@ struct ReportRow: View {
                     Text(verbatim: item.place)
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    if let claimed = report.claimedName {
+                        // Free text from the sender, never its identity.
+                        Text(verbatim: "Calls itself “\(claimed)”")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                     WaitedText(item: item, now: model.attentionTime)
                 }
                 Spacer(minLength: 8)
@@ -65,7 +71,14 @@ struct ReportRow: View {
                 proposalView(proposal)
                     .padding(.leading, 28)
             }
-            if let notice = model.reportNotices[report.id] {
+            if report.outcomeUnknown {
+                Label(AcceptRefusal.outcomeUnknownText(report.proposal?.target?.label ?? report.proposal?.targetAsGiven ?? "the agent"),
+                      systemImage: "questionmark.diamond.fill")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 28)
+            } else if let notice = model.reportNotices[report.id] {
                 Label(notice, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .foregroundStyle(.orange)
@@ -76,9 +89,11 @@ struct ReportRow: View {
                 Spacer()
                 Button("Dismiss") { Task { await model.dismissReport(report.id) } }
                     .help("Discards the report. Nothing is sent.")
-                if let proposal = report.proposal, let target = proposal.target {
+                if let proposal = report.proposal, let target = proposal.target, !report.outcomeUnknown {
+                    // The same values the box above renders, passed as they are.
+                    let shownMessage = proposal.message, shownTarget = proposal.target
                     Button("Accept and Send") {
-                        Task { await model.acceptReport(report.id, shownMessage: proposal.message) }
+                        Task { await model.acceptReport(report.id, shownMessage: shownMessage, shownTarget: shownTarget) }
                     }
                     .buttonStyle(.borderedProminent)
                     .help("Sends the message above to \(target.label) in Herdr, exactly as shown, after checking it’s still the same agent")

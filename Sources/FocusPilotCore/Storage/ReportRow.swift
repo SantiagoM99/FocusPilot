@@ -11,6 +11,7 @@ struct ReportRow: Codable, FetchableRecord, MutablePersistableRecord {
     var summary: String
     var projectId: Int64?
     var sourceLabel: String
+    var sourceClaim: String?
     var message: String?
     var targetGiven: String?
     var targetSession: String?
@@ -21,6 +22,8 @@ struct ReportRow: Codable, FetchableRecord, MutablePersistableRecord {
     var targetKind: String?
     var targetProblem: String?
     var receivedAt: Date
+    /// When Accept started sending; left set if the outcome is unknown.
+    var attemptedAt: Date?
     /// When Accept sent the message; the row stays as a record of it.
     var sentAt: Date?
 
@@ -39,6 +42,7 @@ struct ReportRow: Codable, FetchableRecord, MutablePersistableRecord {
         let proposal = message.map { ReportProposal(message: $0, targetAsGiven: targetGiven ?? "", target: target,
                                                     targetProblem: targetProblem) }
         return AgentReport(id: id!, clientID: UUID(uuidString: clientId)!, summary: summary, projectID: projectId,
-                           projectTitle: projectTitle, sourceLabel: sourceLabel, proposal: proposal, receivedAt: receivedAt)
+                           projectTitle: projectTitle, sourceLabel: sourceLabel, claimedName: sourceClaim, proposal: proposal,
+                           receivedAt: receivedAt, outcomeUnknown: attemptedAt != nil)
     }
 }

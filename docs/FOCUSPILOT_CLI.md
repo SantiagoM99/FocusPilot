@@ -34,8 +34,10 @@ Paste this section into the instructions of a helper agent (the second in comman
 > - If the owner clicks **Accept**, FocusPilot sends your `--message` to that agent with `herdr agent prompt`, exactly as you wrote it. You never send it yourself, and nothing is sent if the owner clicks **Dismiss**.
 > - Before sending, FocusPilot checks that the agent is still the same one (same Herdr session, pane and name) and isn't waiting for an approval. If it changed, the owner sees why and nothing is sent.
 > - Name the agent by its Herdr name, or by pane ID (such as `w4:p2`) if two agents share a name.
-> - The project is the one linked to your Herdr workspace. Add `--project "<name>"` for another existing project. Add `--from "<your role>"` if your agent name doesn't say who you are.
-> - A report is refused if the summary is empty or over 2,000 characters, the message is over 4,000 characters, the message starts with `-`, or either contains control or text-direction characters. A pane can send at most 20 reports per minute.
+> - The project is the one linked to your Herdr workspace. Add `--project "<name>"` for another existing project.
+> - The owner sees your pane's Herdr name as the sender. `--from "<your role>"` is shown only as what you call yourself ("Calls itself …"), never in place of that name.
+> - A message can have several lines and tabs: Herdr submits it as one prompt, with its line breaks and tabs kept.
+> - A report is refused if the summary is empty or over 2,000 characters (8,000 bytes), or the message is over 4,000 characters (16,000 bytes). It is also refused if the message starts with `-`, or if any text contains control characters other than newline and tab, invisible characters (zero-width spaces, the byte-order mark, tag characters, line or paragraph separators), or text-direction characters. A pane can send at most 20 reports per minute, including reports queued while FocusPilot is closed.
 
 ## What each command does
 
@@ -54,9 +56,21 @@ Accept is the only way FocusPilot writes to Herdr (decision 0004, Phase 2 start,
 
 1. The message sent must equal the stored message byte for byte. There is no templating, and nothing changes after the owner sees it.
 2. The target agent is checked again, as in S4: the same Herdr server instance, the same pane, the same program and the same name. An agent waiting for an approval is not sent to, since the message would answer the approval.
-3. FocusPilot runs `herdr agent prompt <pane> <message>`, with the message as one argument and never through a shell.
+3. FocusPilot records that it is about to send, then runs `herdr agent prompt <pane> <message>`, with the message as one argument and never through a shell.
 
-If any check fails, nothing is sent and the report stays, with the reason in plain words. When the target can't be found as the report arrives (unknown name, two agents with the same name, a Herdr session that has restarted), the report shows why and has no Accept button.
+If any check fails, nothing is sent and the report stays, with the reason in plain words.
+
+**Outcome unknown.** Herdr may already have the message when:
+- the command times out;
+- its reply is too large or unreadable;
+- it reports an error other than "blocked" or "not found";
+- FocusPilot can't record the send.
+
+In those cases the report says "Outcome unknown. FocusPilot may have sent the message to … Check the agent in Herdr before sending it again." It can then only be dismissed, never accepted again.
+
+**How Herdr delivers it** (Herdr 0.9.0, checked on 2026-11-03 with a scratch Claude agent on Haiku that FocusPilot's author started and then closed):
+- A multi-line message with a tab arrived as one prompt, submitted once. The line breaks stayed inside it (Claude Code shows it as a paste), and the tab arrived as a tab.
+- While the agent waited on a startup question, `agent prompt` returned `agent_blocked` and nothing was typed. When the target can't be found as the report arrives (unknown name, two agents with the same name, a Herdr session that has restarted), the report shows why and has no Accept button.
 
 ## Where tasks go
 

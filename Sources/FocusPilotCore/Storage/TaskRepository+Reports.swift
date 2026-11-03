@@ -5,7 +5,7 @@ extension TaskRepository {
     /// Stores a report, once per request ID. The project is the one named,
     /// matched like captures (ignoring case and accents) but never created,
     /// else the one linked to the caller's workspace.
-    public func addReport(_ request: ReportRequest, sourceLabel: String,
+    public func addReport(_ request: ReportRequest, sourceLabel: String, claimedName: String? = nil,
                           target: Result<ReportTarget, ReportTargetProblem>?) async throws -> ReportReceipt {
         let receivedAt = now()
         return try await ownerDatabase.write { db in
@@ -26,7 +26,7 @@ extension TaskRepository {
                     """, arguments: [caller.server.socketPath, caller.server.startedAtMilliseconds, caller.workspaceID])
             }
             var row = ReportRow(id: nil, clientId: request.id.uuidString, summary: request.summary, projectId: projectID,
-                                sourceLabel: sourceLabel, message: request.message, targetGiven: request.to,
+                                sourceLabel: sourceLabel, sourceClaim: claimedName, message: request.message, targetGiven: request.to,
                                 receivedAt: receivedAt)
             switch target {
             case .success(let target)?:
@@ -60,6 +60,24 @@ extension TaskRepository {
         try await ownerDatabase.read { db in
             try ReportRow.filter(Column("id") == id && Column("sentAt") == nil).fetchOne(db)
                 .map { $0.report(projectTitle: try Self.projectTitle($0.projectId, db)) }
+        }
+    }
+
+    /// Records that Accept is about to send. False when it was already
+    /// sent, already attempted, or gone: then nothing may be sent.
+    public func beginSending(_ id: Int64) async throws -> Bool {
+        let at = now()
+        return try await ownerDatabase.write { db in
+            try db.execute(sql: "UPDATE agentReport SET attemptedAt = ? WHERE id = ? AND sentAt IS NULL AND attemptedAt IS NULL",
+                           arguments: [at, id])
+            return db.changesCount == 1
+        }
+    }
+
+    /// Herdr refused for certain, so the report may be accepted again.
+    public func sendingRefused(_ id: Int64) async throws {
+        try await ownerDatabase.write { db in
+            try db.execute(sql: "UPDATE agentReport SET attemptedAt = NULL WHERE id = ? AND sentAt IS NULL", arguments: [id])
         }
     }
 

@@ -40,9 +40,12 @@ final class FakeHerdrAgents: HerdrAgentSource, @unchecked Sendable {
     }
 
     var promptResult = PromptResult.sent
+    /// Runs once Herdr "took" the prompt, before the result comes back.
+    var beforePromptReturns: (@Sendable () -> Void)?
 
     func prompt(_ paneID: String, text: String, on server: HerdrServer) async -> PromptResult {
         lock.withLock { recorded.append(.prompt(paneID, text)) }
+        beforePromptReturns?()
         return promptResult
     }
 }

@@ -343,7 +343,9 @@ enum OwnerSchema {
                 table.column("clientId", .text).notNull().unique()
                 table.column("summary", .text).notNull()
                 table.column("projectId", .integer).references(ProjectRecord.databaseTableName, onDelete: .setNull)
+                // Herdr's name for the sending pane; `sourceClaim` is --from.
                 table.column("sourceLabel", .text).notNull()
+                table.column("sourceClaim", .text)
                 table.column("message", .text)
                 table.column("targetGiven", .text)
                 table.column("targetSession", .text)
@@ -354,6 +356,10 @@ enum OwnerSchema {
                 table.column("targetKind", .text)
                 table.column("targetProblem", .text)
                 table.column("receivedAt", .datetime).notNull()
+                // Set before `agent prompt` runs, cleared only when Herdr
+                // refused for certain: set without sentAt means the outcome
+                // is unknown, and the report is never accepted again.
+                table.column("attemptedAt", .datetime)
                 table.column("sentAt", .datetime)
                 table.check(sql: "message IS NOT NULL OR targetGiven IS NULL")
                 table.check(sql: "sentAt IS NULL OR targetPane IS NOT NULL")

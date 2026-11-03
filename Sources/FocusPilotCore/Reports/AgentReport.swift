@@ -81,6 +81,9 @@ public struct ReportTarget: Codable, Equatable, Sendable {
         guard current == server, let agent = list.first(where: { $0.paneID == paneID }) else { return .failure(.gone(name: label)) }
         guard agent.kind == kind else { return .failure(.replaced(name: label)) }
         if let name, agent.name != name { return .failure(.renamed(from: name, to: agent.name ?? agent.kind)) }
+        // A nameless agent is matched by server start, pane and program; a
+        // name appearing since is a change, and a change sends nothing.
+        if name == nil, let new = agent.name { return .failure(.renamed(from: paneID, to: new)) }
         if agent.status == .blocked { return .failure(.blocked(name: label)) }
         return .success(agent)
     }
@@ -111,10 +114,16 @@ public struct AgentReport: Equatable, Sendable, Identifiable {
     public var summary: String
     public var projectID: Int64?
     public var projectTitle: String?
-    /// "second", "Bowling reviewer", or the pane when nothing else is known.
+    /// The sending pane's agent as Herdr names it ("second"), its pane when
+    /// Herdr doesn't know it, or "An agent outside Herdr". Never `--from`.
     public var sourceLabel: String
+    /// What the sender called itself with `--from`; shown only as such.
+    public var claimedName: String?
     public var proposal: ReportProposal?
     public var receivedAt: Date
+    /// Accept ran and Herdr may have the message, but FocusPilot couldn't
+    /// confirm it was sent. The report can never be accepted again.
+    public var outcomeUnknown = false
 }
 
 public struct ReportProposal: Equatable, Sendable {
@@ -147,6 +156,8 @@ public struct ReportReceipt: Codable, Equatable, Sendable {
 /// What Accept did.
 public enum AcceptOutcome: Equatable, Sendable {
     case sent(to: String)
+    /// Herdr may have the message; the report is locked, Dismiss only.
+    case outcomeUnknown(to: String)
     case notSent(AcceptRefusal)
 }
 
@@ -163,6 +174,9 @@ public enum AcceptRefusal: Error, Equatable, Sendable {
     case changed
     /// Already sent or dismissed.
     case alreadyHandled
+    /// An earlier Accept may have sent it; it is never sent again.
+    case outcomeUnknown(name: String)
+    /// FocusPilot couldn't record that it was about to send, so it didn't.
     case failed
 
     /// Plain words for the attention row: what happened and what to do.
@@ -176,7 +190,8 @@ public enum AcceptRefusal: Error, Equatable, Sendable {
         case .noTarget: "Not sent. This proposal has no agent that FocusPilot could check."
         case .changed: "Not sent. The report changed after it was shown. Look at it again before accepting."
         case .alreadyHandled: "This report was already handled."
-        case .failed: "Not sent. Herdr didn’t accept the message. Nothing was changed."
+        case .outcomeUnknown(let name): AcceptRefusal.outcomeUnknownText(name)
+        case .failed: "Not sent. FocusPilot couldn’t save that it was about to send, so it sent nothing. Try again."
         }
     }
 }
@@ -184,4 +199,11 @@ public enum AcceptRefusal: Error, Equatable, Sendable {
 /// A report that breaks `ReportRules`; it is never stored.
 public struct ReportRefused: Error, Equatable {
     public var reason: String
+}
+
+extension AcceptRefusal {
+    /// The row's note once a report is locked.
+    public static func outcomeUnknownText(_ name: String) -> String {
+        "Outcome unknown. FocusPilot may have sent the message to \(name). Check the agent in Herdr before sending it again. This report can only be dismissed."
+    }
 }

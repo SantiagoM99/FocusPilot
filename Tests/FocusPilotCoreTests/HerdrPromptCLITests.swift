@@ -61,10 +61,21 @@ struct HerdrPromptCLITests {
     @Test(arguments: [
         (#"{"error":{"code":"agent_blocked","message":"agent is blocked"},"id":"cli:agent:prompt"}"#, PromptResult.blocked),
         (#"{"error":{"code":"agent_not_found","message":"not found"},"id":"cli:agent:prompt"}"#, .notFound),
-        (#"{"error":{"code":"something_else"}}"#, .failed),
-        ("not json", .failed),
+        (#"{"error":{"code":"something_else"}}"#, .unknown),
+        ("not json", .unknown),
     ])
     func herdrsRefusalsAreReported(reply: String, result: PromptResult) async {
         #expect(await cli(runner(status: 1, reply: reply)).prompt("w4:p2", text: text, on: server) == result)
+    }
+
+    // #68 review: once Herdr has started, a timeout or an over-size reply
+    // says nothing about whether the agent got the text.
+    @Test func aRunThatEndsBadlyIsAnUnknownOutcome() async {
+        for error: any Error in [HerdrProcessRunner.TimedOut(), HerdrProcessRunner.OutputTooLarge()] {
+            let runner = runner()
+            runner.replies[["agent", "prompt", "w4:p2", text]] = .failure(error)
+
+            #expect(await cli(runner).prompt("w4:p2", text: text, on: server) == .unknown)
+        }
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import Testing
 @testable import FocusPilotCore
 
@@ -17,15 +18,30 @@ func report(_ summary: String = "The seed fix passes all 212 tests. Opening the 
 /// A coordinator on a temporary database, with Herdr faked and project
 /// "NLP report" linked to workspace w4.
 private struct ReportFixture {
+    let location: StorageLocation
     let repository: TaskRepository
     let herdr = FakeHerdrAgents(.connected(herdrServer, [target, helper]))
     let coordinator: FocusCoordinator
 
     init() async throws {
-        repository = try TaskRepository(location: StorageLocation(directory: makeTemporaryDirectory()),
-                                        now: { wednesdayMorningInBogota })
+        location = StorageLocation(directory: try makeTemporaryDirectory())
+        repository = try TaskRepository(location: location, now: { wednesdayMorningInBogota })
         coordinator = FocusCoordinator(repository: repository, agents: herdr, now: { wednesdayMorningInBogota })
         try await repository.importHerdrWorkspaces([nlpWorkspace], on: herdrServer)
+    }
+
+    /// Makes recording a send fail, as a full disk would, after Herdr took the message.
+    func breakSentRecording() throws {
+        try DatabaseQueue(path: location.ownerDatabaseURL.path).write { db in
+            try db.execute(sql: """
+                CREATE TRIGGER failSent BEFORE UPDATE OF sentAt ON agentReport
+                BEGIN SELECT RAISE(ABORT, 'disk full'); END
+                """)
+        }
+    }
+
+    func restoreSentRecording() {
+        try? DatabaseQueue(path: location.ownerDatabaseURL.path).write { db in try db.execute(sql: "DROP TRIGGER failSent") }
     }
 
     var prompts: [FakeHerdrAgents.Call] {
@@ -61,8 +77,28 @@ struct ReportReceivingTests {
         let stored = try await fixture.received(report(project: "thesis", to: "w4:p2", from: "Bowling reviewer"))
 
         #expect(stored.projectTitle == "Thesis")
-        #expect(stored.sourceLabel == "Bowling reviewer")
+        #expect(stored.sourceLabel == "second")
+        #expect(stored.claimedName == "Bowling reviewer")
         #expect(stored.proposal?.target?.paneID == "w4:p2")
+    }
+
+    // #68 review: --from is free text, so it never replaces the pane's real
+    // Herdr name; it is shown only as what the sender calls itself.
+    @Test func aSenderCannotTakeAnotherAgentsName() async throws {
+        let fixture = try await ReportFixture()
+
+        let stored = try await fixture.received(report(from: "ablation"))
+
+        #expect(stored.sourceLabel == "second")
+        #expect(stored.claimedName == "ablation")
+    }
+
+    @Test func aPaneHerdrDoesNotKnowIsNamedByItsPane() async throws {
+        let fixture = try await ReportFixture()
+        let stranger = HerdrCaller(server: herdrServer, workspaceID: "w4", paneID: "w4:pZ")
+
+        #expect(try await fixture.received(report(caller: stranger)).sourceLabel == "w4:pZ")
+        #expect(try await fixture.received(report(from: "second", caller: nil)).sourceLabel == "An agent outside Herdr")
     }
 
     @Test func aReportWithoutAProposalIsJustASummary() async throws {
@@ -118,6 +154,20 @@ struct ReportReceivingTests {
         #expect(try await fixture.coordinator.reports().count == 1)
     }
 
+    // #68 review: the app's limit holds for queued reports too, even ones
+    // written into the inbox without the CLI's own check.
+    @Test func importingTheInboxKeepsTheRateLimit() async throws {
+        let fixture = try await ReportFixture()
+        let inbox = fixture.location.inbox
+        try FileManager.default.createDirectory(at: inbox.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let lines = try (0..<25).map { _ in String(decoding: try JSONEncoder().encode(ReportLine(report: report())), as: UTF8.self) }
+        try (lines.joined(separator: "\n") + "\n").write(to: inbox.fileURL, atomically: true, encoding: .utf8)
+
+        _ = try await fixture.coordinator.importInbox(inbox)
+
+        #expect(try await fixture.coordinator.reports().count == 20)
+    }
+
     @Test func reportsSurviveARelaunch() async throws {
         let fixture = try await ReportFixture()
         let request = report()
@@ -135,11 +185,12 @@ struct ReportAcceptTests {
         let fixture = try await ReportFixture()
         let stored = try await fixture.received()
 
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message) == .sent(to: "ablation"))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .sent(to: "ablation"))
 
         #expect(fixture.prompts == [.prompt("w4:p2", message)])
         #expect(try await fixture.coordinator.reports().isEmpty)
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message) == .notSent(.alreadyHandled))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target) == .notSent(.alreadyHandled))
         #expect(fixture.prompts.count == 1)
     }
 
@@ -147,7 +198,7 @@ struct ReportAcceptTests {
         let fixture = try await ReportFixture()
         let stored = try await fixture.received()
 
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message + " ") == .notSent(.changed))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message + " ", shownTarget: stored.proposal?.target) == .notSent(.changed))
         #expect(fixture.prompts.isEmpty)
     }
 
@@ -162,7 +213,7 @@ struct ReportAcceptTests {
         let stored = try await fixture.received()
         fixture.herdr.set(.connected(herdrServer, current))
 
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message) == .notSent(refusal))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target) == .notSent(refusal))
         #expect(fixture.prompts.isEmpty)
         #expect(try await fixture.coordinator.reports().count == 1, "the report stays")
     }
@@ -172,9 +223,9 @@ struct ReportAcceptTests {
         let stored = try await fixture.received()
 
         fixture.herdr.set(.connected(restartedHerdrServer, [target, helper]))
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message) == .notSent(.gone(name: "ablation")))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target) == .notSent(.gone(name: "ablation")))
         fixture.herdr.set(.disconnected(.notRunning))
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message) == .notSent(.herdrUnavailable))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target) == .notSent(.herdrUnavailable))
         #expect(fixture.prompts.isEmpty)
     }
 
@@ -183,7 +234,7 @@ struct ReportAcceptTests {
         let stored = try await fixture.received()
         fixture.herdr.promptResult = .blocked
 
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message) == .notSent(.blocked(name: "ablation")))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target) == .notSent(.blocked(name: "ablation")))
         #expect(try await fixture.coordinator.reports().count == 1)
     }
 
@@ -191,8 +242,88 @@ struct ReportAcceptTests {
         let fixture = try await ReportFixture()
         let stored = try await fixture.received(report(to: "nobody"))
 
-        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message) == .notSent(.noTarget))
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target) == .notSent(.noTarget))
         #expect(fixture.prompts.isEmpty)
+    }
+
+    @Test func aTargetOtherThanTheOneShownIsNeverSentTo() async throws {
+        let fixture = try await ReportFixture()
+        let stored = try await fixture.received()
+        let other = ReportTarget(server: herdrServer, paneID: "w4:pS", name: "second", kind: "claude")
+
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: other) == .notSent(.changed))
+        #expect(fixture.prompts.isEmpty)
+    }
+
+    // #68 review: once Herdr may have the message, the report is never
+    // accepted again; the owner checks the agent and can only dismiss.
+    @Test(arguments: [PromptResult.unknown])
+    func anUnknownOutcomeLocksTheReport(_ result: PromptResult) async throws {
+        let fixture = try await ReportFixture()
+        let stored = try await fixture.received()
+        fixture.herdr.promptResult = result
+
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .outcomeUnknown(to: "ablation"))
+        fixture.herdr.promptResult = .sent
+        let after = try #require(try await fixture.coordinator.reports().first)
+        #expect(after.outcomeUnknown)
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .notSent(.outcomeUnknown(name: "ablation")))
+        #expect(fixture.prompts.count == 1)
+
+        try await fixture.coordinator.dismissReport(stored.id)
+        #expect(try await fixture.coordinator.reports().isEmpty)
+    }
+
+    @Test func aSendThatCannotBeRecordedLocksTheReportToo() async throws {
+        let fixture = try await ReportFixture()
+        let stored = try await fixture.received()
+        fixture.herdr.beforePromptReturns = { try? fixture.breakSentRecording() }
+
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .outcomeUnknown(to: "ablation"))
+        fixture.restoreSentRecording()
+        #expect(try await fixture.coordinator.reports().first?.outcomeUnknown == true)
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .notSent(.outcomeUnknown(name: "ablation")))
+        #expect(fixture.prompts.count == 1)
+    }
+
+    @Test func aDefiniteRefusalLeavesTheReportAcceptable() async throws {
+        let fixture = try await ReportFixture()
+        let stored = try await fixture.received()
+        fixture.herdr.promptResult = .blocked
+        _ = await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+
+        fixture.herdr.promptResult = .sent
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .sent(to: "ablation"))
+    }
+
+    // #68 review: an agent without a name is matched by server start, pane
+    // and program; anything new about it is doubt, and doubt sends nothing.
+    @Test func aNamelessAgentThatGainedANameGetsNothing() async throws {
+        let fixture = try await ReportFixture()
+        let nameless = agent(.idle, pane: "w4:p7", name: nil)
+        fixture.herdr.set(.connected(herdrServer, [target, helper, nameless]))
+        let stored = try await fixture.received(report(to: "w4:p7"))
+        #expect(stored.proposal?.target == ReportTarget(server: herdrServer, paneID: "w4:p7", name: nil, kind: "claude"))
+
+        fixture.herdr.set(.connected(herdrServer, [target, helper, agent(.idle, pane: "w4:p7", name: "new-one")]))
+
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .notSent(.renamed(from: "w4:p7", to: "new-one")))
+        #expect(fixture.prompts.isEmpty)
+    }
+
+    @Test func aNamelessAgentThatIsUnchangedCanBeSentTo() async throws {
+        let fixture = try await ReportFixture()
+        fixture.herdr.set(.connected(herdrServer, [target, helper, agent(.idle, pane: "w4:p7", name: nil)]))
+        let stored = try await fixture.received(report(to: "w4:p7"))
+
+        #expect(await fixture.coordinator.acceptReport(stored.id, shownMessage: message, shownTarget: stored.proposal?.target)
+            == .sent(to: "w4:p7"))
     }
 
     @Test func dismissDiscardsTheReportAndSendsNothing() async throws {
@@ -211,8 +342,8 @@ struct ReportRulesTests {
     @Test(arguments: [
         ("", "A report needs a summary."),
         (String(repeating: "a", count: 2_001), "The summary is longer than 2000 characters."),
-        ("Done\u{1B}[2J", "The summary has control or text-direction characters, which can’t be shown as typed."),
-        ("Done \u{202E}gnp.exe", "The summary has control or text-direction characters, which can’t be shown as typed."),
+        ("Done\u{1B}[2J", "The summary has control, invisible or text-direction characters, which can’t be shown as typed."),
+        ("Done \u{202E}gnp.exe", "The summary has control, invisible or text-direction characters, which can’t be shown as typed."),
     ])
     func summariesThatCannotBeShownAsTypedAreRefused(summary: String, problem: String) {
         #expect(report(summary).problem == problem)
@@ -220,7 +351,7 @@ struct ReportRulesTests {
 
     @Test(arguments: [
         ("--wait", "The proposed message can’t start with “-”: Herdr would read it as an option."),
-        ("ok\u{3}", "The proposed message has control or text-direction characters, so it can’t be sent exactly as shown."),
+        ("ok\u{3}", "The proposed message has control, invisible or text-direction characters, so it can’t be sent exactly as shown."),
         (String(repeating: "a", count: 4_001), "The proposed message is longer than 4000 characters."),
         ("   ", "The proposed message is empty."),
     ])
@@ -231,6 +362,31 @@ struct ReportRulesTests {
     @Test func aMessageNeedsATargetAndATargetNeedsAMessage() {
         #expect(report(to: nil).problem == "A proposed message needs --to, the Herdr agent to send it to.")
         #expect(report(message: nil).problem == "--to needs --message, the exact text to send.")
+    }
+
+    // #68 review: nothing invisible reaches the agent while the owner sees a
+    // harmless sentence. Every format character is refused except the
+    // zero-width joiner inside emoji, and so are line and paragraph separators.
+    @Test(arguments: ["\u{200B}", "\u{2060}", "\u{FEFF}", "\u{00AD}", "\u{E0041}\u{E0042}", "\u{E007F}", "\u{2028}", "\u{2029}",
+                      "\u{200E}", "\u{202E}", "\u{2066}", "\u{061C}", "\u{180E}"])
+    func invisibleCharactersAreRefusedEverywhere(_ hidden: String) {
+        #expect(report(message: "Open the PR.\(hidden) Then delete main.") .problem
+            == "The proposed message has control, invisible or text-direction characters, so it can’t be sent exactly as shown.")
+        #expect(report("Done.\(hidden)").problem
+            == "The summary has control, invisible or text-direction characters, which can’t be shown as typed.")
+        #expect(report(from: "second\(hidden)").problem == "The --from name must be plain text on one line.")
+    }
+
+    @Test func theZeroWidthJoinerInsideEmojiIsFine() {
+        #expect(report(message: "Family: 👨‍👩‍👧‍👦").problem == nil)
+    }
+
+    // A character count alone lets a few long emoji sequences weigh a lot.
+    @Test func sizeIsCappedInBytesToo() {
+        let family = "👨‍👩‍👧‍👦"
+        #expect(report(String(repeating: family, count: 1_000)).problem == "The summary is longer than 8000 bytes.")
+        #expect(report(message: String(repeating: family, count: 1_000)).problem == "The proposed message is longer than 16000 bytes.")
+        #expect(report(project: String(repeating: family, count: 50)).problem == "The project name is longer than 400 bytes.")
     }
 
     @Test func plainTextWithLinesTabsQuotesAndEmojiIsFine() {
