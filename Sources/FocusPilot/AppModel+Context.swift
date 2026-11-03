@@ -70,23 +70,22 @@ extension AppModel {
             contextNotice = "Could not open the context: \(error.localizedDescription)"
             return
         }
-        var opened = 0
-        var broken = plan.needsRepair.map(\.resource.name)
-        for step in plan.steps {
+        let resources = (try? await coordinator.context(forTask: taskID).resources) ?? []
+        contextNotice = await LaunchRun.run(plan, names: { step in
             switch step {
-            case .folder(_, let bookmark):
-                if Self.open(bookmark) { opened += 1 } else { broken.append(bookmark.name) }
-            case .webPage(_, let url):
-                if NSWorkspace.shared.open(url) { opened += 1 }
-            case .agent(let linkID):
-                let label = agentLinks.first { $0.id == linkID }?.label ?? "agent"
-                if case .opened = await coordinator.openAgent(linkID) { opened += 1 } else { broken.append(label) }
-            case .workspace(let projectID):
-                let label = projects.first { $0.id == projectID }?.herdrLink?.label ?? "workspace"
-                if await coordinator.openWorkspace(ofProject: projectID) == .opened { opened += 1 } else { broken.append(label) }
+            case .folder(_, let bookmark): bookmark.name
+            case .webPage(let id, let url): resources.first { $0.id == id }?.resource.name ?? url.absoluteString
+            case .agent(let linkID): agentLinks.first { $0.id == linkID }?.label ?? "agent"
+            case .workspace(let projectID): projects.first { $0.id == projectID }?.herdrLink?.label ?? "workspace"
             }
-        }
-        contextNotice = ResourceText.launchResult(opened: opened, needingRepair: broken, moved: plan.moved)
+        }, open: { step in
+            switch step {
+            case .folder(_, let bookmark): Self.open(bookmark)
+            case .webPage(_, let url): NSWorkspace.shared.open(url)
+            case .agent(let linkID): await coordinator.openAgent(linkID) == .opened
+            case .workspace(let projectID): await coordinator.openWorkspace(ofProject: projectID) == .opened
+            }
+        })
         contextRevision += 1
         await refresh()
     }

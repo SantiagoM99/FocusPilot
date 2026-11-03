@@ -41,13 +41,15 @@ public enum ResourceText {
         rules.flatMap(\.targets).first(where: ActivityTarget.site(domain: page.domain).overlaps)?.displayName
     }
 
-    public static func launchResult(opened: Int, needingRepair names: [String], moved: [MovedFolder] = [],
-                                    home: String = NSHomeDirectory()) -> String {
-        let total = opened + names.count
+    /// What Open context did: items that need repair were never tried;
+    /// items that were tried and did not open are named after them.
+    public static func launchResult(opened: Int, needingRepair names: [String], failed: [String] = [],
+                                    moved: [MovedFolder] = [], home: String = NSHomeDirectory()) -> String {
+        let total = opened + names.count + failed.count
         if total == 0 { return "Nothing to open. Choose what opens with this task in Resources." }
-        var text = names.isEmpty
-            ? "Opened \(opened) item\(opened == 1 ? "" : "s")."
-            : "Opened \(opened) of \(total). \(list(names)) need\(names.count == 1 ? "s" : "") repair."
+        var text = total == opened ? "Opened \(opened) item\(opened == 1 ? "" : "s")." : "Opened \(opened) of \(total)."
+        if !names.isEmpty { text += " \(list(names)) need\(names.count == 1 ? "s" : "") repair." }
+        if !failed.isEmpty { text += " \(list(failed)) didn’t open." }
         for folder in moved {
             text += " “\(folder.name)” had moved; it opened from \(path(folder.path, home: home))."
         }

@@ -393,6 +393,21 @@ struct ContextAllowanceTests {
         #expect(await allowedDomains(fixture).contains("arxiv.org"))
     }
 
+    // #62 review: a change to which tasks' pages count republishes. Undoing
+    // a Herdr add deletes the task, and its links with it.
+    @Test func undoingAHerdrAddDropsItsPagesFromTheSession() async throws {
+        let fixture = try await ContextFixture()
+        let added = try await TaskRepository(location: fixture.location, now: { fixture.clock.now })
+            .addFromHerdr(herdrAdd("Re-run ablation"))
+        try await fixture.coordinator.linkWebPage("arxiv.org/abs/1", to: .task(added.taskID))
+        try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
+        #expect(await allowedDomains(fixture).contains("arxiv.org"))
+
+        try await fixture.coordinator.undoHerdrAdd(added.taskID)
+
+        #expect(await !allowedDomains(fixture).contains("arxiv.org"))
+    }
+
     @Test func aPageLinkedDuringTheSessionIsAllowedRightAway() async throws {
         let fixture = try await ContextFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .strict)
@@ -459,6 +474,35 @@ struct ContextAllowanceTests {
         let policy = try #require(await fixture.publisher.published.last)
         #expect(policy.session == nil)
         #expect(policy.always.domains == ["reddit.com"])
+    }
+
+    // #62 review: linked pages apply only while a normal session runs, not
+    // during its break or pause, when always-on rules still hold.
+    @Test func theCompilerListsLinkedPagesOnlyWhileANormalSessionRuns() {
+        let page = ["https://reddit.com/r/MachineLearning/comments/abc"]
+        let end = wednesdayMorningInBogota.addingTimeInterval(1500)
+        func pages(_ session: SessionPolicy) -> [String]? {
+            PolicyCompiler.compile(rules: [], allowed: [], session: session, allowedPages: page).session?.allowedPages
+        }
+
+        #expect(pages(SessionPolicy(sessionID: UUID(), mode: .normal, end: end)) == page)
+        #expect(pages(SessionPolicy(sessionID: UUID(), mode: .normal, end: end, resumesAt: end.addingTimeInterval(-600))) == nil)
+        #expect(pages(SessionPolicy(sessionID: UUID(), mode: .strict, end: end)) == nil)
+    }
+
+    @Test(arguments: [
+        (SessionPhase.running, true),
+        (.onBreak(until: wednesdayMorningInBogota.addingTimeInterval(300)), false),
+        (.paused(since: wednesdayMorningInBogota), false),
+    ])
+    func linkedPagesFollowTheSessionPhase(phase: SessionPhase, allowed: Bool) {
+        let session = FocusSession(id: UUID(), taskID: 1, action: "Explain baseline results", mode: .normal,
+                                   startedAt: wednesdayMorningInBogota, plannedEnd: wednesdayMorningInBogota.addingTimeInterval(1500),
+                                   phase: phase)
+        var inputs = PolicyInputs(rules: [BlockRuleSet(targets: [.site(domain: "reddit.com")], activation: .always)], allowed: [])
+        inputs.contextSites = [ContextSite(url: "https://reddit.com/r/ML", domain: "reddit.com", owner: .task(1))]
+
+        #expect(ContextAllowance.compute(inputs, session: session).pages == (allowed ? ["https://reddit.com/r/ML"] : []))
     }
 
     @Test func aPolicyWithoutAllowedPagesKeepsItsJSON() throws {

@@ -180,7 +180,10 @@ public actor FocusCoordinator {
     /// running on is refused, wherever it sits in the list.
     public func undoHerdrAdd(_ taskID: Int64) async throws {
         if let active = await snapshot().activeSession, active.taskID == taskID { throw HerdrTaskError.inRunningSession }
+        // Its links go with it, so a session that allowed its pages must not keep them.
+        let hadResources = try await repository.resources(forTask: taskID).contains { $0.owner == .task(taskID) }
         try await repository.undoHerdrAdd(taskID)
+        if hadResources { await publish(try await repository.republish()) }
         await followNowAfterTaskChange()
     }
 

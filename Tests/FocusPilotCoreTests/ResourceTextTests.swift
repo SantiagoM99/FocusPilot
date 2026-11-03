@@ -58,6 +58,10 @@ struct ResourceTextTests {
         #expect(ResourceText.launchResult(opened: opened, needingRepair: names) == text)
     }
 
+    @Test func itemsThatDidNotOpenAreNamedAfterRepairs() {
+        #expect(ResourceText.launchResult(opened: 0, needingRepair: [], failed: ["arxiv.org"]) == "Opened 0 of 1. “arxiv.org” didn’t open.")
+    }
+
     @Test func aFolderThatMovedBeforeLaunchIsMentioned() {
         #expect(ResourceText.launchResult(opened: 2, needingRepair: [], moved: [MovedFolder(name: "figures", path: "/Users/owner/x")],
                                           home: home)

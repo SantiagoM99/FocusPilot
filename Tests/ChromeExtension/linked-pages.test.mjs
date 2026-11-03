@@ -42,9 +42,25 @@ test("a linked page on an always-blocked site opens during the session and is bl
   assert.equal(P.nextBoundary(policy, during), end);
 });
 
-test("during a normal break the linked page on an always-blocked site still opens", () => {
+// #62 review: only while the normal session actually runs. During its
+// break, always-on rules still hold, linked pages included.
+test("during a normal break a linked page on an always-blocked site stays blocked", () => {
+  const thread = "https://reddit.com/r/MachineLearning/comments/abc";
   const onBreak = { ...policy, session: { ...policy.session, resumesAt: "2026-10-14T15:40:00Z" } };
-  assert.equal(P.decide(onBreak, "https://reddit.com/r/MachineLearning/comments/abc", during).blocked, false);
+  const d = P.decide(onBreak, thread, during);
+  assert.equal(d.blocked, true);
+  assert.equal(d.reason, "always");
+  assert.deepEqual(P.linkedPages(onBreak, during), []);
+  assert.equal(P.networkRules(onBreak, during, BLOCKED).filter((r) => r.action.type === "allowAllRequests").length, 0);
+  assert.equal(P.decide(onBreak, thread, at("2026-10-14T15:40:00Z")).blocked, false, "opens again when the break ends");
+  assert.equal(P.nextBoundary(onBreak, during), at("2026-10-14T15:40:00Z"));
+});
+
+test("during a normal break a linked page on a session-blocked site is simply not blocked", () => {
+  const onBreak = { ...policy, session: { ...policy.session, resumesAt: "2026-10-14T15:40:00Z" } };
+  const d = P.decide(onBreak, lecture, during);
+  assert.equal(d.blocked, false);
+  assert.equal(d.linked, undefined);
 });
 
 test("a strict session never lets a linked page through", () => {

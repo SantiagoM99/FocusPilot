@@ -4,8 +4,9 @@
 /// project when it sits outside them).
 ///
 /// A page on a site no rule blocks joins the allowed list. A page on a
-/// blocked site is allowed as that exact page, only in a normal session
-/// (owner decision 0003, 2026-11-03); in a strict session it stays blocked
+/// blocked site is allowed as that exact page, only while a normal session
+/// runs (owner decision 0003, 2026-11-03): not during its break or pause,
+/// when always-on rules still hold. In a strict session it stays blocked
 /// and the owner asks for an exception, with the usual wait.
 enum ContextAllowance {
     struct Result: Equatable {
@@ -21,7 +22,9 @@ enum ContextAllowance {
         for site in inputs.contextSites where covers(session.scope, site.owner, inputs.taskProjects) {
             let target = ActivityTarget.site(domain: site.domain)
             if blocked.contains(where: target.overlaps) {
-                if session.mode == .normal, let page = PageAddress.canonical(site.url) { result.pages.append(page) }
+                if session.mode == .normal, session.phase == .running, let page = PageAddress.canonical(site.url) {
+                    result.pages.append(page)
+                }
             } else if !taken.contains(where: target.overlaps) {
                 taken.append(target)
                 result.allowed.append(AllowedActivity(name: site.domain, target: target))

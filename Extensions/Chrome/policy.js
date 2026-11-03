@@ -127,12 +127,14 @@ var FocusPolicy = (() => {
   // ---- Pages linked to the session's projects ----
   // Owner decision 0003, 2026-11-03: during a normal session, a page linked
   // to a project the session covers opens on a blocked site, that exact page
-  // only (matched as a page exception, #14), until the planned end. The app
-  // lists none for a strict session; checked here too, so a strict session
-  // never lets one through.
+  // only (matched as a page exception, #14), while the session runs: not
+  // during its break, when always-on rules still hold, and not after the
+  // planned end. The app lists none for a strict session or a break; both
+  // are checked here too.
   function linkedPages(policy, now) {
     const s = policy?.session;
     if (!s || s.mode !== "normal" || now >= Date.parse(s.end)) return [];
+    if (s.resumesAt && now < Date.parse(s.resumesAt)) return [];
     return s.allowedPages ?? [];
   }
 

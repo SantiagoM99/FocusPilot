@@ -24,7 +24,8 @@ public enum PolicyCompiler {
             always: PolicyTargets(always),
             scheduled: blocks,
             session: session.map { SessionBlock($0, targets: PolicyTargets(sessionOnly),
-                                                allowedPages: $0.mode == .normal ? Array(Set(allowedPages)).sorted() : []) },
+                                                allowedPages: $0.mode == .normal && $0.resumesAt == nil
+                                                    ? Array(Set(allowedPages)).sorted() : []) },
             allowed: AllowedTargets(domains: allowedTargets.domains, apps: allowedTargets.apps, tools: tools.sorted()),
             exceptions: exceptions.sorted { sortKey($0) < sortKey($1) }
         )
