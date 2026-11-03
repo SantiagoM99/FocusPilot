@@ -297,6 +297,37 @@ enum OwnerSchema {
             try db.rename(table: "new_wrapUp", to: WrapUpRecord.databaseTableName)
             try db.create(index: "wrapUp_on_taskId", on: WrapUpRecord.databaseTableName, columns: ["taskId"])
         }
+        migrator.registerMigration("owner-v14-context") { db in
+            // Folders and web pages linked to a task or project (#18). A
+            // folder keeps its security-scoped bookmark and what it was when
+            // linked, so a different folder at the path is noticed (S5).
+            try db.create(table: ResourceRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("taskId", .integer).references(TaskRecord.databaseTableName, onDelete: .cascade)
+                table.column("projectId", .integer).references(ProjectRecord.databaseTableName, onDelete: .cascade)
+                table.column("kind", .text).notNull().check(sql: "kind IN ('folder', 'webPage')")
+                table.column("url", .text)
+                table.column("bookmark", .blob)
+                table.column("path", .text)
+                table.column("inode", .integer)
+                table.column("volumeUUID", .text)
+                table.column("root", .text)
+                // Null: not in the launch set.
+                table.column("launchOrder", .integer)
+                table.column("createdAt", .datetime).notNull()
+                table.check(sql: "(taskId IS NULL) <> (projectId IS NULL)")
+                table.check(sql: "kind <> 'folder' OR (bookmark IS NOT NULL AND path IS NOT NULL AND inode IS NOT NULL)")
+                table.check(sql: "kind <> 'webPage' OR url IS NOT NULL")
+            }
+            try db.create(index: "resource_on_taskId", on: ResourceRow.databaseTableName, columns: ["taskId"])
+            try db.create(index: "resource_on_projectId", on: ResourceRow.databaseTableName, columns: ["projectId"])
+            try db.alter(table: AgentLinkRow.databaseTableName) { table in
+                table.add(column: "launchOrder", .integer)
+            }
+            try db.alter(table: HerdrLinkRecord.databaseTableName) { table in
+                table.add(column: "launchOrder", .integer)
+            }
+        }
         return migrator
     }
 

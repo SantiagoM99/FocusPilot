@@ -71,6 +71,17 @@ public struct HerdrCLI: Sendable {
         return await run(.agentFocus(paneID: paneID), with: binary) != nil
     }
 
+    /// Focuses the first tab Herdr lists for the workspace, if `server` is
+    /// still the running instance. Only Open context calls this, after the
+    /// owner's click. False when anything is off: nothing is guessed.
+    public func focusFirstTab(ofWorkspace workspaceID: String, on server: HerdrServer) async -> Bool {
+        guard HerdrTabID.isWorkspace(workspaceID), case .success(let (binary, current)) = await reach(), current == server,
+              let listed = await run(.tabList(workspaceID: workspaceID), with: binary),
+              let first = HerdrTabID.firstTab(in: listed, of: workspaceID)
+        else { return false }
+        return await run(.tabFocus(tabID: first), with: binary) != nil
+    }
+
     /// The binary, once the pane ID has Herdr's shape and the running server
     /// is the same instance that reported it: after a restart the same pane
     /// ID can name another agent.
@@ -159,9 +170,36 @@ enum HerdrWorkspaceList {
     }
 }
 
-/// Where the coordinator reads Herdr's workspaces from.
+/// Workspace and tab IDs are passed to `tab list` and `tab focus` as
+/// arguments, so only Herdr's own shapes are accepted.
+enum HerdrTabID {
+    static func isWorkspace(_ id: String) -> Bool {
+        id.wholeMatch(of: /w[A-Za-z0-9]+/) != nil
+    }
+
+    static func isTab(_ id: String, in workspaceID: String) -> Bool {
+        id.wholeMatch(of: /w[A-Za-z0-9]+:t[A-Za-z0-9]+/) != nil && id.hasPrefix(workspaceID + ":")
+    }
+
+    /// The first tab of `herdr tab list --workspace`, which lists tabs in
+    /// Herdr's order. The reply is untrusted: a tab of another workspace or
+    /// of the wrong shape gives nil.
+    static func firstTab(in data: Data, of workspaceID: String) -> String? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let result = root["result"] as? [String: Any],
+              let tabs = result["tabs"] as? [[String: Any]], let first = tabs.first,
+              let id = first["tab_id"] as? String, first["workspace_id"] as? String == workspaceID,
+              isTab(id, in: workspaceID)
+        else { return nil }
+        return id
+    }
+}
+
+/// Where the coordinator reads Herdr's workspaces from, and how Open context
+/// shows one.
 public protocol HerdrWorkspaceSource: Sendable {
     func connection() async -> HerdrConnection
+    func focusFirstTab(ofWorkspace workspaceID: String, on server: HerdrServer) async -> Bool
 }
 
 extension HerdrCLI: HerdrWorkspaceSource {}

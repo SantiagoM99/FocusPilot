@@ -80,16 +80,38 @@ struct NowCard: View {
                     }
                 }
                 SessionControls(model: model, showsReturnCue: false)
+                if let item {
+                    openContext(item, model)
+                        .controlSize(.small)
+                }
             }
             .frame(maxWidth: 360)
         } else {
-            Button { model.requestStartFocus() } label: {
-                Label("Start focus", systemImage: "play.fill")
+            HStack {
+                Button { model.requestStartFocus() } label: {
+                    Label("Start focus", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .help("Start focus (⌘⏎)")
+                .accessibilityHint("Opens Start focus")
+                if let item {
+                    openContext(item, model)
+                }
             }
-            .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .help("Start focus (⌘⏎)")
-            .accessibilityHint("Opens Start focus")
         }
+        if let notice = model.contextNotice, model.contextNoticeOnNowCard {
+            Text(notice)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Opens the task's launch set: with Start focus, resuming takes two clicks.
+    private func openContext(_ item: TodayItem, _ model: AppModel) -> some View {
+        Button { Task { await model.openContext(forTask: item.id, fromNowCard: true) } } label: {
+            Label("Open context", systemImage: "arrow.up.forward.app")
+        }
+        .help("Opens the task’s ticked resources, checking each one first. Nothing is created.")
     }
 }

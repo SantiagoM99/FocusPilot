@@ -51,8 +51,12 @@ enum HerdrLinkStore {
         if let owner = try linkedProjectID(workspace, on: server, in: db), owner != projectID {
             throw HerdrLinkError.workspaceAlreadyLinked
         }
+        // A relinked workspace keeps its place in the launch set.
+        let launchOrder = try HerdrLinkRecord.fetchOne(db, key: projectID)?.launchOrder
         try HerdrLinkRecord.deleteOne(db, key: projectID)
-        try HerdrLinkRecord(projectId: projectID, workspace: workspace, server: server).insert(db)
+        var record = HerdrLinkRecord(projectId: projectID, workspace: workspace, server: server)
+        record.launchOrder = launchOrder
+        try record.insert(db)
         try markSeen(workspace, on: server, in: db)
     }
 

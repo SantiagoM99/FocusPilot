@@ -149,6 +149,7 @@ struct AgentLinkRow: Codable, FetchableRecord, MutablePersistableRecord {
     var workspaceLabel: String?
     var lastStatus: String?
     var statusChangedAt: Date
+    var launchOrder: Int? = nil
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
         id = inserted.rowID
@@ -160,7 +161,7 @@ struct AgentLinkRow: Codable, FetchableRecord, MutablePersistableRecord {
         return TaskAgentLink(id: id!, taskID: taskId, server: server, paneID: paneId, workspaceID: workspaceId,
                              tabID: tabId, name: agentName, kind: agentKind, label: label, workspaceLabel: workspaceLabel,
                              lastStatus: lastStatus.flatMap(HerdrAgentStatus.init(rawValue:)),
-                             statusChangedAt: statusChangedAt)
+                             statusChangedAt: statusChangedAt, launchOrder: launchOrder)
     }
 }
 

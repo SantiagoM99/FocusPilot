@@ -88,6 +88,18 @@ var FocusBlockedView = (() => {
       };
     }
 
+    if (decision.linked) {
+      const host = hostOf(url);
+      return {
+        kind: "linked", domain: decision.domain,
+        status: { tone: "green", text: "Linked to a task in this session" },
+        title: "This page is allowed in this session",
+        subtitle: `It’s linked to a task in the session, so it opens until ${clock(Date.parse(policy.session.end), timeZone)}. Other pages on ${decision.domain} stay blocked.`,
+        primary: { label: `Go back to ${host}`, action: "go-back" }, backURL: FocusPolicy.returnURL(policy, url),
+        exceptionLink: false, footer: ["", "FocusPilot"],
+      };
+    }
+
     if (!decision.blocked) {
       const host = hostOf(url);
       const backURL = FocusPolicy.returnURL(policy, url);

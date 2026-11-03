@@ -19,8 +19,9 @@ public actor FocusCoordinator {
         case sessionStillActive
     }
 
-    private let herdr: (any HerdrWorkspaceSource)?
+    let herdr: (any HerdrWorkspaceSource)?
     let agents: (any HerdrAgentSource)?
+    let folders: any FolderAccess
 
     let repository: TaskRepository
     let publisher: PolicyPublisher
@@ -55,12 +56,14 @@ public actor FocusCoordinator {
     /// Without `herdr` and `agents`, Herdr reads as not installed.
     public init(repository: TaskRepository, herdr: (any HerdrWorkspaceSource)? = nil,
                 agents: (any HerdrAgentSource)? = nil,
+                folders: any FolderAccess = SystemFolderAccess(),
                 publisher: PolicyPublisher = PolicyNotDelivered(),
                 notices: FocusNoticeSink = NoticesIgnored(), now: @escaping @Sendable () -> Date = Date.init,
                 uptime: @escaping @Sendable () -> Duration = FocusCoordinator.continuousUptime()) {
         self.repository = repository
         self.herdr = herdr
         self.agents = agents
+        self.folders = folders
         self.publisher = publisher
         self.notices = notices
         self.now = now
@@ -177,7 +180,10 @@ public actor FocusCoordinator {
     /// running on is refused, wherever it sits in the list.
     public func undoHerdrAdd(_ taskID: Int64) async throws {
         if let active = await snapshot().activeSession, active.taskID == taskID { throw HerdrTaskError.inRunningSession }
+        // Its links go with it, so a session that allowed its pages must not keep them.
+        let hadResources = try await repository.resources(forTask: taskID).contains { $0.owner == .task(taskID) }
         try await repository.undoHerdrAdd(taskID)
+        if hadResources { await publish(try await repository.republish()) }
         await followNowAfterTaskChange()
     }
 

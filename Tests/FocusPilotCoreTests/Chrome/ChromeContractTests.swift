@@ -26,6 +26,33 @@ struct ChromeContractTests {
                               source: "7D5E0C1A-0000-4000-8000-000000000041")
     }
 
+    static let linkedPagesFixture = fixture.deletingLastPathComponent().appending(path: "linked-pages.json")
+
+    /// A normal session whose project links a lecture on a blocked site and
+    /// a thread on an always-blocked one (owner decision 0003, 2026-11-03).
+    static var linkedPagesDelivery: PolicyDelivery {
+        let session = SessionPolicy(sessionID: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, mode: .normal,
+                                    end: instant("2026-10-14T10:50:00-05:00"))
+        let rules = [
+            BlockRuleSet(id: 1, targets: [.site(domain: "reddit.com")], activation: .always),
+            BlockRuleSet(id: 2, targets: [.site(domain: "youtube.com")], activation: .sessionOnly),
+        ]
+        let compiled = PolicyCompiler.compile(rules: rules, allowed: [], session: session, allowedPages: [
+            PageAddress.canonical("https://www.youtube.com/watch?v=lecture7&t=30")!,
+            PageAddress.canonical("https://reddit.com/r/MachineLearning/comments/abc")!,
+        ])
+        return PolicyDelivery(policy: CompiledPolicy(revision: 42, effectiveAt: instant("2026-10-14T10:00:00-05:00"), rules: compiled),
+                              focus: FocusContext(title: "Explain baseline results", nextAction: nil, projectTitle: "NLP report"),
+                              source: "7D5E0C1A-0000-4000-8000-000000000042")
+    }
+
+    @Test func theLinkedPagesFixtureIsWhatTheAppWrites() throws {
+        let written = try CompiledPolicy.encoder().encode(Self.linkedPagesDelivery)
+        let fixture = try Data(contentsOf: Self.linkedPagesFixture)
+
+        #expect(String(decoding: written, as: UTF8.self) == String(decoding: fixture, as: UTF8.self).trimmingCharacters(in: .newlines))
+    }
+
     @Test func theExtensionsFixtureIsWhatTheAppWrites() throws {
         let written = try CompiledPolicy.encoder().encode(Self.delivery)
         let fixture = try Data(contentsOf: Self.fixture)

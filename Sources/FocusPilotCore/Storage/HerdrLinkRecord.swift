@@ -10,6 +10,8 @@ struct HerdrLinkRecord: Codable, Equatable, Sendable {
     var workspaceId: String
     var label: String
     var cwd: String?
+    /// Its place in the launch sets of the project's tasks; nil when left out.
+    var launchOrder: Int? = nil
 
     init(projectId: Int64, workspace: HerdrWorkspace, server: HerdrServer) {
         self.projectId = projectId

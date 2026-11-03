@@ -124,13 +124,30 @@ var FocusPolicy = (() => {
     return found;
   }
 
-  // Why `url` is blocked now, if it is, and whether a timed exception lifts it.
+  // ---- Pages linked to the session's projects ----
+  // Owner decision 0003, 2026-11-03: during a normal session, a page linked
+  // to a project the session covers opens on a blocked site, that exact page
+  // only (matched as a page exception, #14), while the session runs: not
+  // during its break, when always-on rules still hold, and not after the
+  // planned end. The app lists none for a strict session or a break; both
+  // are checked here too.
+  function linkedPages(policy, now) {
+    const s = policy?.session;
+    if (!s || s.mode !== "normal" || now >= Date.parse(s.end)) return [];
+    if (s.resumesAt && now < Date.parse(s.resumesAt)) return [];
+    return s.allowedPages ?? [];
+  }
+
+  // Why `url` is blocked now, if it is, and whether a timed exception or a
+  // linked page lifts it.
   function decide(policy, url, now) {
     const decision = ruleDecision(policy, url, now);
     if (!decision.blocked) return decision;
     const excepted = exceptionFor(policy, url, decision.host, now);
     const { host, ...result } = decision;
-    return excepted ? { ...result, blocked: false, excepted } : result;
+    if (excepted) return { ...result, blocked: false, excepted };
+    const linked = linkedPages(policy, now).find((page) => pageMatches(page, url));
+    return linked ? { ...result, blocked: false, linked } : result;
   }
 
   // The rule that blocks `url`: the session first, since its page shows
@@ -217,10 +234,10 @@ var FocusPolicy = (() => {
     };
   }
 
-  // Excepted pages, canonical, sorted: page rule 10 + i is for the i-th.
+  // Excepted and linked pages, canonical, sorted: page rule 10 + i is for the i-th.
   function pageURLs(policy, now) {
-    return [...new Set(activeExceptions(policy, now).filter((e) => e.scope.kind === "page")
-      .map((e) => canonicalPage(e.scope.url)).filter(Boolean))].sort();
+    const excepted = activeExceptions(policy, now).filter((e) => e.scope.kind === "page").map((e) => e.scope.url);
+    return [...new Set([...excepted, ...linkedPages(policy, now)].map(canonicalPage).filter(Boolean))].sort();
   }
 
   // The dynamic rules for `now`: new top-level loads of blocked sites go to
@@ -282,7 +299,7 @@ var FocusPolicy = (() => {
 
   return {
     localParts, scheduleContains, scheduleNextChange, sessionApplies, hostMatches, decide, blockedDomains, nextBoundary,
-    isNewer, supports, returnURL, canonicalPage, pageMatches, activeExceptions, networkRules, pageAllowRule, pageURLs,
+    isNewer, supports, returnURL, canonicalPage, pageMatches, activeExceptions, linkedPages, networkRules, pageAllowRule, pageURLs,
   };
 })();
 
