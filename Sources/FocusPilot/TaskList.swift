@@ -18,6 +18,8 @@ struct TaskList: View {
     /// Undo is not offered for the task a session is running on.
     var activeSessionTaskID: Int64?
     @Binding var selection: Int64?
+    /// For Mark as waiting (#57); absent in previews.
+    @Environment(AppModel.self) private var model: AppModel?
 
     var body: some View {
         let sections = TaskSections(items)
@@ -40,6 +42,13 @@ struct TaskList: View {
                     Button("Make Current (Now)") { perform(.now, on: id) }
                     Button("Move to Next") { perform(.next, on: id) }
                     Button("Move to Later") { perform(.later, on: id) }
+                    if let model {
+                        Divider()
+                        Button(model.waiting(for: id) == nil ? "Mark as Waiting…" : "Change Waiting…") { model.markingWaiting = id }
+                        if model.waiting(for: id) != nil {
+                            Button("Stop Waiting") { Task { await model.stopWaiting(id) } }
+                        }
+                    }
                     if let undoHerdrAdd,
                        items.first(where: { $0.id == id })?.offersHerdrUndo(activeSessionTaskID: activeSessionTaskID) == true {
                         Divider()

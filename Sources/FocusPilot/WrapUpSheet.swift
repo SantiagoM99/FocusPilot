@@ -3,7 +3,9 @@ import SwiftUI
 
 /// The session wrap-up sheet (design 06), shown when a session ends: what
 /// got done, what remains, and what to start with next time, which becomes
-/// the task's next action and the return cue shown first on resuming.
+/// the task's next action and the return cue shown first on resuming. The
+/// session's other tasks follow with one optional line each (#57); with
+/// nothing in Now at the end, only they are shown.
 ///
 /// The text and the "Mark task complete" box live in `AppModel.wrapUp`, not
 /// here, so they survive the sheet being dismissed and shown again. It must
@@ -32,11 +34,34 @@ struct WrapUpSheet: View {
                     .lineLimit(1)
             }
 
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
-                row("What got done", text: draft(\.outcome), field: .outcome, next: .remainingWork)
-                row("What remains", text: draft(\.remainingWork), field: .remainingWork, next: .returnCue)
-                row("Next time, start with", text: draft(\.returnCue), field: .returnCue, next: nil,
-                    note: "Becomes the task's next action and is shown first when you resume.")
+            if hasTask {
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
+                    row("What got done", text: draft(\.outcome), field: .outcome, next: .remainingWork)
+                    row("What remains", text: draft(\.remainingWork), field: .remainingWork, next: .returnCue)
+                    row("Next time, start with", text: draft(\.returnCue), field: .returnCue, next: nil,
+                        note: "Becomes the task's next action and is shown first when you resume.")
+                }
+            }
+
+            if !others.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(hasTask ? "Other tasks in this session" : "Tasks in this session")
+                        .font(.callout.weight(.semibold))
+                    Text("Where did you leave off? One optional line each, shown first when you come back.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
+                        ForEach(others) { task in
+                            GridRow {
+                                Text(task.title)
+                                    .frame(width: 160, alignment: .leading)
+                                    .lineLimit(2)
+                                TextField("Optional", text: otherCue(task.id))
+                                    .textFieldStyle(.roundedBorder)
+                            }
+                        }
+                    }
+                }
             }
 
             if let error {
@@ -47,8 +72,10 @@ struct WrapUpSheet: View {
 
             Divider()
             HStack(spacing: 8) {
-                Toggle("Mark task complete", isOn: draft(\.marksTaskDone))
-                    .toggleStyle(.checkbox)
+                if hasTask {
+                    Toggle("Mark task complete", isOn: draft(\.marksTaskDone))
+                        .toggleStyle(.checkbox)
+                }
                 Spacer()
                 Button("Skip") { model.skipWrapUp() }
                     .keyboardShortcut(.cancelAction)
@@ -62,7 +89,16 @@ struct WrapUpSheet: View {
         }
         .padding(20)
         .frame(width: 560)
-        .onAppear { focused = .outcome }
+        .onAppear { focused = hasTask ? .outcome : nil }
+    }
+
+    private var hasTask: Bool { prompt.session.taskID != nil }
+
+    private var others: [TodayItem] { model.wrapUp?.id == prompt.id ? model.wrapUp?.others ?? [] : [] }
+
+    private func otherCue(_ id: Int64) -> Binding<String> {
+        Binding(get: { model.wrapUp?.draft.otherCues[id] ?? "" },
+                set: { if model.wrapUp?.id == prompt.id { model.wrapUp?.draft.otherCues[id] = $0 } })
     }
 
     /// A value of the model's draft for this prompt.

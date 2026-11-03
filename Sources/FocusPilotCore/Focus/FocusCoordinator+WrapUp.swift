@@ -7,13 +7,21 @@ extension FocusCoordinator {
     /// asked. Wrap-ups follow the end of a session only (owner decision,
     /// 2026-10-17), so one for the session still running or paused is refused,
     /// as is marking the task done while a later session on it is active.
-    public func saveWrapUp(_ wrapUp: WrapUp, after ended: FocusSession, markingDone: Bool = false) async throws {
-        guard let taskID = ended.taskID else { throw SessionError.noCurrentTask }
+    /// `others` holds the line written for each other task the session
+    /// touched (#57), saved as its return cue; blank lines save nothing.
+    /// With nothing in Now at the end only `others` are saved.
+    public func saveWrapUp(_ wrapUp: WrapUp, after ended: FocusSession, markingDone: Bool = false,
+                           others: [Int64: String] = [:]) async throws {
         if let current = session, !current.hasEnded,
-           current.id == ended.id || (markingDone && current.taskID == ended.taskID) {
+           current.id == ended.id || (markingDone && current.taskID != nil && current.taskID == ended.taskID) {
             throw SessionError.sessionStillActive
         }
-        try await repository.saveWrapUp(wrapUp, forTask: taskID, session: ended.id, markingDone: markingDone)
+        let otherCues = others.compactMapValues { line -> WrapUp? in
+            let cue = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            return cue.isEmpty ? nil : WrapUp(returnCue: cue)
+        }
+        try await repository.saveWrapUp(wrapUp, forTask: ended.taskID, session: ended.id,
+                                        markingDone: markingDone && ended.taskID != nil, others: otherCues)
         await followNowAfterTaskChange()
         await broadcast()
     }

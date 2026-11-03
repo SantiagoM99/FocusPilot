@@ -3,7 +3,7 @@ import FocusPilotCore
 import SwiftUI
 
 /// The planning window (design 01, 07, 15 and 16): a sidebar with Today,
-/// Projects, Review queue and Settings, and the quick capture sheet. A
+/// In flight (#57), Projects, Review queue and Settings, and the quick capture sheet. A
 /// selected task shows its Agent section in the inspector; the rest of the
 /// task detail pane arrives with its ticket. The sidebar footer shows
 /// protection status (#17).
@@ -11,7 +11,7 @@ struct PlanningView: View {
     static let windowID = "planning"
 
     enum Page: Hashable {
-        case today, projects, review, settings
+        case today, inFlight, projects, review, settings
     }
 
     let model: AppModel
@@ -28,6 +28,8 @@ struct PlanningView: View {
         NavigationSplitView {
             List(selection: $page) {
                 Label("Today", systemImage: "sun.max").tag(Page.today)
+                Label("In flight", systemImage: "arrow.triangle.branch").tag(Page.inFlight)
+                    .badge(model.attention.count)
                 Label("Projects", systemImage: "folder").tag(Page.projects)
                 Label("Review queue", systemImage: "tray.full").tag(Page.review)
                     .badge(model.reviewItems.count)
@@ -52,6 +54,10 @@ struct PlanningView: View {
             case .startFocus: StartFocusSheet(model: model)
             case .wrapUp:
                 if let pending = model.wrapUp { WrapUpSheet(model: model, prompt: pending.prompt) }
+            case .switchTask:
+                if let request = model.switchRequest { SwitchSheet(model: model, request: request) }
+            case .markWaiting(let taskID):
+                MarkWaitingSheet(model: model, taskID: taskID)
             }
         }
         .environment(model)
@@ -75,12 +81,14 @@ struct PlanningView: View {
     /// never dropped this way: only Skip and Save end it, so its draft stays.
     private var sheet: Binding<PlanningSheet?> {
         Binding(
-            get: { PlanningSheet.showing(isCapturing: isCapturing, wrapUp: model.wrapUp, isStartingFocus: model.isStartingFocus) },
+            get: { showing },
             set: { newValue in
                 guard newValue == nil else { return }
-                switch PlanningSheet.showing(isCapturing: isCapturing, wrapUp: model.wrapUp, isStartingFocus: model.isStartingFocus) {
+                switch showing {
                 case .capture: isCapturing = false
                 case .wrapUp: break
+                case .switchTask: model.switchRequest = nil
+                case .markWaiting: model.markingWaiting = nil
                 case .startFocus: model.isStartingFocus = false
                 case nil: break
                 }
@@ -88,8 +96,14 @@ struct PlanningView: View {
         )
     }
 
+    private var showing: PlanningSheet? {
+        PlanningSheet.showing(isCapturing: isCapturing, wrapUp: model.wrapUp, isStartingFocus: model.isStartingFocus,
+                              switching: model.switchRequest, markingWaiting: model.markingWaiting)
+    }
+
     private var title: String {
         switch page {
+        case .inFlight: "In flight"
         case .projects: "Projects"
         case .review: "Review queue"
         case .settings: "Settings"
@@ -100,6 +114,11 @@ struct PlanningView: View {
     private var subtitle: String {
         switch page {
         case .projects, .settings: return ""
+        case .inFlight:
+            let threads = model.inFlight.map(\.threads.count).reduce(0, +)
+            let needs = model.attention.count
+            return [needs == 0 ? nil : (needs == 1 ? "1 needs you" : "\(needs) need you"),
+                    threads == 1 ? "1 thread" : "\(threads) threads"].compactMap(\.self).joined(separator: " · ")
         case .review:
             let count = model.reviewItems.count
             let approvals = model.reviewItems.filter { $0.kind == .approval }.count
@@ -115,6 +134,8 @@ struct PlanningView: View {
             ContentUnavailableView("Database unavailable", systemImage: "exclamationmark.triangle", description: Text(startupError))
         } else if page == .projects {
             ProjectsView(model: model, showReviewQueue: { page = .review })
+        } else if page == .inFlight {
+            InFlightView(model: model)
         } else if page == .review {
             ReviewQueueView(model: model)
         } else if page == .settings {

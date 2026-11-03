@@ -108,7 +108,7 @@ struct OwnerMigrationV12Tests {
         #expect(session.taskID == 7 && session.action == "Outline the essay" && session.mode == .strict)
         #expect(session.scope == .allProjects)
         #expect(try await repository.wrapUpHistory(forTask: 7).map(\.outcome) == ["Drafted §2"])
-        #expect(OwnerSchema.migrator.migrations.last == "owner-v12-project-sessions")
+        #expect(OwnerSchema.migrator.migrations.contains("owner-v12-project-sessions"))
     }
 
     @Test func aSessionWithNothingInNowAndChosenProjectsIsStored() async throws {

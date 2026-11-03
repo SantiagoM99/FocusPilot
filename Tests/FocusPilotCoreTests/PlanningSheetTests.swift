@@ -29,4 +29,23 @@ struct PlanningSheetTests {
     @Test func captureTheOwnerIsTypingInStaysOnTopAndTheWrapUpWaits() {
         #expect(PlanningSheet.showing(isCapturing: true, wrapUp: wrapUp, isStartingFocus: true) == .capture)
     }
+
+    // #57: Switch and Mark as waiting are the owner's clicks; a wrap-up already waiting goes first.
+    @Test func switchAndMarkAsWaitingComeAfterAWrapUpAndBeforeStartFocus() {
+        let request = SwitchRequest(taskID: 4, taskTitle: "Run ablation", linkID: 2, agentLabel: "ablation", item: nil)
+
+        #expect(PlanningSheet.showing(isCapturing: false, wrapUp: wrapUp, isStartingFocus: false, switching: request)
+            == .wrapUp(wrapUp.id))
+        #expect(PlanningSheet.showing(isCapturing: false, wrapUp: nil, isStartingFocus: true, switching: request,
+                                      markingWaiting: 9) == .switchTask(request.id))
+        #expect(PlanningSheet.showing(isCapturing: false, wrapUp: nil, isStartingFocus: true, markingWaiting: 9)
+            == .markWaiting(9))
+    }
+
+    @Test func switchSaysWhatItWillOpen() {
+        #expect(SwitchRequest(taskID: 4, taskTitle: "Run ablation", linkID: 2, agentLabel: "ablation", item: nil).opens
+            == "Makes it Now and opens ablation in Herdr.")
+        #expect(SwitchRequest(taskID: 4, taskTitle: "Send the draft", linkID: nil, agentLabel: nil, item: nil).opens
+            == "Makes it Now.")
+    }
 }

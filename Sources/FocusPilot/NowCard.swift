@@ -31,7 +31,7 @@ struct NowCard: View {
                 }
                 if let nextAction = item.nextAction {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(nextAction == item.wrapUp?.returnCue ? "Next action · return cue from last session" : "Next action")
+                        Text(item.wrapUp.flatMap { nextAction == $0.returnCue ? $0.nextActionCaption : nil } ?? "Next action")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Text(nextAction)

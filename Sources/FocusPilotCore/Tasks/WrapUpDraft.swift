@@ -12,6 +12,8 @@ public struct WrapUpDraft: Equatable, Sendable {
     public var returnCue = ""
     /// Always starts unticked: completing a task is the owner's explicit choice.
     public var marksTaskDone = false
+    /// The line for each other task the session touched, by task id (#57).
+    public var otherCues: [Int64: String] = [:]
 
     public init(outcome: String = "", remainingWork: String = "", returnCue: String = "", marksTaskDone: Bool = false) {
         self.outcome = outcome

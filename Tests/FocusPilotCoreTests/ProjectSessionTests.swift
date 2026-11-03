@@ -152,15 +152,6 @@ struct ProjectSessionTests {
         #expect(session.taskID == next && session.action == "Reply to Ana")
     }
 
-    // With nothing in Now at the end there is no task to wrap up.
-    @Test func aSessionEndingWithNothingInNowAsksForNoWrapUp() {
-        let running = FocusSession.sample(taskID: nil, action: nil)
-        var ended = running
-        ended.phase = .ended(at: running.plannedEnd, reason: .reachedPlannedEnd)
-
-        #expect(WrapUpPrompt.after(running, ended) == nil)
-    }
-
     // Review of #60: a Now change and a session step at the same time.
     // Each round races them; neither may undo the other.
     @Test(arguments: 0..<25)
