@@ -2,9 +2,11 @@ import Darwin
 import Foundation
 import os
 
-/// Where `focuspilot add` queues tasks while FocusPilot is not running. The
-/// app imports them through `TaskRepository` when it starts; request IDs
-/// make an import that is repeated or interrupted store each task once.
+/// Where `focuspilot add` queues tasks, and `focuspilot report` reports
+/// (#67), while FocusPilot is not running. The app imports them when it
+/// starts; request IDs make an import that is repeated or interrupted store
+/// each one once. An add is a bare request line, as before reports existed;
+/// a report line is `{"report": …}`.
 ///
 /// One JSON request per line, appended and drained under an exclusive
 /// `flock`, so concurrent CLI calls and the app never interleave. Each line
@@ -34,9 +36,29 @@ public struct TaskInbox: Sendable {
         self.readLimit = readLimit
     }
 
+    /// Appends the report, unless its pane already queued
+    /// `AddRateLimit.limit` reports in the last minute.
+    public func enqueue(_ report: ReportRequest) throws {
+        try append(try JSONEncoder().encode(ReportLine(report: report)), key: AddRateLimit.key(for: report.caller),
+                   at: report.sentAt) { line in
+            (try? JSONDecoder().decode(ReportLine.self, from: line)).map { (AddRateLimit.key(for: $0.report.caller), $0.report.sentAt) }
+        }
+    }
+
     /// Appends the request, unless its pane already queued
     /// `AddRateLimit.limit` adds in the last minute.
     public func enqueue(_ request: HerdrAddRequest) throws {
+        try append(try JSONEncoder().encode(request), key: AddRateLimit.key(for: request.caller), at: request.capturedAt) { line in
+            guard (try? JSONDecoder().decode(ReportLine.self, from: line)) == nil,
+                  let queued = try? JSONDecoder().decode(HerdrAddRequest.self, from: line) else { return nil }
+            return (AddRateLimit.key(for: queued.caller), queued.capturedAt)
+        }
+    }
+
+    /// Appends one encoded line, unless `key` already has
+    /// `AddRateLimit.limit` lines of the same kind (as `counted` reads them)
+    /// in the minute before `instant`.
+    private func append(_ encoded: Data, key: String, at instant: Date, counted: (Data) -> (String, Date)?) throws {
         let descriptor = try openLocked(appending: true)
         defer { close(descriptor) }
         let size = lseek(descriptor, 0, SEEK_END)
@@ -46,15 +68,13 @@ public struct TaskInbox: Sendable {
         if tailStart > 0, let firstBreak = tail.firstIndex(of: Self.newline) { tail = tail[(firstBreak + 1)...] }
 
         var limit = AddRateLimit()
-        let key = AddRateLimit.key(for: request.caller)
         for line in tail.split(separator: Self.newline) {
-            guard let queued = try? JSONDecoder().decode(HerdrAddRequest.self, from: Data(line)),
-                  AddRateLimit.key(for: queued.caller) == key else { continue }
-            _ = limit.allow(key, at: queued.capturedAt)
+            guard let (queuedKey, queuedAt) = counted(Data(line)), queuedKey == key else { continue }
+            _ = limit.allow(key, at: queuedAt)
         }
-        guard limit.allow(key, at: request.capturedAt) else { throw Refusal.rateLimited }
+        guard limit.allow(key, at: instant) else { throw Refusal.rateLimited }
 
-        var line = try JSONEncoder().encode(request) + [Self.newline]
+        var line = encoded + [Self.newline]
         if size > 0, tail.last != Self.newline { line.insert(Self.newline, at: 0) }
         let written = line.withUnsafeBytes { write(descriptor, $0.baseAddress, $0.count) }
         guard written == line.count else {
@@ -64,11 +84,12 @@ public struct TaskInbox: Sendable {
         }
     }
 
-    /// Hands each queued request to `add` in order and removes the ones
-    /// handled. A failure `isPermanent` judges permanent is logged and
-    /// skipped; any other stops the drain and keeps that request and the
-    /// rest for the next attempt.
-    public func drain(isPermanent: (any Error) -> Bool,
+    /// Hands each queued add to `add` and each report to `reports`, in
+    /// order, and removes the ones handled. A failure `isPermanent` judges
+    /// permanent is logged and skipped; any other stops the drain and keeps
+    /// that line and the rest for the next attempt. Without `reports`, the
+    /// drain stops at the first report, leaving it and the rest queued.
+    public func drain(isPermanent: (any Error) -> Bool, reports: (@Sendable (ReportRequest) async throws -> Void)? = nil,
                       _ add: @Sendable (HerdrAddRequest) async throws -> Void) async throws -> Drained {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return Drained(imported: 0, skipped: 0) }
         let descriptor = try openLocked(appending: false)
@@ -96,6 +117,19 @@ public struct TaskInbox: Sendable {
                 break
             }
             let line = data[start..<end]
+            if let queued = try? JSONDecoder().decode(ReportLine.self, from: Data(line)) {
+                guard let reports else { break }
+                start = end + 1
+                do {
+                    try await reports(queued.report)
+                    drained.imported += 1
+                } catch where isPermanent(error) {
+                    Self.log.error("Dropped queued report \(queued.report.id, privacy: .public): \(String(describing: error), privacy: .public)")
+                    drained.skipped += 1
+                }
+                handled = start
+                continue
+            }
             start = end + 1
             guard let request = try? JSONDecoder().decode(HerdrAddRequest.self, from: Data(line)) else {
                 Self.log.error("Dropped an unreadable inbox line")
@@ -177,4 +211,9 @@ public struct TaskInbox: Sendable {
         }
         ftruncate(descriptor, off_t(destination))
     }
+}
+
+/// A queued report, tagged so it is never read as an add.
+struct ReportLine: Codable, Equatable {
+    var report: ReportRequest
 }

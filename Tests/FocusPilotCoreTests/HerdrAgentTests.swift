@@ -153,12 +153,15 @@ struct HerdrCommandAllowlistTests {
         case .agentFocus(let pane): ["agent", "focus", pane]
         case .tabList(let workspace): ["tab", "list", "--workspace", workspace]
         case .tabFocus(let tab): ["tab", "focus", tab]
+        case .agentPrompt(let pane, let text): ["agent", "prompt", pane, text]
         }
     }
 
+    private static let message = "Tests pass. Please open the PR."
+
     private let everyCommand: [HerdrCommand] = [
         .status, .workspaceList, .agentList, .agentRead(paneID: "w4:p2"), .agentFocus(paneID: "w4:p2"),
-        .tabList(workspaceID: "w4"), .tabFocus(tabID: "w4:t1"),
+        .tabList(workspaceID: "w4"), .tabFocus(tabID: "w4:t1"), .agentPrompt(paneID: "w4:p2", text: message),
     ]
 
     @Test func everyCommandHasExactlyThePinnedArguments() {
@@ -167,17 +170,27 @@ struct HerdrCommandAllowlistTests {
         }
     }
 
-    @Test func nothingWritesToAgentsOrChangesLayout() {
-        let forbidden: Set = ["prompt", "send-keys", "send-text", "start", "split", "create", "close", "rename", "move",
-                              "attach", "stop", "run", "wait", "remove", "delete", "report-agent", "release-agent"]
+    /// The command words only: a prompt's text is the owner-approved message.
+    @Test func nothingElseWritesToAgentsOrChangesLayout() {
+        let forbidden: Set = ["send-keys", "send-text", "start", "split", "create", "close", "rename", "move",
+                              "attach", "stop", "run", "wait", "remove", "delete", "report-agent", "release-agent", "--wait"]
         for command in everyCommand {
-            #expect(forbidden.isDisjoint(with: command.arguments), "\(command.arguments)")
+            let words = command == .agentPrompt(paneID: "w4:p2", text: Self.message) ? Array(command.arguments.prefix(3))
+                : command.arguments
+            #expect(forbidden.isDisjoint(with: words), "\(command.arguments)")
         }
     }
 
     /// Open agent, and Open context for a project's workspace (#18).
     @Test func onlyFocusChangesWhatTheOwnerSees() {
         #expect(everyCommand.filter(\.changesHerdrFocus) == [.agentFocus(paneID: "w4:p2"), .tabFocus(tabID: "w4:t1")])
+    }
+
+    /// Decision 0004, Phase 2 start: Accept on a report (#67) is the only
+    /// Herdr write, and the only command that carries text for an agent.
+    @Test func onlyAcceptWritesToAnAgent() {
+        #expect(everyCommand.filter(\.writesToAgent) == [.agentPrompt(paneID: "w4:p2", text: Self.message)])
+        #expect(everyCommand.filter { $0.arguments.contains("prompt") } == [.agentPrompt(paneID: "w4:p2", text: Self.message)])
     }
 }
 

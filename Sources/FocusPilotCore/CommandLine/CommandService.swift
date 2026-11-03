@@ -9,6 +9,8 @@ public enum CommandRequest: Codable, Equatable, Sendable {
     case exception(ExceptionCommand)
     /// The owner left a strict-session exception wait for this scope.
     case cancelException(ExceptionScope)
+    /// `focuspilot report` from a helper agent (#67).
+    case report(ReportRequest)
 }
 
 /// A timed exception as the blocked page asks for it.
@@ -31,6 +33,7 @@ public enum CommandResponse: Codable, Equatable, Sendable {
     case tasks(HerdrTaskScope)
     case exception(ExceptionOutcome)
     case exceptionCancelled
+    case reported(ReportReceipt)
     /// Not done, with a message for the caller, e.g. the rate limit.
     case refused(String)
     case failed(String)
@@ -78,6 +81,14 @@ public protocol ExceptionGate: Sendable {
 
 extension FocusCoordinator: ExceptionGate {}
 
+/// Where reports go: the coordinator, which resolves the target agent and
+/// stores the report. Receiving never sends anything to Herdr.
+public protocol ReportSink: Sendable {
+    func receiveReport(_ request: ReportRequest) async throws -> ReportReceipt
+}
+
+extension FocusCoordinator: ReportSink {}
+
 /// Answers command-socket requests inside the running app. CLI callers can
 /// only append tasks and read; everything written goes through
 /// `TaskRepository`. Exception requests are taken only from callers
@@ -88,19 +99,26 @@ public actor CommandService {
     static let rateLimitMessage =
         "Refused: this pane has added \(AddRateLimit.limit) tasks in the last minute. Wait a minute and try again."
     static let exceptionCallerMessage = "Only the FocusPilot blocked page in Chrome can ask for a site exception."
+    static let reportRateLimitMessage =
+        "Refused: this pane has sent \(AddRateLimit.limit) reports in the last minute. Wait a minute and try again."
 
     private let repository: TaskRepository
     private let exceptions: (any ExceptionGate)?
     /// Nil refuses every exception request.
     private let exceptionCaller: ExceptionCallerCheck?
+    /// Nil refuses every report.
+    private let reports: (any ReportSink)?
     private let now: @Sendable () -> Date
     private var rateLimit = AddRateLimit()
+    /// Reports have their own budget, the same size as adds'.
+    private var reportRateLimit = AddRateLimit()
 
     public init(repository: TaskRepository, exceptions: (any ExceptionGate)? = nil, exceptionCaller: ExceptionCallerCheck? = nil,
-                now: @escaping @Sendable () -> Date = Date.init) {
+                reports: (any ReportSink)? = nil, now: @escaping @Sendable () -> Date = Date.init) {
         self.repository = repository
         self.exceptions = exceptions
         self.exceptionCaller = exceptionCaller
+        self.reports = reports
         self.now = now
     }
 
@@ -130,6 +148,17 @@ public actor CommandService {
                 return .added(try await repository.addFromHerdr(add))
             } catch {
                 return .failed("FocusPilot could not save the task: \(error.localizedDescription)")
+            }
+        case .report(let report):
+            guard let reports else { return .refused("FocusPilot can’t take reports right now.") }
+            if let problem = report.problem { return .refused(problem) }
+            guard reportRateLimit.allow(AddRateLimit.key(for: report.caller), at: now()) else {
+                return .refused(Self.reportRateLimitMessage)
+            }
+            do {
+                return .reported(try await reports.receiveReport(report))
+            } catch {
+                return .failed("FocusPilot could not save the report: \(error.localizedDescription)")
             }
         case .tasks(let caller):
             do {

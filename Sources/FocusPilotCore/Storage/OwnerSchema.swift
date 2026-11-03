@@ -335,6 +335,30 @@ enum OwnerSchema {
                 table.add(column: "ownerReachedAt", .datetime)
             }
         }
+        migrator.registerMigration("owner-v16-reports") { db in
+            // Agent reports (#67, decision 0004). Dismissed ones are deleted;
+            // accepted ones keep the exact message and when it was sent.
+            try db.create(table: ReportRow.databaseTableName) { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("clientId", .text).notNull().unique()
+                table.column("summary", .text).notNull()
+                table.column("projectId", .integer).references(ProjectRecord.databaseTableName, onDelete: .setNull)
+                table.column("sourceLabel", .text).notNull()
+                table.column("message", .text)
+                table.column("targetGiven", .text)
+                table.column("targetSession", .text)
+                table.column("targetSocket", .text)
+                table.column("targetStartedAt", .integer)
+                table.column("targetPane", .text)
+                table.column("targetName", .text)
+                table.column("targetKind", .text)
+                table.column("targetProblem", .text)
+                table.column("receivedAt", .datetime).notNull()
+                table.column("sentAt", .datetime)
+                table.check(sql: "message IS NOT NULL OR targetGiven IS NULL")
+                table.check(sql: "sentAt IS NULL OR targetPane IS NOT NULL")
+            }
+        }
         return migrator
     }
 

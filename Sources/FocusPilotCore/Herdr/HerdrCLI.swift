@@ -71,6 +71,26 @@ public struct HerdrCLI: Sendable {
         return await run(.agentFocus(paneID: paneID), with: binary) != nil
     }
 
+    /// Submits `text` to the agent in the pane with `agent prompt`, if
+    /// `server` is still the running instance. Only Accept on a report calls
+    /// this, after the owner's click and after the coordinator revalidated
+    /// the agent. Herdr itself refuses an agent that is blocked.
+    public func prompt(_ paneID: String, text: String, on server: HerdrServer) async -> PromptResult {
+        guard HerdrPaneID.isValid(paneID) else { return .notFound }
+        guard ReportRules.messageProblem(text) == nil else { return .refused }
+        guard case .success(let (binary, current)) = await reach(), current == server else { return .notFound }
+        guard let output = try? await runner.run(executable: binary, arguments: HerdrCommand.agentPrompt(paneID: paneID, text: text).arguments,
+                                                 environment: environment, outputLimit: nil) else { return .failed }
+        if output.status == 0 { return .sent }
+        let code = (try? JSONSerialization.jsonObject(with: output.standardOutput) as? [String: Any])
+            .flatMap { $0["error"] as? [String: Any] }?["code"] as? String
+        return switch code {
+        case "agent_blocked": .blocked
+        case "agent_not_found": .notFound
+        default: .failed
+        }
+    }
+
     /// Focuses the first tab Herdr lists for the workspace, if `server` is
     /// still the running instance. Only Open context calls this, after the
     /// owner's click. False when anything is off: nothing is guessed.
@@ -170,6 +190,19 @@ enum HerdrWorkspaceList {
     }
 }
 
+/// What `agent prompt` did.
+public enum PromptResult: Equatable, Sendable {
+    case sent
+    /// The agent is waiting for an approval; Herdr sent nothing.
+    case blocked
+    /// No such pane on the running server, or another server instance.
+    case notFound
+    /// The text could not be sent exactly as shown; nothing was run.
+    case refused
+    /// Herdr is unreachable or failed.
+    case failed
+}
+
 /// Workspace and tab IDs are passed to `tab list` and `tab focus` as
 /// arguments, so only Herdr's own shapes are accepted.
 enum HerdrTabID {
@@ -210,6 +243,7 @@ public protocol HerdrAgentSource: Sendable {
     func agents() async -> HerdrAgents
     func output(of paneID: String, on server: HerdrServer) async -> String?
     func focus(_ paneID: String, on server: HerdrServer) async -> Bool
+    func prompt(_ paneID: String, text: String, on server: HerdrServer) async -> PromptResult
 }
 
 extension HerdrCLI: HerdrAgentSource {}

@@ -44,6 +44,8 @@ final class HeldHerdrAgents: HerdrAgentSource, @unchecked Sendable {
 
     func output(of paneID: String, on server: HerdrServer) async -> String? { nil }
 
+    func prompt(_ paneID: String, text: String, on server: HerdrServer) async -> PromptResult { .failed }
+
     func focus(_ paneID: String, on server: HerdrServer) async -> Bool {
         lock.withLock {
             focused = true

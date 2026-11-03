@@ -1,10 +1,12 @@
 import Foundation
 
-/// The `focuspilot` command: adds a task or reads tasks from a Herdr pane.
+/// The `focuspilot` command: adds a task, reads tasks, or sends the owner a
+/// report from a Herdr pane.
 ///
-/// It never writes the database itself. Adds go to the running app over the
-/// owner-only socket, or into the inbox when the app is closed. There is no
-/// command that changes Now, the order, deadlines or an existing task.
+/// It never writes the database itself. Adds and reports go to the running
+/// app over the owner-only socket, or into the inbox when the app is closed.
+/// There is no command that changes Now, the order, deadlines or an existing
+/// task, and a report's proposed message is sent only if the owner accepts.
 public struct FocusPilotCommand: Sendable {
     public struct Outcome: Equatable, Sendable {
         public var status: Int32
@@ -20,6 +22,11 @@ public struct FocusPilotCommand: Sendable {
                                            focuspilot add "Re-run ablation by fri 23:59"
                                            Options go before the text; after -- everything is text.
           focuspilot tasks [--json]        Show the owner's Now and this workspace's project.
+          focuspilot report [--json] --summary <text> [--project <name>] [--from <name>]
+                            [--to <agent> --message <text>]
+                                           Tell the owner what happened, in plain words. With
+                                           --to and --message, propose the exact message to send
+                                           to that Herdr agent (name or pane ID) if they accept.
 
         Tasks go to the project linked to this Herdr workspace, or to No project.
         focuspilot cannot change Now, the order, deadlines or existing tasks.
@@ -50,6 +57,9 @@ public struct FocusPilotCommand: Sendable {
                 return Outcome(status: 2, error: Self.usage)
             }
             return add(text.joined(separator: " "), json: json)
+        case "report":
+            guard let fields = Self.reportFields(arguments.dropFirst()) else { return Outcome(status: 2, error: Self.usage) }
+            return report(fields)
         case "tasks":
             guard let (json, rest) = Self.options(before: arguments.dropFirst()), rest.isEmpty else {
                 return Outcome(status: 2, error: Self.usage)
@@ -88,7 +98,7 @@ public struct FocusPilotCommand: Sendable {
             switch try CommandSocketClient(path: location.commandSocketPath).send(.add(request)) {
             case .added(let result): return added(result, json: json)
             case .refused(let message), .failed(let message): return Outcome(status: 1, error: message + "\n")
-            case .tasks, .exception, .exceptionCancelled: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
+            case .tasks, .exception, .exceptionCancelled, .reported: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
             }
         } catch .pathTooLong {
             return Outcome(status: 1, error: "The FocusPilot data folder path is too long for its socket.\n")
@@ -135,6 +145,73 @@ public struct FocusPilotCommand: Sendable {
         return Outcome(status: 0, output: lines.joined(separator: "\n") + "\n")
     }
 
+    // MARK: report
+
+    struct ReportFields {
+        var json = false
+        var values: [String: String] = [:]
+    }
+
+    /// `--summary` is required; every option but `--json` takes one value,
+    /// given once. Nil for anything else, including loose words.
+    static func reportFields(_ arguments: ArraySlice<String>) -> ReportFields? {
+        let named: Set = ["--summary", "--project", "--from", "--to", "--message"]
+        var fields = ReportFields()
+        var rest = arguments
+        while let word = rest.first {
+            rest = rest.dropFirst()
+            if word == "--json" { fields.json = true; continue }
+            guard named.contains(word), let value = rest.first, fields.values[word] == nil else { return nil }
+            fields.values[word] = value
+            rest = rest.dropFirst()
+        }
+        return fields.values["--summary"] == nil ? nil : fields
+    }
+
+    private func report(_ fields: ReportFields) -> Outcome {
+        let request = ReportRequest(summary: fields.values["--summary"]!, project: fields.values["--project"],
+                                    to: fields.values["--to"], message: fields.values["--message"], from: fields.values["--from"],
+                                    sentAt: now, caller: caller)
+        if let problem = request.problem { return Outcome(status: 1, error: "Refused: \(problem)\n") }
+        do {
+            switch try CommandSocketClient(path: location.commandSocketPath).send(.report(request)) {
+            case .reported(let receipt): return reported(receipt, request, json: fields.json)
+            case .refused(let message), .failed(let message):
+                return Outcome(status: 1, error: (message.hasPrefix("Refused") ? message : "Refused: " + message) + "\n")
+            case .added, .tasks, .exception, .exceptionCancelled: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
+            }
+        } catch .pathTooLong {
+            return Outcome(status: 1, error: "The FocusPilot data folder path is too long for its socket.\n")
+        } catch {
+            do {
+                try location.inbox.enqueue(request)
+            } catch TaskInbox.Refusal.rateLimited {
+                return Outcome(status: 1, error: CommandService.reportRateLimitMessage + "\n")
+            } catch {
+                return Outcome(status: 1, error: "FocusPilot is not running and the report could not be queued: \(error.localizedDescription)\n")
+            }
+            if fields.json { return Outcome(status: 0, output: Self.json(["status": "queued"])) }
+            return Outcome(status: 0, output: "FocusPilot is not running. The report is queued and reaches the owner when FocusPilot starts.\n")
+        }
+    }
+
+    private func reported(_ receipt: ReportReceipt, _ request: ReportRequest, json: Bool) -> Outcome {
+        if json {
+            return Outcome(status: 0, output: Self.json([
+                "status": receipt.wasAlreadyReceived ? "alreadyReported" : "reported", "project": receipt.projectTitle ?? NSNull(),
+                "targetProblem": receipt.targetProblem ?? NSNull(), "notes": receipt.notes,
+            ]))
+        }
+        let place = receipt.projectTitle.map { ", in \($0)" } ?? ", with no project"
+        var lines = [receipt.wasAlreadyReceived ? "Already reported\(place)." : "Reported to FocusPilot\(place). The owner sees it in Needs you."]
+        if let to = request.to {
+            lines.append(receipt.targetProblem.map { "Note: \($0)" }
+                ?? "If they accept, FocusPilot sends your message to \(to), exactly as written.")
+        }
+        lines += receipt.notes.map { "Note: \($0)" }
+        return Outcome(status: 0, output: lines.joined(separator: "\n") + "\n")
+    }
+
     // MARK: tasks
 
     private func tasks(json: Bool) -> Outcome {
@@ -143,7 +220,7 @@ public struct FocusPilotCommand: Sendable {
             switch try CommandSocketClient(path: location.commandSocketPath).send(.tasks(caller)) {
             case .tasks(let answer): scope = answer
             case .refused(let message), .failed(let message): return Outcome(status: 1, error: message + "\n")
-            case .added, .exception, .exceptionCancelled: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
+            case .added, .exception, .exceptionCancelled, .reported: return Outcome(status: 1, error: "FocusPilot gave an unexpected answer.\n")
             }
         } catch .pathTooLong {
             return Outcome(status: 1, error: "The FocusPilot data folder path is too long for its socket.\n")

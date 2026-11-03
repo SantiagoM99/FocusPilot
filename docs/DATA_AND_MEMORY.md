@@ -9,6 +9,7 @@
 | Deadline (value) | Either `{localDate, timezone}` for date-only or `{instant, timezone}` for timed; original entered text and interpretation |
 | Dependency | Predecessor/successor task IDs; reject cycles |
 | Resource | Task or project link (exactly one), kind (folder or web page), launch order (null = not in the minimal launch set; Herdr agent links and a project's Herdr workspace link carry the same order). A folder stores its security-scoped bookmark, path, inode, volume UUID and optional root (S5, WORKSPACE_RULES "Folder links"); a web page stores its absolute URL. Removing the link never touches the folder. During a session, pages linked to projects in its scope (#60, with the Now task's project) join the allowed list; a page on a blocked site goes into the session's `allowedPages` as that exact page, in normal sessions only (decision 0003, 2026-11-03) |
+| Agent report | From `focuspilot report` (#67): request ID, plain summary, project, source label, and an optional proposal: the exact message and its target agent (Herdr server instance, pane, name, program) or why the target couldn't be found. Dismiss deletes it. Accept keeps it with the time the message was sent, as the record of what FocusPilot sent to Herdr |
 | Context | Folder bookmark, browser links, Herdr server/session and workspace/pane IDs |
 | FolderRoot | User-selected parent folder, category mapping, access bookmark |
 | SetupPlan | Proposed paths/actions, parent identity, preview revision, execution/partial-failure state |

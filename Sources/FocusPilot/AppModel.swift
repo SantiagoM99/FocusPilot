@@ -27,6 +27,10 @@ final class AppModel {
     /// What needs the owner and what is in flight, worked out on each refresh
     /// and once a minute (see `AttentionClock`), never on every redraw.
     private(set) var attention: [AttentionItem] = []
+    /// Agent reports waiting for Accept or Dismiss (#67).
+    private(set) var reports: [AgentReport] = []
+    /// Why the last Accept sent nothing, by report.
+    var reportNotices: [Int64: String] = [:]
     private(set) var inFlight: [InFlightProject] = []
     /// The time waiting times are shown for; moves once a minute.
     private(set) var attentionTime = Date.now
@@ -102,7 +106,8 @@ final class AppModel {
             // Site exceptions come only from the Chrome host in this bundle (#14).
             let chromeHost = Bundle.main.bundleURL.appending(path: "Contents/Helpers/focuspilot-chrome-host")
             listenForCommands(location: location, service: CommandService(repository: repository, exceptions: coordinator,
-                                                                          exceptionCaller: .chromeHost(at: chromeHost)))
+                                                                          exceptionCaller: .chromeHost(at: chromeHost),
+                                                                          reports: coordinator))
             setUpChrome(location: location)
             followActivity(location: location)
         } catch {
@@ -122,7 +127,10 @@ final class AppModel {
     private func listenForCommands(location: StorageLocation, service: CommandService) {
         let server = CommandSocketServer(path: location.commandSocketPath) { [weak self] request, peer in
             let response = await service.handle(request, from: peer)
-            if case .added = response { await self?.refresh() }
+            switch response {
+            case .added, .reported: await self?.refresh()
+            default: break
+            }
             return response
         }
         do {
@@ -197,7 +205,7 @@ final class AppModel {
                 if snapshot.activeSession != nil || menuBarStatus().timeText != nil {
                     now = .now
                 }
-                if AttentionClock.isDue(at: .now, last: attentionTime, somethingWaits: !reviewItems.isEmpty || !waiting.isEmpty) {
+                if AttentionClock.isDue(at: .now, last: attentionTime, somethingWaits: !reviewItems.isEmpty || !waiting.isEmpty || !reports.isEmpty) {
                     recomputeAttention()
                 }
             }
@@ -233,6 +241,7 @@ final class AppModel {
             agentLinks = try await coordinator.agentLinks()
             reviewItems = try await coordinator.reviewQueue()
             waiting = try await coordinator.waitingTasks()
+            reports = try await coordinator.reports()
             recomputeAttention()
             taskError = nil
         } catch {
@@ -243,7 +252,7 @@ final class AppModel {
     /// Works out the attention queue and In flight from what `refresh` loaded (#57).
     func recomputeAttention() {
         attentionTime = .now
-        attention = AttentionQueue.items(tasks: today, reviews: reviewItems, waiting: waiting, now: attentionTime)
+        attention = AttentionQueue.items(tasks: today, reviews: reviewItems, waiting: waiting, reports: reports, now: attentionTime)
         inFlight = InFlight.projects(tasks: today, links: agentLinks, reviews: reviewItems, waiting: waiting, now: attentionTime)
     }
 

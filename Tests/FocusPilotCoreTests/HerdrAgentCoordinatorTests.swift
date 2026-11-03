@@ -8,6 +8,7 @@ final class FakeHerdrAgents: HerdrAgentSource, @unchecked Sendable {
         case list
         case read(String)
         case focus(String)
+        case prompt(String, String)
     }
 
     private let lock = NSLock()
@@ -36,6 +37,13 @@ final class FakeHerdrAgents: HerdrAgentSource, @unchecked Sendable {
     func focus(_ paneID: String, on server: HerdrServer) async -> Bool {
         lock.withLock { recorded.append(.focus(paneID)) }
         return focusSucceeds
+    }
+
+    var promptResult = PromptResult.sent
+
+    func prompt(_ paneID: String, text: String, on server: HerdrServer) async -> PromptResult {
+        lock.withLock { recorded.append(.prompt(paneID, text)) }
+        return promptResult
     }
 }
 
