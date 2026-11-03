@@ -43,6 +43,8 @@ public actor FocusCoordinator {
     /// The reason given when `exceptionWait` was confirmed; asking again
     /// from another profile or the app need not type it again.
     var exceptionWaitReason: String?
+    /// The last queued session step; see `oneSessionStepAtATime`.
+    var sessionStep: Task<Void, Never>?
     /// The last queued read-and-record of Herdr's agents; see `oneAgentReadingAtATime`.
     var agentReading: Task<Void, Never>?
     /// Grows with every change, so the app can drop a snapshot older than one it has.
@@ -108,7 +110,7 @@ public actor FocusCoordinator {
 
     public func capture(_ newTask: NewTask) async throws {
         _ = try await repository.addTask(newTask)
-        try await followNow()
+        await followNowAfterTaskChange()
         await broadcast()
     }
 
@@ -124,7 +126,7 @@ public actor FocusCoordinator {
     /// Only called for the owner's own actions.
     public func moveTask(_ id: Int64, to status: TaskStatus, _ placement: TaskPlacement) async throws {
         try await repository.moveTask(id, to: status, placement)
-        try await followNow()
+        await followNowAfterTaskChange()
         await broadcast()
     }
 
@@ -169,7 +171,7 @@ public actor FocusCoordinator {
     public func undoHerdrAdd(_ taskID: Int64) async throws {
         if let active = await snapshot().activeSession, active.taskID == taskID { throw HerdrTaskError.inRunningSession }
         try await repository.undoHerdrAdd(taskID)
-        try await followNow()
+        await followNowAfterTaskChange()
     }
 
     /// Imports the adds queued while FocusPilot was closed. Returns how many
@@ -179,7 +181,7 @@ public actor FocusCoordinator {
         let imported = try await inbox.drain(isPermanent: TaskRepository.isPermanentAddFailure) {
             _ = try await repository.addFromHerdr($0)
         }.imported
-        try await followNow()
+        await followNowAfterTaskChange()
         return imported
     }
 }

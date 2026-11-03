@@ -48,7 +48,7 @@ struct MenuBarContent: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.nowTask?.title ?? "No current task")
                     .font(.headline)
-                Text(model.nowTask?.projectTitle ?? (model.nowTask == nil ? "You can start a session without one." : "No project"))
+                Text(model.nowTask?.projectTitle ?? (model.nowTask == nil ? "You can start a session and pin a task later." : "No project"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -95,6 +95,11 @@ struct MenuBarContent: View {
                 Text(SessionText.covers(session.scope))
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                if let note = model.outsideNote {
+                    Text(note)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
             ProtectionStatusView(model: model)
             SiteExceptionLines(model: model)

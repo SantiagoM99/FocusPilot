@@ -14,7 +14,7 @@ extension FocusCoordinator {
             throw SessionError.sessionStillActive
         }
         try await repository.saveWrapUp(wrapUp, forTask: taskID, session: ended.id, markingDone: markingDone)
-        try await followNow()
+        await followNowAfterTaskChange()
         await broadcast()
     }
 

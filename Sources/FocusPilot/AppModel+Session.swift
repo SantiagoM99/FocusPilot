@@ -55,6 +55,12 @@ extension AppModel {
         }
     }
 
+    /// "Outside this session's projects" under a Now task the session does not cover.
+    var outsideNote: String? {
+        guard let session = snapshot.activeSession, let task = nowTask, task.id == session.taskID else { return nil }
+        return SessionText.outsideNote(session.scope, projectID: task.projectID)
+    }
+
     func requestStartFocus() {
         isStartingFocus = true
     }

@@ -142,10 +142,14 @@ extension FocusCoordinator {
     }
 
     /// The session's task in Now for the blocked page, with its next step
-    /// and project; with nothing in Now, what the session covers.
+    /// and project; with nothing in Now, what the session covers, as the
+    /// app's panel shows it.
     private func focusContext() async -> FocusContext? {
         guard let session else { return nil }
+        guard let action = session.action else {
+            return FocusContext(title: "Nothing in Now", covers: SessionText.covers(session.scope))
+        }
         let task = (try? await repository.nowTask()).flatMap { $0?.id == session.taskID ? $0 : nil }
-        return FocusContext(title: SessionText(session).subject, nextAction: task?.nextAction, projectTitle: task?.projectTitle)
+        return FocusContext(title: action, nextAction: task?.nextAction, projectTitle: task?.projectTitle)
     }
 }

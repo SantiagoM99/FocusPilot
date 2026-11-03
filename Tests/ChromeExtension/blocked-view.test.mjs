@@ -40,6 +40,18 @@ test("during a session the page shows the task and the way back", () => {
   assert.deepEqual(m.footer, ["youtube.com is blocked during focus sessions", "FocusPilot · Chrome"]);
 });
 
+// #56: with nothing in Now the page names what the session covers, as the app's panel does.
+test("with nothing in Now the page says so and what the session covers", () => {
+  const empty = { title: "Nothing in Now", covers: "Covers FocusPilot and NLP report" };
+  const m = view(delivery({ session: session(), focus: empty }), "https://www.youtube.com/");
+
+  assert.equal(m.kind, "session");
+  assert.equal(m.eyebrow, null);
+  assert.equal(m.title, "Nothing in Now");
+  assert.equal(m.subtitle, "Covers FocusPilot and NLP report");
+  assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
+});
+
 test("a site blocked by a schedule during a session still shows the task", () => {
   const m = view(delivery({ session: session(), focus }), "https://instagram.com/");
 

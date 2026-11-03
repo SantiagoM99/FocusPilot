@@ -130,10 +130,14 @@ var FocusBlockedView = (() => {
     if (FocusPolicy.sessionApplies(session, now) && delivery.focus) {
       const remaining = Date.parse(session.end) - now;
       const status = remaining > 0 ? `Focus session · ${left(remaining / 1000)} left` : "Strict session · past its planned end";
+      // With nothing in Now the app sends what the session covers instead (#56).
+      const focus = delivery.focus, nothingInNow = focus.covers != null;
       return {
-        kind: "session", domain, status: { tone: "accent", text: status }, eyebrow: "You're working on",
-        title: delivery.focus.title, subtitle: delivery.focus.nextAction ?? delivery.focus.projectTitle ?? null,
-        primary: openApp, hint: offlineHint, exceptionLink: !offline,
+        kind: "session", domain, status: { tone: "accent", text: status },
+        eyebrow: nothingInNow ? null : "You're working on",
+        title: focus.title, subtitle: focus.nextAction ?? focus.projectTitle ?? focus.covers ?? null,
+        primary: nothingInNow ? { label: "Open FocusPilot", action: "open-app" } : openApp,
+        hint: offlineHint, exceptionLink: !offline,
         footer: [reasonText[decision.reason](domain), "FocusPilot · Chrome"],
       };
     }

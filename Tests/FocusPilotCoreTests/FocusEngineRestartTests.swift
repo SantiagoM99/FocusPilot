@@ -109,7 +109,12 @@ struct FocusSessionGoldenJSONTests {
 
         #expect(session.taskID == nil && session.action == nil)
         #expect(session.scope == SessionScope(projects: [ScopedProject(id: 3, title: "NLP report")]))
-        #expect(String(decoding: try JSONEncoder().encode(SessionScope.allProjects), as: UTF8.self) == #"{"projects":[]}"#)
+        #expect(session.scope.alsoAllowed.isEmpty, "Scopes saved before alsoAllowed have none")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let thesis = SessionScope(projects: [], alsoAllowed: [ScopedProject(id: 4, title: "Thesis")])
+        #expect(String(decoding: try encoder.encode(thesis), as: UTF8.self)
+            == #"{"alsoAllowed":[{"id":4,"title":"Thesis"}],"projects":[]}"#)
     }
 
     @Test func normalModeIsStoredByName() throws {

@@ -20,8 +20,11 @@ extension FocusCoordinator {
     /// decision 0004). Nothing needs to be in Now; the task that is, if any,
     /// is the first one the session touches.
     public func startSession(duration: TimeInterval, mode: SessionMode, projects: [Int64] = []) async throws {
-        let scope = try await scope(of: projects)
+        var scope = try await scope(of: projects)
         let task = try await repository.nowTask()
+        if let task, let projectID = task.projectID, let title = task.projectTitle {
+            scope.allow(ScopedProject(id: projectID, title: title))
+        }
         let request = SessionRequest(id: UUID(), taskID: task?.id, action: task?.title, mode: mode, duration: duration,
                                      scope: scope)
         let touched = task.map { PilotEvent(kind: .taskTouched, at: now(), sessionID: request.id, taskID: $0.id) }
@@ -41,13 +44,29 @@ extension FocusCoordinator {
     /// Keeps the active session on the task in Now, which the owner may
     /// change at any time without ending the session. Each new task is
     /// recorded, and the policy is published again so blocked pages name it.
-    /// Strict waits and exceptions are untouched (decision 0003).
+    /// A pinned task from outside the chosen projects is allowed, with its
+    /// project. Strict waits and exceptions are untouched (decision 0003).
     func followNow() async throws {
-        guard var active = session, !active.hasEnded else { return }
+        try await oneSessionStepAtATime { try await self.followNowStep() }
+    }
+
+    /// After a task change the owner made: that change stands even if the
+    /// session cannot follow it now; the next change or launch catches up.
+    func followNowAfterTaskChange() async {
+        try? await followNow()
+    }
+
+    private func followNowStep() async throws {
         let task = try await repository.nowTask()
-        guard task?.id != active.taskID else { return }
+        // Read after the await: only the task, its title and the scope change.
+        guard var active = session, !active.hasEnded,
+              task?.id != active.taskID || task?.title != active.action else { return }
+        let touched = task?.id != active.taskID
         active.follow(now: task.map { ($0.id, $0.title) })
-        let change = try await repository.recordNowChange(active, at: now())
+        if let task, let projectID = task.projectID, let title = task.projectTitle {
+            active.scope.allow(ScopedProject(id: projectID, title: title))
+        }
+        let change = try await repository.recordNowChange(active, touched: touched, at: now())
         session = active
         await publish(change)
     }
@@ -104,6 +123,24 @@ extension FocusCoordinator {
     /// One engine step: record the session and revisions in one write, then
     /// publish the wrapped policies and deliver notices.
     private func handle(_ event: FocusEvent, events: [PilotEvent] = []) async throws {
+        try await oneSessionStepAtATime { try await self.step(event, events: events) }
+    }
+
+    /// Runs `work` after every earlier session step has finished. Steps wait
+    /// on the database and the extensions; without this a Now change and a
+    /// reconcile or pause could each compute from the same session and the
+    /// later write would undo the other (review of #60).
+    private func oneSessionStepAtATime(_ work: @escaping @Sendable () async throws -> Void) async throws {
+        let earlier = sessionStep
+        let this = Task { () -> Result<Void, any Error> in
+            await earlier?.value
+            do { return .success(try await work()) } catch { return .failure(error) }
+        }
+        sessionStep = Task { _ = await this.value }
+        try await this.value.get()
+    }
+
+    private func step(_ event: FocusEvent, events: [PilotEvent]) async throws {
         let at = now()
         let transition = try FocusEngine.handle(event, session: session, at: at)
         // Starting a strict session cancels exceptions granted before it,

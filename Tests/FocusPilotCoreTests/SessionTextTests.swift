@@ -61,6 +61,12 @@ struct SessionTextTests {
         #expect(SessionText.covers(SessionScope(projects: Array(projects.prefix(2)))) == "Covers FocusPilot and NLP report")
     }
 
+    @Test func anyTaskIsInsideASessionOnAllProjects() {
+        #expect(SessionText.outsideNote(.allProjects, projectID: 4) == nil)
+        #expect(SessionText.outsideNote(SessionScope(projects: [ScopedProject(id: 3, title: "NLP report")]), projectID: nil)
+            == "Outside this session's projects")
+    }
+
     @Test func withNothingInNowTheSessionIsNamedByItsScope() {
         #expect(SessionText(.sample(taskID: 1, action: "Explain baseline results")).subject == "Explain baseline results")
         #expect(SessionText(.sample(taskID: nil, action: nil)).subject == "All projects")

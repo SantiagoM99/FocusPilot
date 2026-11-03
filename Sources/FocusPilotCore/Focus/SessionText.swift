@@ -40,6 +40,11 @@ public struct SessionText: Sendable {
         "Covers " + (scope.isAllProjects ? "all projects" : Self.scope(scope))
     }
 
+    /// The quiet note under a Now task the session does not cover.
+    public static func outsideNote(_ scope: SessionScope, projectID: Int64?) -> String? {
+        scope.covers(projectID: projectID) ? nil : "Outside this session's projects"
+    }
+
     public var phase: String {
         switch session.phase {
         case .running: "Focusing"

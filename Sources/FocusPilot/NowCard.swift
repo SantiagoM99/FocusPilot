@@ -73,6 +73,11 @@ struct NowCard: View {
                     Text(SessionText.covers(session.scope))
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    if let note = model.outsideNote {
+                        Text(note)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 SessionControls(model: model, showsReturnCue: false)
             }

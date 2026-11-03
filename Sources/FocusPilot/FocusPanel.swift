@@ -91,6 +91,11 @@ struct FocusPanelView: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    if let note = model.outsideNote {
+                        Text(note)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 ProtectionStatusView(model: model, showsDetail: false, showsSafari: false, showsWeek: false)
             }

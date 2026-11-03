@@ -33,12 +33,15 @@ extension TaskRepository {
         }
     }
 
-    /// Stores the session after Now changed inside it, with the task it now
-    /// has as an event, and hands out the policy revision that names it.
-    func recordNowChange(_ session: FocusSession, at instant: Date) async throws -> PolicyChange {
-        try await policyChange { db in
-            try SessionRow(session).save(db)
-            if let taskID = session.taskID {
+    /// Stores what Now changed in the session (its task, title and scope,
+    /// nothing else), with a new task as an event, and hands out the policy
+    /// revision that names it.
+    func recordNowChange(_ session: FocusSession, touched: Bool, at instant: Date) async throws -> PolicyChange {
+        let row = try SessionRow(session)
+        return try await policyChange { db in
+            try db.execute(sql: "UPDATE focusSession SET taskID = ?, action = ?, scope = ? WHERE id = ?",
+                           arguments: [row.taskID, row.action, row.scope, row.id])
+            if touched, let taskID = session.taskID {
                 var event = PilotEventRow(PilotEvent(kind: .taskTouched, at: instant, sessionID: session.id, taskID: taskID))
                 try event.insert(db)
             }
