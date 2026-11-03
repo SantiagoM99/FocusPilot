@@ -17,6 +17,13 @@ public struct PilotEvent: Equatable, Sendable {
         case exceptionGranted
         /// A task became Now during a session, at its start or later (#56).
         case taskTouched
+        /// After Now changed inside a running session, the time until the
+        /// first work app or site was in front (#58).
+        case backIntoThread
+        /// How long an agent's result or approval request waited until the
+        /// owner switched to it or reviewed it (#58); `target` is "finished"
+        /// or "approval".
+        case agentWait
     }
 
     public var kind: Kind

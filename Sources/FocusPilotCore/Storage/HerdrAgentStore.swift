@@ -122,7 +122,22 @@ enum HerdrAgentStore {
         }
     }
 
+    /// The first time the owner switches to or reviews an item, its agent's
+    /// wait ends: recorded once as a pilot event (#58), from when FocusPilot
+    /// saw the agent ask or finish.
+    static func noteReached(_ id: Int64, at now: Date, in db: Database) throws {
+        guard let row = try Row.fetchOne(db, sql: """
+            SELECT taskId, kind, occurredAt FROM herdrReviewItem WHERE id = ? AND ownerReachedAt IS NULL
+            """, arguments: [id]) else { return }
+        try db.execute(sql: "UPDATE herdrReviewItem SET ownerReachedAt = ? WHERE id = ?", arguments: [now, id])
+        let occurredAt: Date = row["occurredAt"]
+        var event = PilotEventRow(PilotEvent(kind: .agentWait, at: now, duration: max(0, now.timeIntervalSince(occurredAt)),
+                                             target: row["kind"], taskID: row["taskId"]))
+        try event.insert(db)
+    }
+
     static func markReviewed(_ id: Int64, at now: Date, in db: Database) throws {
+        try noteReached(id, at: now, in: db)
         try db.execute(sql: "UPDATE herdrReviewItem SET reviewedAt = ? WHERE id = ?", arguments: [now, id])
     }
 }

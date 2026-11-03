@@ -36,6 +36,8 @@ public struct ActivityTracker: Sendable {
     private var seenSessions = false
     private var session: FocusSession?
     private var resumeSince: Date?
+    /// When Now last changed inside the running session (#58).
+    private var backInSince: Date?
 
     public init(ownBundleID: String?) {
         self.ownBundleID = ownBundleID?.lowercased()
@@ -114,6 +116,14 @@ public struct ActivityTracker: Sendable {
         } else if new?.phase != .running {
             resumeSince = nil
         }
+        // Now changed inside the running session: time getting back in (#58).
+        if wasRunning, new?.phase == .running, new?.taskID != old?.taskID {
+            backInSince = new?.taskID == nil ? nil : now
+            session = new
+            record.events += backInIfWorking(at: now)
+        } else if new?.phase != .running {
+            backInSince = nil
+        }
         return record
     }
 
@@ -132,13 +142,13 @@ public struct ActivityTracker: Sendable {
 
     private mutating func moved(at now: Date) -> ActivityRecord {
         let key = key
-        guard key != current?.key else { return ActivityRecord(events: resumedIfWorking(at: now)) }
+        guard key != current?.key else { return ActivityRecord(events: resumedIfWorking(at: now) + backInIfWorking(at: now)) }
         let target = key.flatMap(distraction)
         let continuesVisit = target != nil && target == visit?.target
         var record = continuesVisit ? closeSpan(at: now) : close(at: now)
         current = key.map { ($0, now) }
         if !continuesVisit, let key { startVisit(key, at: now) }
-        record.events += resumedIfWorking(at: now)
+        record.events += resumedIfWorking(at: now) + backInIfWorking(at: now)
         return record
     }
 
@@ -179,6 +189,12 @@ public struct ActivityTracker: Sendable {
     private func isWork(_ key: ActivityKey) -> Bool {
         if case .app(let id) = key, id.lowercased() == ownBundleID { return false }
         return distraction(key) == nil
+    }
+
+    private mutating func backInIfWorking(at now: Date) -> [PilotEvent] {
+        guard let since = backInSince, let inFront, isWork(inFront) else { return [] }
+        backInSince = nil
+        return [event(.backIntoThread, at: since, duration: max(0, now.timeIntervalSince(since)), session: session)]
     }
 
     private mutating func resumedIfWorking(at now: Date) -> [PilotEvent] {

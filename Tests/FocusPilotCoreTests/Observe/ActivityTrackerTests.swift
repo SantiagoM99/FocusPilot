@@ -276,4 +276,37 @@ struct ActivityTrackerTests {
         #expect(t.blockedApp("com.burbn.instagram", at: at(30))
             == PilotEvent(kind: .blockedVisit, at: at(30), target: "com.burbn.instagram", sessionID: sessionID, taskID: 7))
     }
+
+    // #58: after Now changes inside a running session, the time until the
+    // first work app or site is in front is getting back into that thread.
+    @Test func switchingNowTimesGettingBackIntoTheThread() {
+        var t = tracker(observing: false)
+        _ = t.session(nil, at: at(0))
+        _ = t.frontApp(xcode, at: at(0))
+        _ = t.session(session(.running), at: at(0))
+        _ = t.frontApp(own, at: at(100))
+        var switched = session(.running)
+        switched.follow(now: (id: 9, title: "Reply to Ana"))
+
+        #expect(t.session(switched, at: at(100)).events.isEmpty, "FocusPilot is in front")
+        let record = t.frontApp("com.apple.Terminal", at: at(112))
+
+        #expect(record.events == [PilotEvent(kind: .backIntoThread, at: at(100), duration: 12, sessionID: sessionID, taskID: 9)])
+        #expect(t.frontApp(xcode, at: at(130)).events.isEmpty, "Once per switch")
+    }
+
+    @Test func emptyingNowOrPausingIsNotASwitch() {
+        var t = tracker(observing: false)
+        _ = t.session(nil, at: at(0))
+        _ = t.frontApp(own, at: at(0))
+        _ = t.session(session(.running), at: at(0))
+        _ = t.frontApp(xcode, at: at(5))
+        _ = t.frontApp(own, at: at(50))
+        var empty = session(.running)
+        empty.follow(now: nil)
+
+        _ = t.session(empty, at: at(50))
+
+        #expect(!t.frontApp(xcode, at: at(60)).events.contains { $0.kind == .backIntoThread })
+    }
 }

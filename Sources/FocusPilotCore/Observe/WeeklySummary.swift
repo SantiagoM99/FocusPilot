@@ -2,7 +2,9 @@ import Foundation
 
 /// The last seven days of pilot events (VALIDATION_PLAN.md, measures):
 /// sessions, resume time and distraction visits, comparable between the
-/// baseline week and the pilot.
+/// baseline week and the pilot; and parallel work (decision 0004, #58):
+/// switches per focus hour, time to get back into a thread, and how long
+/// agents waited for the owner.
 public struct WeeklySummary: Equatable, Sendable {
     public struct Line: Equatable, Sendable {
         public var label: String
@@ -22,14 +24,25 @@ public struct WeeklySummary: Equatable, Sendable {
     /// While blocking: blocked apps hidden as they came forward.
     public var blockedVisits = 0
     public var blockedVisitsInSessions = 0
+    /// Changes of Now inside sessions that ended this week; the first task a
+    /// session takes up is not a switch.
+    public var switches = 0
+    /// The length of those sessions.
+    public var focusTime: TimeInterval = 0
+    public var backIntoThreadTimes: [TimeInterval] = []
+    public var agentWaits: [TimeInterval] = []
 
     public init(events: [PilotEvent], now: Date) {
         let start = now.addingTimeInterval(-Self.period)
         var resumeTimes: [TimeInterval] = []
+        var touches: [UUID: Int] = [:]
+        var ended: Set<UUID> = []
         for event in events where event.at >= start && event.at <= now {
             switch event.kind {
             case .sessionStarted: sessionsStarted += 1
-            case .sessionEnded: sessionsEnded += 1
+            case .sessionEnded:
+                sessionsEnded += 1
+                if let id = event.sessionID, ended.insert(id).inserted { focusTime += event.duration ?? 0 }
             case .resume:
                 resumes += 1
                 resumeTimes.append(event.duration ?? 0)
@@ -42,10 +55,13 @@ public struct WeeklySummary: Equatable, Sendable {
                 blockedVisits += 1
                 if event.sessionID != nil { blockedVisitsInSessions += 1 }
             case .taskTouched:
-                break // Switches per hour arrive with T21.
+                if let id = event.sessionID { touches[id, default: 0] += 1 }
+            case .backIntoThread: backIntoThreadTimes.append(event.duration ?? 0)
+            case .agentWait: agentWaits.append(event.duration ?? 0)
             }
         }
         medianResume = Self.median(resumeTimes)
+        switches = ended.reduce(0) { $0 + max(0, (touches[$1] ?? 0) - 1) }
     }
 
     public var lines: [Line] {
@@ -60,7 +76,29 @@ public struct WeeklySummary: Equatable, Sendable {
             Line(label: "Blocked visits", value: blockedVisits == 0 ? "None"
                  : "\(blockedVisits) · \(blockedVisitsInSessions) during sessions"),
             Line(label: "Exceptions", value: "\(exceptionsGranted) granted"),
+            Line(label: "Switches", value: focusTime <= 0 ? "No sessions ended yet"
+                 : "\(Self.rate(Double(switches) / (focusTime / 3600))) per hour · \(switches) in \(Self.hours(focusTime))"),
+            Line(label: "Back into a thread", value: Self.median(backIntoThreadTimes).map {
+                "median \(Self.duration($0)) · \(backIntoThreadTimes.count) switch\(backIntoThreadTimes.count == 1 ? "" : "es")"
+            } ?? "No switches yet"),
+            Line(label: "Agents waiting for you", value: Self.median(agentWaits).map { median in
+                let count = agentWaits.count
+                return "median \(Self.minutes(median)) · longest \(Self.minutes(agentWaits.max() ?? median)) · "
+                    + "\(count) \(count == 1 ? "result or request" : "results and requests")"
+            } ?? "None yet"),
         ]
+    }
+
+    /// "1.3", one decimal.
+    private static func rate(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(1)).locale(Locale(identifier: "en_US")))
+    }
+
+    /// "3 h", "7 h 40 min", "40 min".
+    private static func hours(_ seconds: TimeInterval) -> String {
+        let minutes = Int((seconds / 60).rounded())
+        if minutes < 60 { return "\(minutes) min" }
+        return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min"
     }
 
     private static func median(_ values: [TimeInterval]) -> TimeInterval? {
