@@ -18,10 +18,12 @@ public struct TaskAgentLink: Equatable, Sendable, Identifiable {
     public var lastStatus: HerdrAgentStatus?
     /// When FocusPilot last saw `lastStatus` change.
     public var statusChangedAt: Date
+    /// Its place in the task's launch set; nil when Open context leaves it.
+    public var launchOrder: Int?
 
     public init(id: Int64, taskID: Int64, server: HerdrServer, paneID: String, workspaceID: String, tabID: String,
                 name: String?, kind: String, label: String, workspaceLabel: String?, lastStatus: HerdrAgentStatus?,
-                statusChangedAt: Date) {
+                statusChangedAt: Date, launchOrder: Int? = nil) {
         self.id = id
         self.taskID = taskID
         self.server = server
@@ -34,6 +36,7 @@ public struct TaskAgentLink: Equatable, Sendable, Identifiable {
         self.workspaceLabel = workspaceLabel
         self.lastStatus = lastStatus
         self.statusChangedAt = statusChangedAt
+        self.launchOrder = launchOrder
     }
 
     /// Whether `agent` is still the agent that was linked: same server

@@ -19,11 +19,10 @@ struct TaskAgentInspector: View {
                     .font(.headline)
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
+                TaskResourcesSection(model: model, task: task)
+                Divider()
                 HStack {
-                    Text("Agent")
-                        .font(.caption.weight(.semibold))
-                        .textCase(.uppercase)
-                        .foregroundStyle(.secondary)
+                    SectionTitle("Agent")
                     Spacer()
                     Button("Link Agent…", systemImage: "plus") { isLinking = true }
                         .buttonStyle(.borderless)
@@ -87,6 +86,12 @@ private struct AgentLinkView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Toggle("Opens with context", isOn: Binding(
+                get: { link.launchOrder != nil },
+                set: { included in Task { await model.setLaunch(.agent(link.id), included: included) } }))
+                .toggleStyle(.checkbox)
+                .font(.caption)
+                .controlSize(.small)
             HStack(spacing: 8) {
                 Button("Open agent") { Task { await model.openAgent(link.id) } }
                     .disabled(!state.canOpen)

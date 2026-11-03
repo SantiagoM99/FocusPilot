@@ -11,6 +11,10 @@ public struct PolicyInputs: Equatable, Sendable {
     public var exceptions: [TimedException] = []
     /// When observe-only mode was turned on; nil while rules are enforced.
     public var observeSince: Date?
+    /// Linked pages' sites, allowed during their project's sessions.
+    public var contextSites: [ContextSite] = []
+    /// Each task's project, to find the session's.
+    public var taskProjects: [Int64: Int64] = [:]
 }
 
 /// What storing a requested exception did.
@@ -152,8 +156,10 @@ extension TaskRepository {
     }
 
     static func policyInputs(_ db: Database, at now: Date) throws -> PolicyInputs {
-        PolicyInputs(rules: try rules(db), allowed: try allowed(db), exceptions: try exceptions(db, unexpiredAt: now),
-                     observeSince: try Date.fetchOne(db, sql: "SELECT since FROM observeMode WHERE id = 1"))
+        let context = try contextSites(db)
+        return PolicyInputs(rules: try rules(db), allowed: try allowed(db), exceptions: try exceptions(db, unexpiredAt: now),
+                            observeSince: try Date.fetchOne(db, sql: "SELECT since FROM observeMode WHERE id = 1"),
+                            contextSites: context.sites, taskProjects: context.taskProjects)
     }
 
     private static func exceptions(_ db: Database, unexpiredAt now: Date) throws -> [TimedException] {

@@ -21,6 +21,7 @@ public actor FocusCoordinator {
 
     private let herdr: (any HerdrWorkspaceSource)?
     let agents: (any HerdrAgentSource)?
+    let folders: any FolderAccess
 
     let repository: TaskRepository
     let publisher: PolicyPublisher
@@ -55,12 +56,14 @@ public actor FocusCoordinator {
     /// Without `herdr` and `agents`, Herdr reads as not installed.
     public init(repository: TaskRepository, herdr: (any HerdrWorkspaceSource)? = nil,
                 agents: (any HerdrAgentSource)? = nil,
+                folders: any FolderAccess = SystemFolderAccess(),
                 publisher: PolicyPublisher = PolicyNotDelivered(),
                 notices: FocusNoticeSink = NoticesIgnored(), now: @escaping @Sendable () -> Date = Date.init,
                 uptime: @escaping @Sendable () -> Duration = FocusCoordinator.continuousUptime()) {
         self.repository = repository
         self.herdr = herdr
         self.agents = agents
+        self.folders = folders
         self.publisher = publisher
         self.notices = notices
         self.now = now

@@ -36,6 +36,12 @@ final class AppModel {
     var markingWaiting: Int64?
     /// Why the last Open agent did nothing, shown where it was clicked.
     var agentNotice: String?
+    /// What the last Open context did, or why a link edit failed, and
+    /// which surface it was clicked on.
+    var contextNotice: String?
+    var contextNoticeOnNowCard = false
+    /// Grows with every link edit, so the Resources section reloads.
+    var contextRevision = 0
     /// Set when a session command fails; shown by the session surfaces.
     var sessionError: String?
     /// Asks the planning window to show the Start focus sheet.
