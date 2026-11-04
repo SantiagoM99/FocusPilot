@@ -77,16 +77,17 @@ test("always-on rules have no end", () => {
   assert.equal(m.detail, "Always-on rule · no end time");
 });
 
-test("a strict session past its end without the app says how to reopen it", () => {
+test("a strict session past its end without the app offers to open it, with no explanation", () => {
   const m = view(delivery({ session: session("strict"), focus }), "https://youtube.com/", { now: at("2026-10-14T16:30:00Z"), appRunning: false });
 
   assert.equal(m.kind, "strict-offline");
   assert.equal(m.status.text, "FocusPilot isn't running");
   assert.equal(m.title, "Still blocked · strict session");
-  assert.equal(m.subtitle, "Your last policy keeps youtube.com blocked until FocusPilot is running again.");
-  assert.equal(m.hint, "Applications › FocusPilot, or Spotlight. Exceptions can only be requested while it runs.");
+  assert.equal(m.subtitle, undefined);
+  assert.equal(m.hint, undefined);
+  assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
   assert.equal(m.exceptionLink, false);
-  assert.deepEqual(m.footer, ["Your last rules are saved in Chrome · no planned end while strict", "FocusPilot"]);
+  assert.deepEqual(m.footer, ["", "FocusPilot"]);
 });
 
 // Design 05 D applies to the whole strict session, not only past its end.
@@ -103,11 +104,11 @@ test("a normal session without the app says when the rule lifts (05 D2)", () => 
   assert.equal(m.kind, "normal-offline");
   assert.deepEqual(m.status, { tone: "orange", text: "FocusPilot isn't running" });
   assert.equal(m.title, "Still blocked until 10:51");
-  assert.equal(m.subtitle, "This normal session keeps youtube.com blocked until its planned end, then the rule lifts even if FocusPilot stays closed.");
+  assert.equal(m.subtitle, undefined);
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
-  assert.equal(m.hint, "Open it from Applications or Spotlight to pause, complete, or request an exception.");
+  assert.equal(m.hint, undefined);
   assert.equal(m.exceptionLink, false);
-  assert.deepEqual(m.footer, ["Your last rules are saved in Chrome · the session ends at 10:51", "FocusPilot"]);
+  assert.deepEqual(m.footer, ["", "FocusPilot"]);
 });
 
 // The offline session variants speak about the session, so a site blocked
@@ -121,7 +122,7 @@ test("without the app, a site blocked only by an always-on rule still says so", 
     assert.equal(m.footer[0], "facebook.com is blocked at all times");
     assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
     assert.equal(m.exceptionLink, false);
-    assert.equal(m.hint, "FocusPilot isn't running. Open it from Applications or Spotlight to request an exception.");
+    assert.equal(m.hint, "FocusPilot isn't running");
   }
 });
 
@@ -174,11 +175,10 @@ test("the exception form offers 5, 10 or 20 minutes for this page or the whole s
   const f = form("normal");
 
   assert.equal(f.title, "Timed exception");
-  assert.equal(f.note, "Applies in every Chrome profile. Ends at the time shown, not at the session end.");
   assert.deepEqual(f.durations, [{ seconds: 300, label: "5 min", selected: false }, { seconds: 600, label: "10 min", selected: true }, { seconds: 1200, label: "20 min", selected: false }]);
   assert.deepEqual(f.scopes.map((s) => [s.id, s.label, s.selected]), [["page", "This page only", true], ["site", "All of youtube.com", false]]);
   assert.equal(f.scopes[0].detail, "youtube.com/watch?v=3kqW9MabcdEFG&list=…");
-  assert.equal(f.scopes[1].detail, "Every page on the site");
+  assert.equal(f.scopes[1].detail, undefined);
   assert.equal(f.reason, null, "only strict sessions ask why");
   assert.deepEqual(f.allow, { label: "Allow for 10 min", disabled: false });
 });
@@ -192,21 +192,18 @@ test("a strict session asks why, then confirms, then counts down a wait", () => 
   const editing = form("strict");
   assert.equal(editing.strict, true);
   assert.equal(form("normal").strict, false);
-  assert.equal(editing.reason.placeholder, "Why this page is needed for the task");
+  assert.deepEqual(editing.reason, {});
   assert.equal(editing.allow.disabled, true, "no reason yet");
-  assert.equal(form("strict", { scope: "site" }).reason.placeholder, "Why this site is needed for the task");
 
   const withReason = form("strict", { reason: "Lecture for §4.2" });
   assert.equal(withReason.allow.disabled, false);
   assert.equal(withReason.request.reason, "Lecture for §4.2");
 
   const confirming = form("strict", { reason: "Lecture", phase: "confirming" });
-  assert.equal(confirming.waitNote, "A strict session waits 1 minute before allowing it.");
   assert.deepEqual(confirming.allow, { label: "Start the wait", disabled: false });
   assert.equal(confirming.request.confirmed, true);
 
   const waiting = form("strict", { reason: "Lecture", phase: "waiting", availableAt: now + 42000 });
-  assert.equal(waiting.waitNote, "Strict session · Allow becomes available in 0:42");
   assert.deepEqual(waiting.allow, { label: "Allow in 0:42", disabled: true });
   assert.equal(waiting.locked, true, "duration, scope and reason stay as confirmed");
 

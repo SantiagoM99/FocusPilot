@@ -40,7 +40,7 @@ struct StartFocusSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("Nothing in Now. You can pin a task during the session.")
+                    Text("Nothing in Now")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -67,10 +67,8 @@ struct StartFocusSheet: View {
                 GridRow {
                     label("Mode")
                     Picker("Mode", selection: $mode) {
-                        modeOption("Normal", "Blocks until the planned end. If FocusPilot quits, browser rules lift at the planned end and app blocking stops right away.")
-                            .tag(SessionMode.normal)
-                        modeOption("Strict", "Cancels timed exceptions already running. Ending early or a new exception needs confirmation and a wait. If FocusPilot quits, browser rules stay until it runs again; app blocking stops.")
-                            .tag(SessionMode.strict)
+                        Text("Normal").tag(SessionMode.normal)
+                        Text("Strict").tag(SessionMode.strict)
                     }
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
@@ -152,10 +150,6 @@ struct StartFocusSheet: View {
                     }
                 }
             }
-            Text("Moving between your own tasks never counts as a distraction. Only block rules do.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -178,17 +172,6 @@ struct StartFocusSheet: View {
         Text(text)
             .foregroundStyle(.secondary)
             .gridColumnAlignment(.leading)
-    }
-
-    private func modeOption(_ title: String, _ detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-            Text(detail)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.bottom, 6)
     }
 
     private func start() {

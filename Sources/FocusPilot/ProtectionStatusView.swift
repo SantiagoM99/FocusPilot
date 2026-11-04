@@ -94,7 +94,7 @@ extension BrowserProtection.Level {
 }
 
 /// The planning window's sidebar footer (design 01): "Chrome · Protected"
-/// over "Apps · protected while running".
+/// over "Apps · protected".
 struct SidebarProtectionFooter: View {
     let model: AppModel
 

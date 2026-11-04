@@ -41,7 +41,7 @@ struct DeadlinePreview: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
         } else {
-            Text("None — type it above or click to choose")
+            Text("None")
                 .foregroundStyle(.secondary)
         }
     }

@@ -68,7 +68,6 @@ button.secondary { height: 24px; padding: 0 12px; border-radius: 6px; background
 button:disabled { opacity: .45; }
 input[type="text"] { height: 24px; padding: 0 8px; border-radius: 6px; border: 0; box-shadow: 0 0 0 .5px var(--btnb); background: var(--field); color: var(--label); font: inherit; }
 input[type="text"]:focus { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); }
-.card .wait { color: var(--label); font-variant-numeric: tabular-nums; }
 .card .error { color: var(--orange); }
 .card-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .card-actions button { height: 28px; border-radius: 7px; padding: 0 14px; }

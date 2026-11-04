@@ -20,8 +20,6 @@ struct SwitchSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Switch to “\(request.taskTitle)”")
                     .font(.headline)
-                Text(request.opens)
-                    .foregroundStyle(.secondary)
             }
             if let current {
                 VStack(alignment: .leading, spacing: 4) {
@@ -33,9 +31,6 @@ struct SwitchSheet: View {
                         .textFieldStyle(.roundedBorder)
                         .focused($isNoteFocused)
                         .onSubmit(confirm)
-                    Text("Saved on “\(current.title)” and shown first when you come back to it.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
                 }
             }
             HStack {
@@ -82,7 +77,7 @@ struct MarkWaitingSheet: View {
                 GridRow {
                     Text("Waiting on")
                         .foregroundStyle(.secondary)
-                    TextField("Optional, for example Ana’s review", text: $waitingOn)
+                    TextField("Optional", text: $waitingOn)
                         .textFieldStyle(.roundedBorder)
                         .accessibilityLabel("Waiting on")
                 }
@@ -96,10 +91,6 @@ struct MarkWaitingSheet: View {
                     .fixedSize()
                 }
             }
-            Text("At that time the task appears under Needs you in In flight. Nothing opens on its own.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button("Cancel") { model.markingWaiting = nil }

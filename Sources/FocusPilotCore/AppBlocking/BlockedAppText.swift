@@ -5,12 +5,10 @@ import Foundation
 public struct BlockedAppText: Sendable {
     public var headline: String
     public var detail: String
-    public var footer: String
 
     /// `session` is the active session, if any; it is shown whatever rule hid the app.
     /// With `reducesMotion` the time left reads in whole minutes ("25 min left").
     public init(appName: String, reason: AppBlockReason, session: FocusSession?, at now: Date, reducesMotion: Bool = false) {
-        footer = "\(appName) was hidden, not quit. Nothing was closed. Exceptions cover the whole app."
         if let session {
             let text = SessionText(session)
             headline = "Focus session · " + (reducesMotion ? text.minutesLeft(at: now) : text.timeLeft(at: now) + " left")
@@ -73,12 +71,13 @@ public struct BlockedAppText: Sendable {
 /// 0003, 2026-10-14): app hiding works only while FocusPilot runs.
 public struct AppProtectionText: Sendable {
     public var summary: String
-    public var detail = "Only while FocusPilot is running"
+    /// Set only when app blocking isn't running though apps should be hidden.
+    public var detail: String?
     /// Apps are hidden right now; false when none is, or hiding isn't running.
     public var isProtected: Bool
     /// After "Apps ·" in the sidebar footer (design 01), with the prefix.
     public var short: String {
-        if isProtected { "Apps · protected while running" } else if summary.hasPrefix("Apps not protected") {
+        if isProtected { "Apps · protected" } else if summary.hasPrefix("Apps not protected") {
             "Apps · not protected"
         } else { "Apps · none hidden now" }
     }
@@ -117,7 +116,7 @@ public struct AppProtectionText: Sendable {
             }
         }
         let apps = Self.apps(in: applying)
-        return apps.isEmpty ? "No apps blocked" : apps.map(\.name).joined(separator: ", ") + " hidden on open · only while FocusPilot runs"
+        return apps.isEmpty ? "No apps blocked" : apps.map(\.name).joined(separator: ", ") + " hidden on open"
     }
 
     private struct App: Equatable {

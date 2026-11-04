@@ -56,9 +56,6 @@ struct SessionControls: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("End this strict session early?")
                 .font(.headline)
-            Text("Strict sessions wait \(StrictEarlyEnd.waitText) before ending. Rules stay on until then.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 Button { model.isConfirmingEarlyEnd = false } label: { wide("Keep focusing") }
                 Button { Task { await model.complete(confirmed: true) } } label: { wide("End early") }

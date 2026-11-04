@@ -38,7 +38,7 @@ function render() {
   $("detail").textContent = m.detail ?? "";
   $("detail").hidden = !m.detail;
   $("primary").textContent = m.primary.label;
-  const hint = unreachable ? "FocusPilot couldn't be reached. Open it from Applications or Spotlight." : m.hint;
+  const hint = unreachable ? "FocusPilot couldn't be reached" : m.hint;
   $("hint").textContent = hint ?? "";
   $("hint").hidden = !hint;
   $("exception").hidden = !m.exceptionLink;
@@ -140,7 +140,6 @@ function renderForm() {
   const f = FocusBlockedView.exceptionForm({ ...state, url: from, now: Date.now(), state: form });
   $("x-title").textContent = f.title;
   $("x-strict").hidden = !f.strict;
-  $("x-note").textContent = f.note;
   // Rebuilt only when they change, so the countdown tick keeps keyboard focus.
   const choices = JSON.stringify([f.durations, f.scopes, f.locked]);
   if ($("x-durations").dataset.choices !== choices) {
@@ -158,12 +157,7 @@ function renderForm() {
   }
   $("x-reason-row").hidden = !f.reason;
   $("x-reason").required = Boolean(f.reason);
-  if (f.reason) {
-    $("x-reason").placeholder = f.reason.placeholder;
-    $("x-reason").disabled = f.locked;
-  }
-  $("x-wait").textContent = f.waitNote ?? "";
-  $("x-wait").hidden = !f.waitNote;
+  if (f.reason) $("x-reason").disabled = f.locked;
   $("x-error").textContent = f.error ?? "";
   $("x-error").hidden = !f.error;
   $("x-allow").textContent = form.phase === "granted" ? "Allowed" : f.allow.label;

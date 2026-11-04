@@ -96,6 +96,6 @@ test("the blocked page says a linked page is allowed in this session", () => {
   assert.equal(m.kind, "linked");
   assert.equal(m.status.text, "Linked to a task in this session");
   assert.equal(m.title, "This page is allowed in this session");
-  assert.equal(m.subtitle, "It’s linked to a task in the session, so it opens until 10:50. Other pages on youtube.com stay blocked.");
+  assert.equal(m.subtitle, "Until 10:50");
   assert.equal(m.primary.label, "Go back to youtube.com");
 });

@@ -5,24 +5,16 @@ import SwiftUI
 /// owner has not chosen one.
 struct NowCard: View {
     let item: TodayItem?
-    let caption: String?
     let showsProject: Bool
     let now: Date
     @Environment(AppModel.self) private var model: AppModel?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Label("Now", systemImage: "pin.fill")
-                    .font(.caption.weight(.semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(.secondary)
-                if let caption {
-                    Text("· " + caption)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
+            Label("Now", systemImage: "pin.fill")
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
             if let item {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title)
@@ -44,12 +36,8 @@ struct NowCard: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No current task")
-                        .font(.title3.weight(.semibold))
-                    Text("Pick one from Next and press ⌘1, or capture a new one.")
-                        .foregroundStyle(.secondary)
-                }
+                Text("No current task")
+                    .font(.title3.weight(.semibold))
             }
             if let model {
                 session(model)

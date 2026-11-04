@@ -94,7 +94,7 @@ var FocusBlockedView = (() => {
         kind: "linked", domain: decision.domain,
         status: { tone: "green", text: "Linked to a task in this session" },
         title: "This page is allowed in this session",
-        subtitle: `It’s linked to a task in the session, so it opens until ${clock(Date.parse(policy.session.end), timeZone)}. Other pages on ${decision.domain} stay blocked.`,
+        subtitle: `Until ${clock(Date.parse(policy.session.end), timeZone)}`,
         primary: { label: `Go back to ${host}`, action: "go-back" }, backURL: FocusPolicy.returnURL(policy, url),
         exceptionLink: false, footer: ["", "FocusPilot"],
       };
@@ -105,7 +105,6 @@ var FocusBlockedView = (() => {
       const backURL = FocusPolicy.returnURL(policy, url);
       return {
         kind: "unblocked", status: { tone: "gray", text: "Not blocked" }, title: `${host} isn't blocked now`,
-        subtitle: "The rule that blocked it no longer applies.",
         primary: { label: backURL ? `Go back to ${host}` : "Open a new tab", action: "go-back" }, backURL,
         exceptionLink: false, footer: ["", "FocusPilot"],
       };
@@ -118,11 +117,9 @@ var FocusBlockedView = (() => {
       return {
         kind: "strict-offline", domain, status: { tone: "orange", text: "FocusPilot isn't running" },
         title: "Still blocked · strict session",
-        subtitle: `Your last policy keeps ${domain} blocked until FocusPilot is running again.`,
         primary: { label: "Open FocusPilot", action: "open-app" },
-        hint: "Applications › FocusPilot, or Spotlight. Exceptions can only be requested while it runs.",
         exceptionLink: false,
-        footer: ["Your last rules are saved in Chrome · no planned end while strict", "FocusPilot"],
+        footer: ["", "FocusPilot"],
       };
     }
     if (offlineSession) {
@@ -130,14 +127,12 @@ var FocusBlockedView = (() => {
       return {
         kind: "normal-offline", domain, status: { tone: "orange", text: "FocusPilot isn't running" },
         title: `Still blocked until ${end}`,
-        subtitle: `This normal session keeps ${domain} blocked until its planned end, then the rule lifts even if FocusPilot stays closed.`,
         primary: { label: "Open FocusPilot", action: "open-app" },
-        hint: "Open it from Applications or Spotlight to pause, complete, or request an exception.",
         exceptionLink: false,
-        footer: [`Your last rules are saved in Chrome · the session ends at ${end}`, "FocusPilot"],
+        footer: ["", "FocusPilot"],
       };
     }
-    const offlineHint = offline ? "FocusPilot isn't running. Open it from Applications or Spotlight to request an exception." : null;
+    const offlineHint = offline ? "FocusPilot isn't running" : null;
 
     if (FocusPolicy.sessionApplies(session, now) && delivery.focus) {
       const remaining = Date.parse(session.end) - now;
@@ -171,8 +166,6 @@ var FocusBlockedView = (() => {
     };
   }
 
-  // StrictEarlyEnd.wait in the app; the real wait comes back as `availableAt`.
-  const STRICT_WAIT_TEXT = "1 minute";
   const DURATIONS = [300, 600, 1200];
 
   // "youtube.com/watch?v=3kqW9M…": the page as the scope choice shows it.
@@ -204,22 +197,17 @@ var FocusBlockedView = (() => {
     else if (waiting) allow = remaining > 0 ? { label: `Allow in ${countdown(remaining / 1000)}`, disabled: true } : { label: "Allow now", disabled: false };
     else allow = { label: `Allow for ${minutes(state.duration)}`, disabled: strict && !state.reason.trim() };
 
-    let waitNote = null;
-    if (state.phase === "confirming") waitNote = `A strict session waits ${STRICT_WAIT_TEXT} before allowing it.`;
-    else if (waiting && remaining > 0) waitNote = `Strict session · Allow becomes available in ${countdown(remaining / 1000)}`;
-
     const reason = state.reason.trim();
     return {
       title: "Timed exception", strict,
-      note: "Applies in every Chrome profile. Ends at the time shown, not at the session end.",
       durations: DURATIONS.map((seconds) => ({ seconds, label: minutes(seconds), selected: seconds === state.duration })),
       scopes: [
         { id: "page", label: "This page only", detail: shortPage(url), selected: state.scope === "page" },
-        { id: "site", label: `All of ${domain}`, detail: "Every page on the site", selected: state.scope === "site" },
+        { id: "site", label: `All of ${domain}`, selected: state.scope === "site" },
       ],
-      reason: strict ? { placeholder: `Why this ${state.scope === "site" ? "site" : "page"} is needed for the task` } : null,
+      reason: strict ? {} : null,
       locked: waiting || state.phase === "sending",
-      waitNote, allow, error: state.error ?? null,
+      allow, error: state.error ?? null,
       request: {
         scope: state.scope === "site" ? { kind: "site", domain } : { kind: "page", url },
         durationSeconds: state.duration, reason: strict && reason ? reason : null,

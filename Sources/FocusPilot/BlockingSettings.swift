@@ -13,7 +13,7 @@ struct BlockingSettings: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 StrictRuleEditBanner(model: model)
-                SectionHeader("Blocked sites and apps", note: "Blocked immediately, no check-in")
+                SectionHeader("Blocked sites and apps")
                 VStack(spacing: 0) {
                     RuleTable(model: model, selection: $selection, edit: { editing = .init($0) },
                               except: { site in excepting = .init(site: site) })
@@ -66,7 +66,7 @@ extension BlockRuleSet {
     }
 }
 
-/// "Blocked sites and apps  Blocked immediately, no check-in".
+/// "Blocked sites and apps", a section title over its table.
 struct SectionHeader: View {
     let title: String
     let note: String?
@@ -131,7 +131,7 @@ struct RuleTable: View {
         }
         .overlay {
             if model.ruleSets.isEmpty {
-                Text("No blocked sites or apps yet. Press + to add one.")
+                Text("No blocked sites or apps")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -142,14 +142,9 @@ struct RuleTable: View {
         model.ruleSets.first { $0.id == id }
     }
 
-    /// The schedule, and for apps that hiding them needs the app running.
+    /// The schedule, for scheduled rules.
     private func detail(_ rule: BlockRuleSet) -> String? {
-        var parts: [String] = []
-        if case .schedule(let schedule) = rule.activation { parts.append(RuleText.summary(schedule)) }
-        if rule.targets.contains(where: { if case .app = $0 { true } else { false } }) {
-            parts.append("Requires FocusPilot running")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        if case .schedule(let schedule) = rule.activation { RuleText.summary(schedule) } else { nil }
     }
 }
 

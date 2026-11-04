@@ -11,7 +11,7 @@ struct AllowedSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader("Allowed apps and sites", note: "Never trigger a check-in")
+                SectionHeader("Allowed apps and sites")
                 VStack(spacing: 0) {
                     List(selection: $selection) {
                         ForEach(model.allowed, id: \.id) { entry in
@@ -57,9 +57,6 @@ struct AllowedSettings: View {
                 .background(.background, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
                 SettingsError(message: model.rulesError)
-                Text("Check-ins for unknown apps and sites arrive later (#21); this list is what they will skip.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
             }
             .padding(20)
         }

@@ -41,11 +41,4 @@ struct PlanningSheetTests {
         #expect(PlanningSheet.showing(isCapturing: false, wrapUp: nil, isStartingFocus: true, markingWaiting: 9)
             == .markWaiting(9))
     }
-
-    @Test func switchSaysWhatItWillOpen() {
-        #expect(SwitchRequest(taskID: 4, taskTitle: "Run ablation", linkID: 2, agentLabel: "ablation", item: nil).opens
-            == "Makes it Now and opens ablation in Herdr.")
-        #expect(SwitchRequest(taskID: 4, taskTitle: "Send the draft", linkID: nil, agentLabel: nil, item: nil).opens
-            == "Makes it Now.")
-    }
 }

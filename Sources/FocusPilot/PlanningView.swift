@@ -141,11 +141,7 @@ struct PlanningView: View {
         } else if page == .settings {
             SettingsPage(model: model)
         } else if model.today.isEmpty {
-            ContentUnavailableView(
-                "No tasks yet",
-                systemImage: "sun.max",
-                description: Text("Press ⌘N to capture one. Closing this window keeps FocusPilot running in the menu bar.")
-            )
+            ContentUnavailableView("No tasks yet", systemImage: "sun.max")
         } else {
             TaskList(items: model.today, showsProject: true,
                      move: { id, status, placement in Task { await model.move(id, to: status, placement) } },

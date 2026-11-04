@@ -29,7 +29,7 @@ struct TaskAgentInspector: View {
                         .controlSize(.small)
                 }
                 if links.isEmpty {
-                    Text("No Herdr agent is linked to this task. Linked agents report here and their results go to Review queue.")
+                    Text("No agent linked")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -82,10 +82,6 @@ private struct AgentLinkView: View {
                     .font(.callout)
                     .lineLimit(2)
             }
-            Text("Results go to Review queue; nothing opens until you choose to.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             Toggle("Opens with context", isOn: Binding(
                 get: { link.launchOrder != nil },
                 set: { included in Task { await model.setLaunch(.agent(link.id), included: included) } }))
@@ -195,9 +191,6 @@ struct AgentLinkSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(verbatim: "Link agents to “\(task.title)”")
                     .font(.headline)
-                Text("FocusPilot reads their status every few seconds and queues their results for review. It never prompts an agent or answers its questions.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(20)
             Divider()
@@ -227,7 +220,7 @@ struct AgentLinkSheet: View {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .disconnected(let reason):
-            ContentUnavailableView(reason.title, systemImage: "bolt.horizontal.circle", description: Text(reason.explanation))
+            ContentUnavailableView(reason.title, systemImage: "bolt.horizontal.circle")
         case .connected:
             if let choices, !choices.choices.agents.isEmpty {
                 List(choices.choices.agents) { agent in
@@ -239,8 +232,7 @@ struct AgentLinkSheet: View {
                 }
                 .listStyle(.inset)
             } else {
-                ContentUnavailableView("No agents to link", systemImage: "terminal",
-                                       description: Text("Herdr has no other agents running right now."))
+                ContentUnavailableView("No agents to link", systemImage: "terminal")
             }
         }
     }

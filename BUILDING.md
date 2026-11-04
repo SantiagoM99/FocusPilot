@@ -30,6 +30,16 @@ The login item points at one specific app on disk. Every ad hoc rebuild changes 
 
 Prefer the bundle over `swift run FocusPilot`: the bare executable has no Info.plist, so `LSUIElement` and login-item registration do not apply to it.
 
+## Chrome setup
+
+The app shows only the state and the buttons (decision 0003, 2026-11-03), so the steps are here. Once per Chrome profile:
+
+1. In Settings › Blocking › Chrome, click Show Extension Folder (or Copy Folder Path).
+2. In Chrome, open `chrome://extensions`, turn on Developer mode, click Load unpacked and choose that folder.
+3. In the extension's details, keep Site access on all sites and turn on Allow in Incognito. Settings shows "Site access limited" or "Incognito not allowed" until you do.
+
+A profile that no longer connects shows as disconnected; Forget removes it from the list, and it comes back if it connects again.
+
 ## The focuspilot command
 
 `build-app.sh` also builds the `focuspilot` command and puts it in `FocusPilot.app/Contents/Helpers/focuspilot`. See [docs/FOCUSPILOT_CLI.md](docs/FOCUSPILOT_CLI.md) for what it does and how to put it on your PATH.

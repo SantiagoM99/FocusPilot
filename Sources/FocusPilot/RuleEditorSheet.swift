@@ -68,9 +68,6 @@ struct RuleEditorSheet: View {
                         Text(siteError).font(.callout).foregroundStyle(.orange)
                     } else if let note = RuleText.wholeDomainNote(typedSite) ?? addedPageNote {
                         Text(note).font(.callout).foregroundStyle(.orange)
-                    } else {
-                        Text("A site blocks the whole domain, subdomains included.")
-                            .font(.callout).foregroundStyle(.secondary)
                     }
                 }
                 Section("When") {
@@ -152,7 +149,7 @@ private struct ScheduleEditor: View {
         DatePicker("To", selection: time(\.end), displayedComponents: .hourAndMinute)
             .environment(\.timeZone, schedule.timeZone)
         if schedule.end < schedule.start {
-            Text("Runs past midnight into the next day.").font(.callout).foregroundStyle(.secondary)
+            Text("Ends the next day").font(.callout).foregroundStyle(.secondary)
         }
         Picker("Time zone", selection: $schedule.timeZone) {
             ForEach(zones, id: \.self) { Text($0.identifier).tag($0) }

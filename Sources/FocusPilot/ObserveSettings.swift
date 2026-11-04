@@ -2,7 +2,8 @@ import FocusPilotCore
 import SwiftUI
 
 /// Settings › Observe (design 12): observe-only for the baseline week, how
-/// far it has got, this week's pilot measures and what is recorded.
+/// far it has got and this week's pilot measures. What is recorded is in
+/// docs/DATA_AND_MEMORY.md, not on screen (decision 0003, 2026-11-03).
 struct ObserveSettings: View {
     let model: AppModel
 
@@ -11,8 +12,7 @@ struct ObserveSettings: View {
             Section {
                 Toggle(isOn: Binding(get: { model.snapshot.isObserveOnly },
                                      set: { on in Task { await model.setObserveOnly(on) } })) {
-                    Text("Observe only — record activity, no blocking or nudges")
-                    Text("Sessions still run and are timed; rules are not enforced.")
+                    Text("Observe only")
                 }
                 if let since = model.snapshot.observeSince {
                     LabeledContent("Observed so far", value: BaselineWeek(since: since, now: model.now).observedLine)
@@ -20,12 +20,6 @@ struct ObserveSettings: View {
                 if let error = model.observeError {
                     SettingsError(message: error)
                 }
-            } footer: {
-                Text(model.snapshot.isObserveOnly
-                     ? "Turning this off applies your rules again right away."
-                     : "Use it for a baseline week before blocking: the same measures, with nothing blocked.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             Section("Last 7 days") {
                 ForEach(model.weeklySummary?.lines ?? [], id: \.label) { line in
@@ -34,14 +28,6 @@ struct ObserveSettings: View {
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(line.label), \(line.spoken)")
                 }
-            }
-            Section("What is recorded") {
-                Group {
-                    Text("Only while observing, kept for 24 hours: which app is in front and the domain of Chrome's front tab.")
-                    Text("Kept for the pilot: session starts and ends, how long you took to get back to work, the tasks you switched to, how long agents waited for you, exceptions, and blocked apps you opened; while observing, also visits to sites and apps your rules name. Times and durations, with their session and task.")
-                    Text("Never stored: URLs, page titles or content, keystrokes or screenshots.")
-                }
-                .font(.callout)
             }
         }
         .formStyle(.grouped)

@@ -57,10 +57,6 @@ struct SiteExceptionSheet: View {
                     Label("Strict", systemImage: "lock.fill").font(.callout).foregroundStyle(.secondary)
                 }
             }
-            Text("Applies in every Chrome profile. Ends at the time chosen, not at the session end.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             Form {
                 TextField("Site or page", text: $typed, prompt: Text("youtube.com/watch?v=…"))
                     .disabled(availableAt != nil)
@@ -80,19 +76,11 @@ struct SiteExceptionSheet: View {
                 .fixedSize()
                 .disabled(availableAt != nil)
                 if isStrict {
-                    TextField("Reason", text: $reason, prompt: Text(pending?.reason ?? (wholeSite || !namesAPage ? "Why this site is needed for the task" : "Why this page is needed for the task")))
+                    TextField("Reason", text: $reason, prompt: Text(pending?.reason ?? ""))
                         .disabled(availableAt != nil)
                 }
             }
             .formStyle(.columns)
-            if !namesAPage, !wholeSite {
-                Text("Type a page address to allow only that page.").font(.callout).foregroundStyle(.secondary)
-            }
-            if isConfirming {
-                Text("A strict session waits \(StrictEarlyEnd.waitText) before allowing it.")
-                    .font(.callout)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
             if let error {
                 Text(error).font(.callout).foregroundStyle(.orange)
             }

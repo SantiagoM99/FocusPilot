@@ -10,7 +10,7 @@ struct ChromeSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("Chrome", note: "Each Chrome profile gets your rules separately")
+            SectionHeader("Chrome")
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(model.chromeProfiles.enumerated()), id: \.element.id) { index, profile in
                     if index > 0 { Divider() }
@@ -25,8 +25,6 @@ struct ChromeSection: View {
             if !model.chromeProfiles.isEmpty, let setup = model.chromeSetup {
                 Button("Show Extension Folder") { NSWorkspace.shared.activateFileViewerSelecting([setup.extensionFolder]) }
                     .controlSize(.small)
-                Text("To add another Chrome profile, load this folder there too.")
-                    .font(.callout).foregroundStyle(.secondary)
             }
         }
     }
@@ -77,6 +75,7 @@ private struct ChromeProfileRow: View {
 }
 
 /// First-time setup: Chrome loads the unpacked extension from a folder.
+/// The steps are in BUILDING.md, not on screen (decision 0003, 2026-11-03).
 private struct LoadExtensionSteps: View {
     let setup: ChromeSetup?
 
@@ -86,9 +85,6 @@ private struct LoadExtensionSteps: View {
             if let problem = setup?.problem {
                 Text(problem).foregroundStyle(.orange)
             }
-            Text("In Chrome, open chrome://extensions, turn on Developer mode, click Load unpacked and choose the FocusPilot extension folder. You only do this once per Chrome profile.")
-                .font(.callout).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             if let setup {
                 HStack {
                     Button("Show Extension Folder") { NSWorkspace.shared.activateFileViewerSelecting([setup.extensionFolder]) }
@@ -111,11 +107,11 @@ private struct LoadExtensionSteps: View {
 struct OtherBrowsersSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("Other browsers", note: "FocusPilot can't confirm what they block")
+            SectionHeader("Other browsers")
             VStack(alignment: .leading, spacing: 0) {
-                row("Safari", "External blocker · not verified by FocusPilot")
+                row("Safari", "Not verified")
                 Divider()
-                row("Firefox, Arc and others", "Not supported · shown as not protected when in front during a session")
+                row("Firefox, Arc and others", "Not supported")
             }
             .background(.background, in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))

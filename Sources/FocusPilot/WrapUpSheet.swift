@@ -39,18 +39,14 @@ struct WrapUpSheet: View {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
                     row("What got done", text: draft(\.outcome), field: .outcome, next: .remainingWork)
                     row("What remains", text: draft(\.remainingWork), field: .remainingWork, next: .returnCue)
-                    row("Next time, start with", text: draft(\.returnCue), field: .returnCue, next: nil,
-                        note: "Becomes the task's next action and is shown first when you resume.")
+                    row("Next time, start with", text: draft(\.returnCue), field: .returnCue, next: nil)
                 }
             }
 
             if !others.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(hasTask ? "Other tasks in this session" : "Tasks in this session")
+                    Text(hasTask ? "Where you left off on other tasks" : "Where you left off")
                         .font(.callout.weight(.semibold))
-                    Text("Where did you leave off? One optional line each, shown first when you come back.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
                     Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 8) {
                         ForEach(others) { task in
                             GridRow {
@@ -110,25 +106,18 @@ struct WrapUpSheet: View {
                 set: { if model.wrapUp?.id == prompt.id { model.wrapUp?.draft[keyPath: field] = $0 } })
     }
 
-    private func row(_ title: String, text: Binding<String>, field: Field, next: Field?, note: String? = nil) -> some View {
+    private func row(_ title: String, text: Binding<String>, field: Field, next: Field?) -> some View {
         GridRow {
             Text(title)
                 .foregroundStyle(.secondary)
                 .frame(width: 110, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 4) {
-                TextField(title, text: text, axis: .vertical)
-                    .labelsHidden()
-                    .lineLimit(2...4)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($focused, equals: field)
-                    .onSubmit { if let next { focused = next } else { save() } }
-                if let note {
-                    Text(note)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
+            TextField(title, text: text, axis: .vertical)
+                .labelsHidden()
+                .lineLimit(2...4)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused, equals: field)
+                .onSubmit { if let next { focused = next } else { save() } }
         }
     }
 
