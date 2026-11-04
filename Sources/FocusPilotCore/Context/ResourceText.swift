@@ -26,7 +26,7 @@ public enum ResourceText {
     /// (owner decision 0003, 2026-11-03).
     public static func sessionNote(for page: WebPageLink, rules: [BlockRuleSet]) -> String {
         blockingRule(page, rules) == nil ? "Allowed in this project’s sessions"
-            : "This page opens in normal sessions · Blocked in strict sessions — ask for an exception"
+            : "Opens in normal sessions"
     }
 
     /// The blocked site the page is on, as the rule names it.

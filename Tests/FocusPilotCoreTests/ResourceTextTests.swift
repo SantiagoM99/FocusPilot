@@ -32,9 +32,9 @@ struct ResourceTextTests {
         let rules = [BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly)]
 
         #expect(ResourceText.sessionNote(for: try! WebPageLink("youtube.com/watch?v=1"), rules: rules)
-            == "This page opens in normal sessions · Blocked in strict sessions — ask for an exception")
+            == "Opens in normal sessions")
         #expect(ResourceText.sessionNote(for: try! WebPageLink("m.youtube.com/watch?v=1"), rules: rules)
-            == "This page opens in normal sessions · Blocked in strict sessions — ask for an exception")
+            == "Opens in normal sessions")
         #expect(ResourceText.sessionNote(for: try! WebPageLink("arxiv.org/abs/1"), rules: rules)
             == "Allowed in this project’s sessions")
     }
