@@ -1,0 +1,134 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-03T19:02:00-05:00"
+  },
+  "title": "FocusPilot screens",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1180,
+      "h": 720,
+      "title": "Planning · Today",
+      "radius": 10
+    },
+    "FocusPanel.dc.html": {
+      "x": 1260,
+      "y": 0,
+      "w": 760,
+      "h": 400,
+      "title": "Focus panel · Menu bar"
+    },
+    "Sheets.dc.html": {
+      "x": 2100,
+      "y": 0,
+      "w": 1040,
+      "h": 460,
+      "title": "Quick capture · Start focus"
+    },
+    "InFlight.dc.html": {
+      "x": 0,
+      "y": 1100,
+      "w": 1180,
+      "h": 720,
+      "title": "In flight · Review",
+      "radius": 10
+    },
+    "Blocked.dc.html": {
+      "x": 1260,
+      "y": 1100,
+      "w": 1180,
+      "h": 720,
+      "title": "Blocked page (Chrome)",
+      "radius": 10
+    },
+    "Settings.dc.html": {
+      "x": 2520,
+      "y": 1100,
+      "w": 1180,
+      "h": 720,
+      "title": "Settings",
+      "radius": 10
+    },
+    "Labs.dc.html": {
+      "x": 0,
+      "y": 2200,
+      "w": 1180,
+      "h": 720,
+      "title": "Labs · interns and seniors",
+      "radius": 10
+    },
+    "MainDark.dc.html": {
+      "x": 2520,
+      "y": 2200,
+      "w": 1180,
+      "h": 720,
+      "title": "Today · dark",
+      "radius": 10
+    },
+    "TodaySIC.dc.html": {
+      "x": 1260,
+      "y": 2200,
+      "w": 1180,
+      "h": 720,
+      "title": "Today · second in command on",
+      "radius": 10
+    },
+    "Parallel.dc.html": {
+      "x": 0,
+      "y": 3300,
+      "w": 1940,
+      "h": 520,
+      "title": "One afternoon, three agents"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "FocusPanel.dc.html",
+    "Sheets.dc.html",
+    "InFlight.dc.html",
+    "Blocked.dc.html",
+    "Settings.dc.html",
+    "Labs.dc.html",
+    "TodaySIC.dc.html",
+    "MainDark.dc.html",
+    "Parallel.dc.html"
+  ],
+  "notes": {
+    "daily": {
+      "x": 0,
+      "y": -300,
+      "text": "FocusPilot · every day",
+      "kind": "title1",
+      "maxW": 3140
+    },
+    "secondary": {
+      "x": 0,
+      "y": 800,
+      "text": "FocusPilot · when something needs you",
+      "kind": "title1",
+      "maxW": 3700
+    },
+    "phase2": {
+      "x": 0,
+      "y": 1900,
+      "text": "FocusPilot · phase 2: Labs, second in command, dark mode",
+      "kind": "title1",
+      "maxW": 3700
+    },
+    "parallel": {
+      "x": 0,
+      "y": 3000,
+      "text": "FocusPilot · working on several things at once",
+      "kind": "title1",
+      "maxW": 1940
+    }
+  },
+  "designSystems": []
+}

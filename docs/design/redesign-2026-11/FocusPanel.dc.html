@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Focus panel and menu bar popover</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Inter,system-ui,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}
+a{color:#0b63ce}a:hover{color:#084d9f}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 760px; height: 400px; box-sizing: border-box; display: flex; gap: 60px; align-items: flex-start; padding: 24px">
+
+  <!-- Floating focus panel -->
+  <section aria-label="Focus panel" style="width: 340px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 16px 18px 16px 18px; border-radius: 12px; background: rgba(246,246,248,0.96); box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 12px 32px rgba(0,0,0,0.2)">
+    <div style="display: flex; align-items: baseline; justify-content: space-between">
+      <span style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #1f6b3a">
+        <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #1f9d55"></span>
+        Focusing
+      </span>
+      <span style="font-size: 30px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">24:08</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 3px">
+      <span style="font-size: 16px; font-weight: 600">Explain baseline results</span>
+      <span style="font-size: 12px; color: #6e6e73">NLP report · Overleaf</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px; font-size: 12px; color: #3a3a3c">
+      <span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #1f9d55"></span>Chrome</span>
+      <span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #c77d00"></span>Safari</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: #ffffff; border: 1px solid #e3e3e8">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 1px">
+        <span style="font-size: 12px; font-weight: 500">PR #132 ready to approve</span>
+        <span style="font-size: 11px; color: #6e6e73">Second in command · 18 min</span>
+      </div>
+      <a href="TodaySIC.dc.html" style="display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; text-decoration: none; font-size: 12px; font-weight: 500">Switch</a>
+    </div>
+    <div style="display: flex; gap: 8px; padding-top: 2px">
+      <button type="button" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 30px; border: 1px solid #d1d1d6; border-radius: 7px; background: #ffffff; color: #1d1d1f; font-size: 13px">
+        <svg aria-hidden="true" width="10" height="12" viewBox="0 0 10 12" fill="#1d1d1f"><rect x="1" y="1" width="3" height="10"/><rect x="6" y="1" width="3" height="10"/></svg>
+        Pause
+      </button>
+      <button type="button" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 30px; border: 0; border-radius: 7px; background: #0b63ce; color: #ffffff; font-size: 13px; font-weight: 600">
+        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="1.8"><path d="M2 6.5l3 3 5-6"/></svg>
+        Complete
+      </button>
+    </div>
+  </section>
+
+  <!-- Menu bar popover -->
+  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0">
+    <div aria-hidden="true" style="display: flex; align-items: center; gap: 18px; height: 24px; padding: 0 14px; background: #e9e9ee; border-radius: 6px 6px 0 0; font-size: 12px; color: #1d1d1f">
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; background: #d6d6dc">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#1d1d1f" stroke-width="1.6"><circle cx="6" cy="6" r="4.5"/><circle cx="6" cy="6" r="1.4" fill="#1d1d1f"/></svg>
+        24:08
+      </span>
+      <span>Tue 18:52</span>
+    </div>
+    <section aria-label="Menu bar popover" style="width: 300px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 14px 14px 12px 14px; border-radius: 0 0 10px 10px; background: #f6f6f8; box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 12px 32px rgba(0,0,0,0.18)">
+      <div style="display: flex; flex-direction: column; gap: 3px; padding: 2px 4px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between">
+          <span style="font-size: 14px; font-weight: 600">Explain baseline results</span>
+          <span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums">24:08</span>
+        </div>
+        <span style="font-size: 12px; color: #6e6e73">NLP report</span>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button type="button" style="flex: 1; height: 28px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 13px">Pause</button>
+        <button type="button" style="flex: 1; height: 28px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 13px">Complete</button>
+      </div>
+      <div style="height: 1px; background: #dcdce0"></div>
+      <div style="display: flex; flex-direction: column; font-size: 13px">
+        <a href="TodaySIC.dc.html" style="display: flex; align-items: center; justify-content: space-between; height: 30px; padding: 0 6px; border-radius: 5px; color: #1d1d1f; text-decoration: none"><span>Next up: PR #132</span><span style="font-size: 12px; color: #6e6e73">Switch</span></a>
+        <a href="Main.dc.html" style="display: flex; align-items: center; height: 30px; padding: 0 6px; border-radius: 5px; color: #1d1d1f; text-decoration: none">Open FocusPilot</a>
+        <a href="Settings.dc.html" style="display: flex; align-items: center; height: 30px; padding: 0 6px; border-radius: 5px; color: #1d1d1f; text-decoration: none">Settings…</a>
+      </div>
+      <div style="height: 1px; background: #dcdce0"></div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 0 6px 2px 6px; font-size: 12px; color: #3a3a3c">
+        <span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #1f9d55"></span>Chrome</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #c77d00"></span>Safari</span>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":400}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

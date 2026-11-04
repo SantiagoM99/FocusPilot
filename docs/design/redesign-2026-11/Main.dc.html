@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Planning window, Today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Inter,system-ui,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}
+a{color:#0b63ce}a:hover{color:#084d9f}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1180px; height: 720px; box-sizing: border-box; display: flex; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,0.12), 0 18px 48px rgba(0,0,0,0.18)">
+
+  <!-- Sidebar -->
+  <nav aria-label="Sections" style="width: 210px; flex-shrink: 0; box-sizing: border-box; background: #f3f3f5; border-right: 1px solid #dcdce0; display: flex; flex-direction: column; padding: 14px 10px 14px 10px; gap: 22px">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px">
+      <span style="width: 12px; height: 12px; border-radius: 6px; background: #ff5f57"></span>
+      <span style="width: 12px; height: 12px; border-radius: 6px; background: #febc2e"></span>
+      <span style="width: 12px; height: 12px; border-radius: 6px; background: #28c840"></span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Main.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; background: #dedee3; color: #1d1d1f; text-decoration: none; font-size: 13px; font-weight: 500">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1d1d1f" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
+        <span style="flex: 1">Today</span>
+      </a>
+      <a href="InFlight.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: #1d1d1f; text-decoration: none; font-size: 13px">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1d1d1f" stroke-width="1.5"><path d="M3 13V8M3 8c0-3 2-4 5-4h5M10 1.5L13 4l-3 2.5"/></svg>
+        <span style="flex: 1">In flight</span>
+        <span style="font-size: 11px; font-weight: 600; color: #ffffff; background: #6e6e73; border-radius: 9px; padding: 1px 7px">2</span>
+      </a>
+      <a href="#projects" style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: #1d1d1f; text-decoration: none; font-size: 13px">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1d1d1f" stroke-width="1.5"><path d="M1.5 4.5A1.5 1.5 0 0 1 3 3h3l1.5 1.5H13A1.5 1.5 0 0 1 14.5 6v6A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12z"/></svg>
+        <span style="flex: 1">Projects</span>
+      </a>
+      <a href="InFlight.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: #1d1d1f; text-decoration: none; font-size: 13px">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1d1d1f" stroke-width="1.5"><path d="M1.5 9h3.5l1 2h4l1-2h3.5M1.5 9v4h13V9M3 9l1.5-6h7L13 9"/></svg>
+        <span style="flex: 1">Review queue</span>
+        <span style="font-size: 11px; font-weight: 600; color: #ffffff; background: #6e6e73; border-radius: 9px; padding: 1px 7px">1</span>
+      </a>
+      <a href="Labs.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: #1d1d1f; text-decoration: none; font-size: 13px">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1d1d1f" stroke-width="1.5"><path d="M6 1.5h4M6.5 1.5v4.5L2.5 12a1.5 1.5 0 0 0 1.3 2.3h8.4a1.5 1.5 0 0 0 1.3-2.3L9.5 6V1.5"/></svg>
+        <span style="flex: 1">Labs</span>
+      </a>
+      <a href="Settings.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: #1d1d1f; text-decoration: none; font-size: 13px">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1d1d1f" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
+        <span style="flex: 1">Settings</span>
+      </a>
+    </div>
+    <div style="flex: 1"></div>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: #3a3a3c">
+      <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #1f9d55"></span>
+      <span>Chrome protected</span>
+    </div>
+  </nav>
+
+  <!-- Center -->
+  <main style="flex: 1; min-width: 0; display: flex; flex-direction: column; background: #ffffff">
+    <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 24px 10px 24px; border-bottom: 1px solid #e5e5ea">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-size: 15px; font-weight: 600">Today</h1>
+        <span style="font-size: 12px; color: #6e6e73">Tuesday 3 November</span>
+      </div>
+      <button type="button" style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 13px">
+        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#1d1d1f" stroke-width="1.6"><path d="M6 1.5v9M1.5 6h9"/></svg>
+        New Task
+      </button>
+    </header>
+
+    <div style="display: flex; flex-direction: column; gap: 28px; padding: 22px 24px; overflow: hidden">
+
+      <!-- Now -->
+      <section aria-label="Now" style="display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: 10px; background: #f3f6fb; border: 1px solid #d9e3f3">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #3b5b8c">NOW</span>
+          <span style="font-size: 12px; color: #3b5b8c">Due Fri 23:59</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.01em">Explain baseline results</span>
+          <span style="font-size: 13px; color: #6e6e73">NLP report · Next: write the comparison table</span>
+        </div>
+        <div style="display: flex; gap: 8px; padding-top: 4px">
+          <a href="FocusPanel.dc.html" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 14px; border-radius: 7px; background: #0b63ce; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 600">
+            <svg aria-hidden="true" width="10" height="12" viewBox="0 0 10 12" fill="#ffffff"><path d="M1 1l8 5-8 5z"/></svg>
+            Start focus
+          </a>
+          <button type="button" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border: 1px solid #c9d3e3; border-radius: 7px; background: #ffffff; color: #1d1d1f; font-size: 13px">Open context</button>
+        </div>
+      </section>
+
+      <!-- Next -->
+      <section aria-label="Next" style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #6e6e73; padding: 0 6px">NEXT</span>
+        <div style="display: flex; flex-direction: column">
+          <div style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px; border-radius: 6px; background: #eef2f8">
+            <span style="flex: 1; font-size: 13px; font-weight: 500">PhD shortlist: email two advisors</span>
+            <span style="font-size: 12px; color: #6e6e73">Applications</span>
+            <span style="font-size: 12px; color: #6e6e73; width: 64px; text-align: right">Thu</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px; border-radius: 6px">
+            <span style="flex: 1; font-size: 13px">Rebuttal: answer reviewer 2</span>
+            <span style="font-size: 12px; color: #6e6e73">SciBETO</span>
+            <span style="font-size: 12px; color: #6e6e73; width: 64px; text-align: right">Sat</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px; border-radius: 6px">
+            <span style="flex: 1; font-size: 13px">Proposal: section 3 figures</span>
+            <span style="font-size: 12px; color: #6e6e73">Thesis</span>
+            <span style="font-size: 12px; color: #6e6e73; width: 64px; text-align: right">12 Nov</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Later -->
+      <section aria-label="Later" style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #6e6e73; padding: 0 6px">LATER</span>
+        <div style="display: flex; flex-direction: column">
+          <div style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px; border-radius: 6px">
+            <span style="flex: 1; font-size: 13px; color: #3a3a3c">Grade week 6 submissions</span>
+            <span style="font-size: 12px; color: #6e6e73">Teaching</span>
+            <span style="font-size: 12px; color: #6e6e73; width: 64px; text-align: right"></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px; border-radius: 6px">
+            <span style="flex: 1; font-size: 13px; color: #3a3a3c">Clean the realignment plots</span>
+            <span style="font-size: 12px; color: #6e6e73">ARR paper</span>
+            <span style="font-size: 12px; color: #6e6e73; width: 64px; text-align: right"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Inspector -->
+  <aside aria-label="Task details" style="width: 300px; flex-shrink: 0; box-sizing: border-box; border-left: 1px solid #e5e5ea; background: #fafafa; display: flex; flex-direction: column; gap: 22px; padding: 22px 20px">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600">PhD shortlist: email two advisors</h2>
+      <span style="font-size: 12px; color: #6e6e73">Applications</span>
+    </div>
+
+    <dl style="margin: 0; display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 12px; column-gap: 10px; font-size: 13px">
+      <dt style="color: #6e6e73">Deadline</dt>
+      <dd style="margin: 0">Thu 5 Nov, 18:00</dd>
+      <dt style="color: #6e6e73">Next action</dt>
+      <dd style="margin: 0">Draft the message to Adelani</dd>
+      <dt style="color: #6e6e73">Workspace</dt>
+      <dd style="margin: 0; display: flex; align-items: center; gap: 6px">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#6e6e73" stroke-width="1.5"><path d="M1.5 4.5A1.5 1.5 0 0 1 3 3h3l1.5 1.5H13A1.5 1.5 0 0 1 14.5 6v6A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12z"/></svg>
+        <span>~/PhD/applications</span>
+      </dd>
+    </dl>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #6e6e73">RESOURCES</span>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px">
+        <a href="#r1" style="text-decoration: none; display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 3px; background: #0b63ce"></span>Shortlist sheet</a>
+        <a href="#r2" style="text-decoration: none; display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 3px; background: #0b63ce"></span>Statement draft v4</a>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 8px; background: #ffffff; border: 1px solid #e5e5ea">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <span style="font-size: 12px; font-weight: 600">Herdr agent</span>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #1f6b3a"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #1f9d55"></span>Results ready</span>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <a href="InFlight.dc.html" style="display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 6px; background: #ffffff; border: 1px solid #d1d1d6; color: #1d1d1f; text-decoration: none; font-size: 12px; font-weight: 500">Review</a>
+        <button type="button" style="height: 26px; padding: 0 10px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 12px">Open agent</button>
+      </div>
+    </div>
+
+    <div style="flex: 1"></div>
+    <div style="display: flex; gap: 8px">
+      <button type="button" style="flex: 1; height: 28px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 13px">Pin to Now</button>
+      <button type="button" style="flex: 1; height: 28px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 13px">Done</button>
+    </div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1180,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

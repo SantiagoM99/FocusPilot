@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quick capture and Start focus sheets</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Inter,system-ui,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}
+a{color:#0b63ce}a:hover{color:#084d9f}
+button,input,select{font:inherit}
+button{cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1040px; height: 460px; box-sizing: border-box; display: flex; gap: 60px; align-items: flex-start; padding: 24px">
+
+  <!-- Quick capture -->
+  <section aria-label="New task" style="width: 460px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 22px 22px 18px 22px; border-radius: 12px; background: #ffffff; box-shadow: 0 0 0 1px rgba(0,0,0,0.12), 0 18px 48px rgba(0,0,0,0.2)">
+    <h2 style="margin: 0; font-size: 15px; font-weight: 600">New task</h2>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="capture" style="font-size: 12px; color: #6e6e73">Task</label>
+      <input id="capture" type="text" value="Write NLP report by Friday 5pm" style="box-sizing: border-box; width: 100%; height: 34px; padding: 0 10px; border: 1px solid #c7c7cc; border-radius: 7px; background: #ffffff; font-size: 14px; color: #1d1d1f">
+    </div>
+
+    <dl style="margin: 0; display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 10px; column-gap: 12px; font-size: 13px; padding: 12px 14px; border-radius: 8px; background: #f3f6fb; border: 1px solid #d9e3f3">
+      <dt style="color: #6e6e73">Title</dt>
+      <dd style="margin: 0; font-weight: 500">Write NLP report</dd>
+      <dt style="color: #6e6e73">Deadline</dt>
+      <dd style="margin: 0; display: flex; align-items: center; gap: 10px"><span>Fri 7 Nov, 17:00</span><button type="button" style="height: 22px; padding: 0 8px; border: 1px solid #c9d3e3; border-radius: 5px; background: #ffffff; color: #1d1d1f; font-size: 12px">Change</button></dd>
+      <dt style="color: #6e6e73">Project</dt>
+      <dd style="margin: 0"><select aria-label="Project" style="height: 24px; padding: 0 6px; border: 1px solid #c9d3e3; border-radius: 5px; background: #ffffff; font-size: 13px; color: #1d1d1f"><option>NLP report</option><option>Applications</option><option>Thesis</option><option>None</option></select></dd>
+      <dt style="color: #6e6e73">Next action</dt>
+      <dd style="margin: 0"><input aria-label="Next action" type="text" value="" placeholder="Optional" style="box-sizing: border-box; width: 100%; height: 24px; padding: 0 8px; border: 1px solid #c9d3e3; border-radius: 5px; background: #ffffff; font-size: 13px; color: #1d1d1f"></dd>
+    </dl>
+
+    <div style="display: flex; justify-content: flex-end; gap: 8px">
+      <button type="button" style="height: 28px; padding: 0 14px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 13px">Cancel</button>
+      <button type="button" style="height: 28px; padding: 0 16px; border: 0; border-radius: 6px; background: #0b63ce; color: #ffffff; font-size: 13px; font-weight: 600">Save</button>
+    </div>
+  </section>
+
+  <!-- Start focus -->
+  <section aria-label="Start focus" style="width: 460px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 22px 22px 18px 22px; border-radius: 12px; background: #ffffff; box-shadow: 0 0 0 1px rgba(0,0,0,0.12), 0 18px 48px rgba(0,0,0,0.2)">
+    <h2 style="margin: 0; font-size: 15px; font-weight: 600">Start focus</h2>
+
+    <div style="display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 8px; background: #f3f6fb; border: 1px solid #d9e3f3">
+      <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #3b5b8c">NOW</span>
+      <span style="font-size: 15px; font-weight: 600">Explain baseline results</span>
+      <span style="font-size: 12px; color: #6e6e73">NLP report · Due Fri 23:59</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 12px; color: #6e6e73">Length</span>
+      <div role="group" aria-label="Length" style="display: flex; gap: 0; border: 1px solid #c7c7cc; border-radius: 7px; overflow: hidden">
+        <button type="button" style="flex: 1; height: 30px; border: 0; background: #ffffff; color: #1d1d1f; font-size: 13px">25 min</button>
+        <button type="button" aria-pressed="true" style="flex: 1; height: 30px; border: 0; border-left: 1px solid #c7c7cc; background: #0b63ce; color: #ffffff; font-size: 13px; font-weight: 600">50 min</button>
+        <button type="button" style="flex: 1; height: 30px; border: 0; border-left: 1px solid #c7c7cc; background: #ffffff; color: #1d1d1f; font-size: 13px">90 min</button>
+        <button type="button" style="flex: 1; height: 30px; border: 0; border-left: 1px solid #c7c7cc; background: #ffffff; color: #1d1d1f; font-size: 13px">Custom…</button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <label style="display: flex; align-items: center; justify-content: space-between; font-size: 13px">
+        <span>Strict session</span>
+        <input type="checkbox" role="switch" style="width: 36px; height: 20px; margin: 0; accent-color: #0b63ce">
+      </label>
+      <label style="display: flex; align-items: center; justify-content: space-between; font-size: 13px">
+        <span>Projects allowed</span>
+        <select aria-label="Projects allowed" style="height: 24px; padding: 0 6px; border: 1px solid #c7c7cc; border-radius: 5px; background: #ffffff; font-size: 13px; color: #1d1d1f"><option>All projects</option><option>Chosen projects</option></select>
+      </label>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 8px">
+      <button type="button" style="height: 28px; padding: 0 14px; border: 1px solid #d1d1d6; border-radius: 6px; background: #ffffff; color: #1d1d1f; font-size: 13px">Cancel</button>
+      <a href="FocusPanel.dc.html" style="display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 16px; border-radius: 6px; background: #0b63ce; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 600">
+        <svg aria-hidden="true" width="10" height="12" viewBox="0 0 10 12" fill="#ffffff"><path d="M1 1l8 5-8 5z"/></svg>
+        Start
+      </a>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1040,"height":460}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
