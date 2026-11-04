@@ -14,8 +14,6 @@ struct HerdrImportSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Import from Herdr")
                     .font(.headline)
-                Text("Each workspace you tick becomes a project linked to it. FocusPilot only reads Herdr.")
-                    .foregroundStyle(.secondary)
             }
             .padding(20)
             Divider()
@@ -39,8 +37,7 @@ struct HerdrImportSheet: View {
         if case .connected(let server, let workspaces) = model.herdr {
             let rows = HerdrImportRow.rows(for: workspaces, on: server, projects: model.projects)
             if rows.isEmpty {
-                ContentUnavailableView("No workspaces", systemImage: "square.stack.3d.up",
-                                       description: Text("Herdr has no open workspaces."))
+                ContentUnavailableView("No workspaces", systemImage: "square.stack.3d.up")
             } else {
                 List(rows) { row in
                     Toggle(isOn: binding(for: row)) {
@@ -115,8 +112,7 @@ struct HerdrUnavailableView: View {
         case nil, .connected:
             ProgressView()
         case .disconnected(let reason):
-            ContentUnavailableView(reason.title, systemImage: "bolt.horizontal.circle",
-                                   description: Text(reason.explanation))
+            ContentUnavailableView(reason.title, systemImage: "bolt.horizontal.circle")
         }
     }
 }
@@ -131,16 +127,4 @@ extension HerdrUnavailable {
         }
     }
 
-    var explanation: String {
-        switch self {
-        case .binaryNotFound:
-            "FocusPilot looks for herdr in ~/.local/bin, /opt/homebrew/bin, /usr/local/bin and ~/.cargo/bin."
-        case .notRunning:
-            "Start Herdr and its workspaces appear here. FocusPilot keeps checking."
-        case .unsupportedVersion:
-            "FocusPilot works with Herdr’s protocol 22 (Herdr 0.9). FocusPilot keeps checking."
-        case .unreadableReply:
-            "This Herdr version may be newer than FocusPilot supports. FocusPilot keeps checking."
-        }
-    }
 }

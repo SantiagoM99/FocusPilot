@@ -22,9 +22,6 @@ struct QuickCaptureSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("New task")
                 .font(.title3.weight(.semibold))
-            Text("Type the task, and its deadline if it has one, in the same field. Check the reading below before saving.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 4) {
                 TextField("Task", text: $text, prompt: Text("Write NLP report by Friday 5pm"))

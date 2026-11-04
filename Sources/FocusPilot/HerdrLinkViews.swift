@@ -52,9 +52,11 @@ struct HerdrLinkSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(isRelink ? "Relink “\(project.title)”" : "Link “\(project.title)” to Herdr")
                     .font(.headline)
-                Text(subtitle)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let link = project.herdrLink {
+                    Text("“\(link.label)” is no longer in Herdr")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(20)
             Divider()
@@ -75,14 +77,6 @@ struct HerdrLinkSheet: View {
         .onAppear { selection = suggestion?.id }
     }
 
-    private var subtitle: String {
-        guard let link = project.herdrLink else {
-            return "Choose the workspace this project's work happens in. FocusPilot only reads Herdr."
-        }
-        let match = suggestion.map { " “\($0.label)” has the same name and folder." } ?? ""
-        return "The workspace “\(link.label)” is no longer in Herdr, possibly because Herdr restarted.\(match)"
-    }
-
     /// Workspaces not linked to another project.
     private var available: [HerdrWorkspace] {
         guard case .connected(let server, let workspaces) = model.herdr else { return [] }
@@ -97,8 +91,7 @@ struct HerdrLinkSheet: View {
     @ViewBuilder private var content: some View {
         if case .connected = model.herdr {
             if available.isEmpty {
-                ContentUnavailableView("No free workspaces", systemImage: "square.stack.3d.up",
-                                       description: Text("Every open Herdr workspace is already linked to a project."))
+                ContentUnavailableView("No free workspaces", systemImage: "square.stack.3d.up")
             } else {
                 List(available, selection: $selection) { workspace in
                     HerdrWorkspaceLabel(workspace: workspace,

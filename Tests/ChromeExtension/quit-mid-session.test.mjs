@@ -38,11 +38,11 @@ for (const mode of ["normal", "strict"]) {
     const m = page("https://www.youtube.com/watch?v=1");
     assert.equal(m.status.text, "FocusPilot isn't running");
     assert.equal(m.primary.label, "Open FocusPilot");
-    assert.match(m.hint, /Applications.*Spotlight/);
+    assert.equal(m.hint, undefined);
     assert.equal(m.exceptionLink, false);
     assert.equal(m.kind, mode === "strict" ? "strict-offline" : "normal-offline");
     assert.equal(m.title, mode === "strict" ? "Still blocked · strict session" : "Still blocked until 10:25");
-    assert.match(page("https://instagram.com/").hint, /isn't running.*Applications.*Spotlight/);
+    assert.equal(page("https://instagram.com/").hint, "FocusPilot isn't running");
   });
 }
 

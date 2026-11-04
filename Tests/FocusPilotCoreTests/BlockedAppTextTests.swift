@@ -24,7 +24,6 @@ struct BlockedAppTextTests {
 
         #expect(text.headline == "Focus session · 24:08 left")
         #expect(text.detail == "You're working on Write the essay")
-        #expect(text.footer == "Instagram was hidden, not quit. Nothing was closed. Exceptions cover the whole app.")
     }
 
     @Test func outsideASessionAScheduleSaysWhenItEnds() {
@@ -71,14 +70,14 @@ struct AppProtectionTextTests {
         CompiledPolicy(revision: 1, effectiveAt: now, rules: PolicyCompiler.compile(rules: rules, allowed: [], session: session, exceptions: exceptions))
     }
 
-    @Test func namesTheAppsHiddenNowAndThatItNeedsFocusPilotRunning() {
+    @Test func namesTheAppsHiddenNow() {
         let rules = [BlockRuleSet(targets: [instagram, .site(domain: "instagram.com")], activation: .always),
                      BlockRuleSet(targets: [tiktok], activation: .sessionOnly)]
 
         let line = AppProtectionText(rules: rules, policy: policy(rules), at: now)
 
         #expect(line.summary == "Apps protected · Instagram")
-        #expect(line.detail == "Only while FocusPilot is running")
+        #expect(line.detail == nil, "no explanation under the line (decision 0003, 2026-11-03)")
     }
 
     @Test func anExceptionOrNoAppRulesSayNoAppIsHidden() {
@@ -94,7 +93,7 @@ struct AppProtectionTextTests {
                      BlockRuleSet(targets: [tiktok], activation: .sessionOnly),
                      BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly)]
 
-        #expect(AppProtectionText.preflight(rules: rules, at: now) == "Instagram, TikTok hidden on open · only while FocusPilot runs")
+        #expect(AppProtectionText.preflight(rules: rules, at: now) == "Instagram, TikTok hidden on open")
         #expect(AppProtectionText.preflight(rules: [], at: now) == "No apps blocked")
     }
 }

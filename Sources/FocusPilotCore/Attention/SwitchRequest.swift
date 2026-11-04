@@ -34,10 +34,4 @@ public struct SwitchRequest: Hashable, Sendable, Identifiable {
         self.init(taskID: thread.taskID, taskTitle: thread.taskTitle, linkID: thread.linkID,
                   agentLabel: thread.linkID == nil ? nil : thread.label, item: item)
     }
-
-    /// What confirming does, under the sheet's title.
-    public var opens: String {
-        guard linkID != nil, let agentLabel else { return "Makes it Now." }
-        return "Makes it Now and opens \(agentLabel) in Herdr."
-    }
 }

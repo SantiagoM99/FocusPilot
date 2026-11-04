@@ -38,7 +38,7 @@ struct BrowserProtectionTests {
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · Incognito unprotected")
         #expect(s.footer == "Chrome · Incognito unprotected")
-        #expect(s.detail == "Turn on Allow in Incognito for the FocusPilot extension in chrome://extensions")
+        #expect(s.detail == nil)
     }
 
     @Test func noExtensionIsDegraded() {
@@ -64,7 +64,7 @@ struct BrowserProtectionTests {
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · 1 profile disconnected")
         #expect(s.footer == "Chrome · Disconnected")
-        #expect(s.detail == "A profile's extension isn't connected. Forget it in Settings if you no longer use it.")
+        #expect(s.detail == nil)
     }
 
     @Test func aProfileStillApplyingThePolicyIsSyncing() {
@@ -82,7 +82,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .unknown)
         #expect(s.line == "Chrome not running")
-        #expect(s.detail == "It gets the current policy when it opens")
+        #expect(s.detail == nil)
     }
 
     @Test func afterARestartOrWakeTheStatusIsUnknownUntilConfirmed() {
@@ -115,7 +115,7 @@ struct BrowserProtectionTests {
         #expect(s.level == .degraded)
         #expect(s.line == "Firefox in front · not protected")
         #expect(s.footer == "Firefox · not protected")
-        #expect(s.detail == "Chrome rules still apply; Firefox has no FocusPilot extension")
+        #expect(s.detail == nil)
     }
 
     @Test func anUnsupportedBrowserOutsideASessionChangesNothing() {
@@ -131,7 +131,7 @@ struct BrowserProtectionTests {
 
     // Decision 0003, 2026-10-20: Safari relies on the owner's own blocker.
     @Test func safariIsAnExternalBlockerThatIsNeverVerified() {
-        #expect(status().safari == "Safari · external blocker, not verified")
+        #expect(status().safari == "Safari · not verified")
         #expect(status(inSession: true, front: .safari).level == .protected)
     }
 
@@ -206,7 +206,7 @@ struct AppProtectionStatusTests {
 
     @Test func hidingAppsIsProtectedWhileRunning() {
         #expect(line(running: true).isProtected)
-        #expect(line(running: true).short == "Apps · protected while running")
+        #expect(line(running: true).short == "Apps · protected")
     }
 
     @Test func appBlockingThatIsNotRunningProtectsNothing() {

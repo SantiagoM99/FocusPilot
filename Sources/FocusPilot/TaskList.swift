@@ -7,11 +7,9 @@ import SwiftUI
 struct TaskList: View {
     let items: [TodayItem]
     let showsProject: Bool
-    var nowCaption: String? = nil
     /// Today shows an empty Now card; a project whose tasks do not include
     /// the one Now leaves it out rather than claim there is none.
     var showsEmptyNow = true
-    var nextCaption = "Manual order · drag to reorder"
     let move: (Int64, TaskStatus, TaskPlacement) -> Void
     /// Removes a task added from Herdr; nil hides Undo.
     var undoHerdrAdd: ((Int64) -> Void)?
@@ -28,13 +26,13 @@ struct TaskList: View {
             List(selection: $selection) {
                 if sections.now != nil || showsEmptyNow {
                     Section {
-                        NowCard(item: sections.now, caption: nowCaption, showsProject: showsProject, now: context.date)
+                        NowCard(item: sections.now, showsProject: showsProject, now: context.date)
                             .tag(sections.now?.id)
                             .listRowSeparator(.hidden)
                     }
                 }
-                section(.next, "Next", caption: nextCaption, sections, context.date)
-                section(.later, "Later", caption: nil, sections, context.date)
+                section(.next, "Next", sections, context.date)
+                section(.later, "Later", sections, context.date)
             }
             .listStyle(.inset)
             .contextMenu(forSelectionType: Int64.self) { ids in
@@ -64,7 +62,7 @@ struct TaskList: View {
     }
 
     @ViewBuilder
-    private func section(_ status: TaskStatus, _ title: String, caption: String?, _ sections: TaskSections,
+    private func section(_ status: TaskStatus, _ title: String, _ sections: TaskSections,
                          _ now: Date) -> some View {
         let members = sections.items(in: status)
         if !members.isEmpty {
@@ -82,16 +80,9 @@ struct TaskList: View {
                     }
                 }
             } header: {
-                HStack(spacing: 8) {
-                    Text(title)
-                        .font(.caption.weight(.semibold))
-                        .textCase(.uppercase)
-                    if let caption {
-                        Text(caption)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .textCase(.uppercase)
             }
         }
     }

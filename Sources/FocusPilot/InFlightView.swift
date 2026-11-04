@@ -13,7 +13,7 @@ struct InFlightView: View {
             VStack(alignment: .leading, spacing: 24) {
                 section("Needs you") {
                     if model.attention.isEmpty {
-                        note("Nothing needs you right now. Agent results, approval requests and checks you scheduled appear here.")
+                        note("Nothing needs you")
                     } else {
                         VStack(spacing: 0) {
                             ForEach(Array(model.attention.enumerated()), id: \.element.id) { index, item in
@@ -26,7 +26,7 @@ struct InFlightView: View {
                 }
                 section("In flight") {
                     if model.inFlight.isEmpty {
-                        note("Nothing in flight. Link an agent to a task, or mark a task as waiting from its menu.")
+                        note("Nothing in flight")
                     } else {
                         VStack(spacing: 0) {
                             ForEach(Array(model.inFlight.enumerated()), id: \.element.id) { index, project in

@@ -11,8 +11,7 @@ struct ReviewQueueView: View {
 
     var body: some View {
         if model.reviewItems.isEmpty {
-            ContentUnavailableView("Nothing to review", systemImage: "tray",
-                                   description: Text("Agent results appear here when they finish. Nothing opens on its own."))
+            ContentUnavailableView("Nothing to review", systemImage: "tray")
         } else {
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
@@ -20,12 +19,6 @@ struct ReviewQueueView: View {
                         AgentResultRow(item: item)
                     }
                     .listStyle(.inset)
-                    Divider()
-                    Text("Previews are plain text from the agent’s screen, never executed. Approval requests are shown; FocusPilot never answers them.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(12)
                 }
                 .frame(minWidth: 380)
                 Divider()
@@ -125,15 +118,11 @@ struct AgentResultDetail: View {
                 }
                 .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 6))
                 .contrastBorder(cornerRadius: 6)
-                Text(lineCaption)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if item.kind == .approval {
-                Text("The request is shown here as text. Respond in Herdr after Open agent; FocusPilot never approves or declines on your behalf.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let lineCaption {
+                    Text(lineCaption)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             if let notice = model.agentNotice {
                 Label(notice, systemImage: "exclamationmark.triangle.fill")
@@ -155,10 +144,11 @@ struct AgentResultDetail: View {
         .onChange(of: item.id) { model.agentNotice = nil }
     }
 
-    private var lineCaption: String {
-        guard let output = item.output else { return "Plain text · not executed" }
+    /// "Last 12 of 40 lines", "12 lines".
+    private var lineCaption: String? {
+        guard let output = item.output else { return nil }
         return output.lines.count < output.totalLineCount
-            ? "Plain text · not executed · last \(output.lines.count) of \(output.totalLineCount) lines"
-            : "Plain text · not executed · \(output.lines.count) lines"
+            ? "Last \(output.lines.count) of \(output.totalLineCount) lines"
+            : "\(output.lines.count) lines"
     }
 }

@@ -48,9 +48,11 @@ struct MenuBarContent: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.nowTask?.title ?? "No current task")
                     .font(.headline)
-                Text(model.nowTask?.projectTitle ?? (model.nowTask == nil ? "You can start a session and pin a task later." : "No project"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                if let task = model.nowTask {
+                    Text(task.projectTitle ?? "No project")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
             ProtectionStatusView(model: model, showsDetail: false)
             SiteExceptionLines(model: model)
@@ -181,7 +183,7 @@ private struct LoginItemToggle: View {
     }
 }
 
-/// "Apps protected · Instagram" over "Only while FocusPilot is running" (design 03).
+/// "Apps protected · Instagram", over "App blocking isn't running" when it isn't (design 03).
 struct AppProtectionLine: View {
     let text: AppProtectionText
 
@@ -189,10 +191,12 @@ struct AppProtectionLine: View {
         VStack(alignment: .leading, spacing: 1) {
             Label(text.summary, systemImage: "app.dashed")
                 .font(.callout)
-            Text(text.detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 22)
+            if let detail = text.detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 22)
+            }
         }
         .accessibilityElement(children: .combine)
     }

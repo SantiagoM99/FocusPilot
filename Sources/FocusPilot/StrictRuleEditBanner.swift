@@ -18,20 +18,21 @@ struct StrictRuleEditBanner: View {
                     .disabled(model.now < pending.availableAt)
             }
         } else if let edit = model.ruleEditToConfirm {
-            banner(RuleText.title(edit, rules: model.ruleSets),
-                   detail: "This is a strict session, so weakening a rule waits \(StrictEarlyEnd.waitText) after you confirm. Blocking stays on until then.") {
+            banner(RuleText.title(edit, rules: model.ruleSets), detail: nil) {
                 Button("Keep Rule") { model.ruleEditToConfirm = nil }
                 Button("Continue") { Task { await model.perform(edit, confirmed: true) } }
             }
         }
     }
 
-    private func banner(_ title: String, detail: String, @ViewBuilder actions: () -> some View) -> some View {
+    private func banner(_ title: String, detail: String?, @ViewBuilder actions: () -> some View) -> some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: "lock.fill").foregroundStyle(.secondary).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
-                Text(detail).font(.callout).foregroundStyle(.secondary).monospacedDigit()
+                if let detail {
+                    Text(detail).font(.callout).foregroundStyle(.secondary).monospacedDigit()
+                }
             }
             Spacer()
             actions()

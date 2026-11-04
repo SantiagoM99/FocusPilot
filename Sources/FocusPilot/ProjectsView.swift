@@ -82,8 +82,7 @@ struct ProjectsView: View {
                 // Until the newly selected project has loaded, show nothing
                 // rather than the previous project's tasks.
                 TaskList(items: model.shownProject == projectSelection ? model.projectItems : [], showsProject: false,
-                         nowCaption: "the one current action, shared with Today", showsEmptyNow: false,
-                         nextCaption: "Manual order within the project",
+                         showsEmptyNow: false,
                          move: { id, status, placement in Task { await model.move(id, to: status, placement) } },
                          undoHerdrAdd: { id in Task { await model.undoHerdrAdd(id) } },
                      activeSessionTaskID: model.snapshot.activeSession?.taskID,
@@ -92,8 +91,7 @@ struct ProjectsView: View {
                                    showReviewQueue: showReviewQueue)
             }
         } else if model.projects.isEmpty {
-            ContentUnavailableView("No projects yet", systemImage: "folder",
-                                   description: Text("Choose a project when you capture a task, or import Herdr workspaces with +."))
+            ContentUnavailableView("No projects yet", systemImage: "folder")
         } else {
             ContentUnavailableView("Select a project", systemImage: "folder")
         }

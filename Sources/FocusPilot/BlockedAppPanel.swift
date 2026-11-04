@@ -192,15 +192,6 @@ struct BlockedAppPanelView: View {
             }
             .padding(18)
             .background(Color(nsColor: .controlBackgroundColor))
-            Divider()
-            Text(verbatim: text.footer)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .barBackground()
         }
         .frame(width: 420)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -213,10 +204,6 @@ struct BlockedAppPanelView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text("Timed exception")
                 .font(.headline)
-            Text("Covers all of \(blocked.name). Ends at the time chosen, not at the session end.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             Picker("Duration", selection: $state.duration) {
                 ForEach(TimedException.durations, id: \.self) { duration in
                     Text("\(Int(duration / 60)) min").tag(duration)
@@ -226,14 +213,9 @@ struct BlockedAppPanelView: View {
             .fixedSize()
             .disabled(availableAt != nil)
             if isStrict {
-                TextField("Why this app is needed for the task", text: $state.reason)
+                TextField("Reason", text: $state.reason)
                     .textFieldStyle(.roundedBorder)
                     .disabled(availableAt != nil)
-            }
-            if state.isConfirming {
-                Text("A strict session waits \(StrictEarlyEnd.waitText) before allowing \(blocked.name).")
-                    .font(.callout)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             if let error = state.error {
                 Text(error)
