@@ -92,3 +92,19 @@ Direction agreed with the owner on 2026-11-02. The details are proposals.
 - **First job for the second in command:** Bowling PR reviews.
 - **Local experiment runs** for the Final Project and Observatorio Deserción interns: allowed at any time at low (background) priority, including during focus sessions. Starting a run still follows the propose-and-approve rule.
 - **Bowling PR reviews (owner, 2026-11-03).** The second in command reviews only marilynjov's PRs in marilynjov/Bowling, the ones the owner must review as the other developer. It checks each PR against Bowling's AGENTS.md: the package contract, the CloudKit schema rules, tests, and the linked issue. It reports a plain summary and a draft review. On Accept it posts the review under the owner's account. When the review is clean, Accept may also approve the PR. It never merges, pushes or requests changes without an Accept, and it never reviews the owner's own PRs.
+
+## Redesign decisions (owner, 2026-11-03)
+
+The owner's redesign (`docs/design/redesign-2026-11/`) wins over the earlier design.
+
+- **Interruptions during focus:** approvals and due checks show in the focus panel. Finished results and helper reports are held and come out in the wrap-up. They are visible in In flight at any time. A held item doesn't trigger the 30-minute alert, but the "agents waited for you" metric still counts from when the agent finished.
+- **Wrap-up:** one note per task, plus minutes and switches. The note becomes the task's return cue. "What got done", "What remains" and "Mark task complete" are removed from the sheet; older history stays readable.
+- **In flight:** grouped by state (needs you, working, finished), with the project on each row. This replaces grouping by project.
+- **"About N min of yours":** the median of the owner's last 10 approval round trips (Switch, then Back). It is hidden until there are 3.
+- **Defaults Claude chose:**
+  - The task line "· Overleaf" names the first resource in the task's open-with-context list.
+  - "Back to …" stays until Back, another Switch, or the end of the session.
+  - Results leave the Review queue on Open agent or Switch; "Mark reviewed" moves to the right-click menu.
+  - Dark mode ships now.
+  - Labs and "Ask about unknown apps" stay hidden until their features exist.
+  - In the second-in-command view, the line that says what Accept does on the owner's account stays.
