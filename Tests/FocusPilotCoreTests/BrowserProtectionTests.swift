@@ -37,7 +37,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · Incognito unprotected")
-        #expect(s.footer == "Chrome protected · Incognito unprotected")
+        #expect(s.footer == "Incognito unprotected")
         #expect(s.detail == nil)
     }
 
@@ -63,7 +63,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · 1 profile disconnected")
-        #expect(s.footer == "Chrome protected · 1 profile disconnected")
+        #expect(s.footer == "Profile disconnected")
         #expect(s.detail == nil)
     }
 
@@ -105,7 +105,7 @@ struct BrowserProtectionTests {
 
     // Safari is unverified, so the footer names Chrome, not "Browsers".
     @Test func theFooterNamesChromeAlone() {
-        #expect(status().footer.hasPrefix("Chrome "))
+        #expect(status().footer == "Chrome protected")
         #expect(status(chromeRunning: false).footer == "Chrome not running")
     }
 

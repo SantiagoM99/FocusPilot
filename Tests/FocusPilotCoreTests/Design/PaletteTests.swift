@@ -77,11 +77,24 @@ struct SidebarFooterTests {
                                        inSession: false, front: nil)
 
         #expect([protected, missing, incognito, closed].map(\.footer)
-            == ["Chrome protected", "Chrome not connected", "Chrome protected · Incognito unprotected", "Chrome not running"])
+            == ["Chrome protected", "Chrome not connected", "Incognito unprotected", "Chrome not running"])
+        // Review of #77: the footer fits the sidebar; the full line is its tooltip.
+        #expect(SidebarFooter(protection: incognito, observing: false).help == "Chrome protected · Incognito unprotected")
+        #expect([protected, missing, incognito, closed].allSatisfy { $0.footer.count <= 24 })
         #expect(SidebarFooter(protection: protected, observing: false).tone == .green)
         #expect(SidebarFooter(protection: missing, observing: false).tone == .amber)
         #expect(SidebarFooter(protection: closed, observing: false).tone == .unknown)
-        #expect(SidebarFooter(protection: protected, observing: true) == SidebarFooter(text: "Observing · nothing blocked", tone: .unknown))
+        #expect(SidebarFooter(protection: protected, observing: true)
+            == SidebarFooter(text: "Observing · nothing blocked", tone: .unknown, help: "Observing · nothing blocked"))
+    }
+
+    // Review of #77: arrow keys move through the sidebar in its order, and stop at the ends.
+    @Test func arrowKeysMoveThroughTheSidebar() {
+        #expect(PlanningPage.allCases == [.today, .inFlight, .projects, .review, .settings])
+        #expect(PlanningPage.today.moved(by: 1) == .inFlight)
+        #expect(PlanningPage.review.moved(by: -1) == .projects)
+        #expect(PlanningPage.today.moved(by: -1) == .today)
+        #expect(PlanningPage.settings.moved(by: 1) == .settings)
     }
 
     @Test func badgesHideAtZero() {

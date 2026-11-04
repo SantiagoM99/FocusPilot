@@ -10,9 +10,7 @@ import SwiftUI
 struct PlanningView: View {
     static let windowID = "planning"
 
-    enum Page: Hashable {
-        case today, inFlight, projects, review, settings
-    }
+    typealias Page = PlanningPage
 
     let model: AppModel
     @State private var page: Page?

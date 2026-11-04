@@ -11,15 +11,18 @@ public struct SidebarFooter: Equatable, Sendable {
 
     public var text: String
     public var tone: Tone
+    /// The full status line, shown on hover.
+    public var help: String
 
-    public init(text: String, tone: Tone) {
+    public init(text: String, tone: Tone, help: String) {
         self.text = text
         self.tone = tone
+        self.help = help
     }
 
     public init(protection: BrowserProtection, observing: Bool) {
         guard !observing else {
-            self.init(text: "Observing · nothing blocked", tone: .unknown)
+            self.init(text: "Observing · nothing blocked", tone: .unknown, help: "Observing · nothing blocked")
             return
         }
         let tone: Tone = switch protection.level {
@@ -27,7 +30,19 @@ public struct SidebarFooter: Equatable, Sendable {
         case .syncing, .degraded: .amber
         case .unknown: .unknown
         }
-        self.init(text: protection.footer, tone: tone)
+        self.init(text: protection.footer, tone: tone, help: protection.line)
+    }
+}
+
+/// The planning window's pages in sidebar order (#70).
+public enum PlanningPage: CaseIterable, Hashable, Sendable {
+    case today, inFlight, projects, review, settings
+
+    /// The page `offset` rows away, for the arrow keys; it stops at the ends.
+    public func moved(by offset: Int) -> PlanningPage {
+        let all = Self.allCases
+        let index = all.firstIndex(of: self)! + offset
+        return all[min(max(index, 0), all.count - 1)]
     }
 }
 

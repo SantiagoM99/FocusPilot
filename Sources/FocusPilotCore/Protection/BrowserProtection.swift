@@ -44,7 +44,8 @@ public struct BrowserProtection: Equatable, Sendable {
     /// "Chrome protected · Incognito unprotected".
     public var line: String
     /// The sidebar footer's one line (#70): "Chrome protected", or the same
-    /// line with the real state. It names Chrome, not "Browsers", since
+    /// line with the real state, short enough for the sidebar; `line` is its
+    /// tooltip. It names Chrome, not "Browsers", since
     /// Safari is never verified.
     public var footer: String
     public var detail: String?
@@ -80,9 +81,9 @@ public struct BrowserProtection: Equatable, Sendable {
             self.init(.syncing, "Chrome is updating…", "Chrome updating…")
         } else if disconnected > 0 {
             self.init(.degraded, "Chrome protected · \(disconnected) profile\(disconnected == 1 ? "" : "s") disconnected",
-                      "Chrome protected · \(disconnected) profile\(disconnected == 1 ? "" : "s") disconnected")
+                      disconnected == 1 ? "Profile disconnected" : "\(disconnected) profiles disconnected")
         } else if connected.contains(where: { !$0.incognitoAllowed }) {
-            self.init(.degraded, "Chrome protected · Incognito unprotected", "Chrome protected · Incognito unprotected")
+            self.init(.degraded, "Chrome protected · Incognito unprotected", "Incognito unprotected")
         } else {
             self.init(.protected, "Chrome protected", "Chrome protected", Self.upToDate(connected))
         }

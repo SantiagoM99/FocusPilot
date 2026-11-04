@@ -4,9 +4,11 @@ import SwiftUI
 /// The planning window sidebar (#70, redesign Main): Today, In flight,
 /// Projects, Review queue and Settings with grey count pills that hide at
 /// zero, and a one-line protection footer. Labs stays hidden until its ticket.
+/// The up and down arrows move between pages, as in a list.
 struct PlanningSidebar: View {
     let model: AppModel
     @Binding var page: PlanningView.Page?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,6 +22,11 @@ struct PlanningSidebar: View {
             .padding(.horizontal, 10)
             // Below the window's close, minimize and zoom buttons.
             .padding(.top, 48)
+            .focusable()
+            .focused($isFocused)
+            .focusEffectDisabled()
+            .onKeyPress(.upArrow) { move(-1) }
+            .onKeyPress(.downArrow) { move(1) }
             Spacer(minLength: 0)
             SidebarFooterLine(footer: SidebarFooter(protection: model.browserProtection,
                                                     observing: model.snapshot.isObserveOnly))
@@ -30,9 +37,17 @@ struct PlanningSidebar: View {
         .background(Color.palette(.sidebar))
     }
 
+    private func move(_ offset: Int) -> KeyPress.Result {
+        page = (page ?? .today).moved(by: offset)
+        return .handled
+    }
+
     private func row(_ target: PlanningView.Page, _ title: String, _ symbol: String, count: Int = 0) -> some View {
         let selected = page == target || (page == nil && target == .today)
-        return Button { page = target } label: {
+        return Button {
+            page = target
+            isFocused = true
+        } label: {
             HStack(spacing: 10) {
                 Image(systemName: symbol)
                     .frame(width: 16)
@@ -84,6 +99,7 @@ struct SidebarFooterLine: View {
                 .foregroundStyle(.palette(.footerText))
                 .lineLimit(1)
         }
+        .help(footer.help)
         .accessibilityElement(children: .combine)
     }
 }
