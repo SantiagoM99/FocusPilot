@@ -27,7 +27,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .protected)
         #expect(s.line == "Chrome protected")
-        #expect(s.footer == "Chrome · Protected")
+        #expect(s.footer == "Chrome protected")
         #expect(s.detail == "All 2 Chrome profiles have your latest rules")
     }
 
@@ -37,7 +37,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · Incognito unprotected")
-        #expect(s.footer == "Chrome · Incognito unprotected")
+        #expect(s.footer == "Chrome protected · Incognito unprotected")
         #expect(s.detail == nil)
     }
 
@@ -46,7 +46,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome extension not connected")
-        #expect(s.footer == "Chrome · Not connected")
+        #expect(s.footer == "Chrome not connected")
     }
 
     @Test func limitedSiteAccessIsDegraded() {
@@ -54,7 +54,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome extension needs site access")
-        #expect(s.footer == "Chrome · Permission missing")
+        #expect(s.footer == "Chrome needs site access")
     }
 
     // With Chrome open, a disconnected profile may have the extension turned off.
@@ -63,7 +63,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome protected · 1 profile disconnected")
-        #expect(s.footer == "Chrome · Disconnected")
+        #expect(s.footer == "Chrome protected · 1 profile disconnected")
         #expect(s.detail == nil)
     }
 
@@ -73,7 +73,7 @@ struct BrowserProtectionTests {
 
             #expect(s.level == .syncing)
             #expect(s.line == "Chrome is updating…")
-            #expect(s.footer == "Chrome · Updating…")
+            #expect(s.footer == "Chrome updating…")
         }
     }
 
@@ -90,7 +90,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .unknown)
         #expect(s.line == "Chrome not confirmed yet")
-        #expect(s.footer == "Chrome · Unknown")
+        #expect(s.footer == "Chrome not confirmed yet")
     }
 
     // Review of #48: an extension turned off never acknowledges, so waiting
@@ -100,13 +100,13 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Chrome extension not connected")
-        #expect(s.footer == "Chrome · Disconnected")
+        #expect(s.footer == "Chrome not connected")
     }
 
     // Safari is unverified, so the footer names Chrome, not "Browsers".
     @Test func theFooterNamesChromeAlone() {
-        #expect(status().footer.hasPrefix("Chrome · "))
-        #expect(status(chromeRunning: false).footer == "Chrome · Unknown")
+        #expect(status().footer.hasPrefix("Chrome "))
+        #expect(status(chromeRunning: false).footer == "Chrome not running")
     }
 
     @Test func anUnsupportedBrowserInFrontDuringASessionIsDegraded() {
@@ -114,7 +114,7 @@ struct BrowserProtectionTests {
 
         #expect(s.level == .degraded)
         #expect(s.line == "Firefox in front · not protected")
-        #expect(s.footer == "Firefox · not protected")
+        #expect(s.footer == "Firefox not protected")
         #expect(s.detail == nil)
     }
 

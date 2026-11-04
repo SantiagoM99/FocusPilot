@@ -43,8 +43,9 @@ public struct BrowserProtection: Equatable, Sendable {
     public var level: Level
     /// "Chrome protected · Incognito unprotected".
     public var line: String
-    /// The sidebar footer: "Chrome · Protected". It names Chrome, not
-    /// "Browsers", since Safari is never verified.
+    /// The sidebar footer's one line (#70): "Chrome protected", or the same
+    /// line with the real state. It names Chrome, not "Browsers", since
+    /// Safari is never verified.
     public var footer: String
     public var detail: String?
     /// FocusPilot can't see Safari's blocker, so this line never changes.
@@ -61,29 +62,29 @@ public struct BrowserProtection: Equatable, Sendable {
         // Only real state goes under the line; how to fix a problem is in
         // the docs, not on screen (decision 0003, 2026-11-03).
         if inSession, case .unsupported(let name) = front {
-            self.init(.degraded, "\(name) in front · not protected", "\(name) · not protected")
+            self.init(.degraded, "\(name) in front · not protected", "\(name) not protected")
         } else if profiles.isEmpty {
-            self.init(.degraded, "Chrome extension not connected", "Chrome · Not connected")
+            self.init(.degraded, "Chrome extension not connected", "Chrome not connected")
         } else if !chromeRunning {
-            self.init(.unknown, "Chrome not running", "Chrome · Unknown")
+            self.init(.unknown, "Chrome not running", "Chrome not running")
         } else if connected.isEmpty {
             // Before the confirmation check: a turned-off extension never confirms.
-            self.init(.degraded, "Chrome extension not connected", "Chrome · Disconnected")
+            self.init(.degraded, "Chrome extension not connected", "Chrome not connected")
         } else if !confirmedSinceStart {
-            self.init(.unknown, "Chrome not confirmed yet", "Chrome · Unknown")
+            self.init(.unknown, "Chrome not confirmed yet", "Chrome not confirmed yet")
         } else if connected.contains(where: { !$0.allSitesAccess }) {
-            self.init(.degraded, "Chrome extension needs site access", "Chrome · Permission missing")
+            self.init(.degraded, "Chrome extension needs site access", "Chrome needs site access")
         } else if pending && inSession && front == .chrome {
-            self.init(.degraded, "Chrome in front · not yet protected", "Chrome · Not yet protected")
+            self.init(.degraded, "Chrome in front · not yet protected", "Chrome not yet protected")
         } else if pending {
-            self.init(.syncing, "Chrome is updating…", "Chrome · Updating…")
+            self.init(.syncing, "Chrome is updating…", "Chrome updating…")
         } else if disconnected > 0 {
             self.init(.degraded, "Chrome protected · \(disconnected) profile\(disconnected == 1 ? "" : "s") disconnected",
-                      "Chrome · Disconnected")
+                      "Chrome protected · \(disconnected) profile\(disconnected == 1 ? "" : "s") disconnected")
         } else if connected.contains(where: { !$0.incognitoAllowed }) {
-            self.init(.degraded, "Chrome protected · Incognito unprotected", "Chrome · Incognito unprotected")
+            self.init(.degraded, "Chrome protected · Incognito unprotected", "Chrome protected · Incognito unprotected")
         } else {
-            self.init(.protected, "Chrome protected", "Chrome · Protected", Self.upToDate(connected))
+            self.init(.protected, "Chrome protected", "Chrome protected", Self.upToDate(connected))
         }
     }
 
