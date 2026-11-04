@@ -3,7 +3,7 @@ import Foundation
 /// One thing that needs the owner now (decision 0004).
 public struct AttentionItem: Equatable, Sendable, Identifiable {
     public enum ID: Hashable, Sendable {
-        case review(Int64), check(Int64)
+        case review(Int64), check(Int64), report(Int64)
     }
 
     public enum Kind: Sendable {
@@ -13,6 +13,8 @@ public struct AttentionItem: Equatable, Sendable, Identifiable {
         case finished
         /// A check the owner scheduled on a waiting task is due.
         case check
+        /// A helper agent's report, maybe with a message to accept (#67).
+        case report
     }
 
     /// An item quietly stands out once it has waited this long (decision 0004, proposed default).
@@ -20,7 +22,8 @@ public struct AttentionItem: Equatable, Sendable, Identifiable {
 
     public var id: ID
     public var kind: Kind
-    public var taskID: Int64
+    /// Nil for a report, which belongs to a project rather than a task.
+    public var taskID: Int64?
     public var taskTitle: String
     public var projectTitle: String?
     public var agentLabel: String?
@@ -31,6 +34,8 @@ public struct AttentionItem: Equatable, Sendable, Identifiable {
     /// When the owner was first needed: when FocusPilot saw the agent ask or
     /// finish, or the time the owner set for a check.
     public var waitingSince: Date
+    /// The report, for `.report` items.
+    public var report: AgentReport? = nil
 
     public func needsAlert(at now: Date) -> Bool {
         now.timeIntervalSince(waitingSince) >= Self.alertAfter
@@ -42,22 +47,31 @@ public struct AttentionItem: Equatable, Sendable, Identifiable {
         case .approval: "\(agentLabel ?? "An agent") needs your approval"
         case .finished: "\(agentLabel ?? "An agent") finished"
         case .check: "Time to check on \(waitingOn ?? taskTitle)"
+        case .report:
+            if let report, let proposal = report.proposal {
+                "\(report.sourceLabel) proposes a message for \(proposal.target?.label ?? proposal.targetAsGiven)"
+            } else {
+                "\(report?.sourceLabel ?? "An agent") sent a report"
+            }
         }
     }
 
-    /// "Run ablation · NLP report".
+    /// "Run ablation · NLP report"; a report's project, or "No project".
     public var place: String {
-        ([taskTitle] + [projectTitle].compactMap(\.self)).joined(separator: " · ")
+        if kind == .report { return projectTitle ?? "No project" }
+        return ([taskTitle] + [projectTitle].compactMap(\.self)).joined(separator: " · ")
     }
 }
 
 /// Builds the attention queue: unreviewed agent results and approval
-/// requests, and due checks, for open tasks only. Ordered by priority (the
-/// task's place: Now, then Next, then Later), then deadline (soonest first,
-/// none last), then how long it has waited (longest first). No limit.
+/// requests, and due checks, for open tasks only, and agent reports.
+/// Ordered by priority (the task's place: Now, then Next, then Later), then
+/// deadline (soonest first, none last), then how long it has waited
+/// (longest first). A report has no task: it ranks with Now when its
+/// project holds the Now task, else with Next, with no deadline. No limit.
 public enum AttentionQueue {
     public static func items(tasks: [TodayItem], reviews: [ReviewItem], waiting: [TaskWaiting],
-                             now: Date) -> [AttentionItem] {
+                             reports: [AgentReport] = [], now: Date) -> [AttentionItem] {
         let open = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
         let fromAgents = reviews.compactMap { review -> AttentionItem? in
             guard let task = open[review.taskID] else { return nil }
@@ -70,16 +84,25 @@ public enum AttentionQueue {
             return AttentionItem(id: .check(task.id), kind: .check, taskID: task.id, taskTitle: task.title,
                                  projectTitle: task.projectTitle, waitingOn: mark.on, waitingSince: checkAt)
         }
-        return (fromAgents + checks).sorted { lhs, rhs in
-            let left = key(lhs, open), right = key(rhs, open)
+        let fromReports = reports.map { report in
+            AttentionItem(id: .report(report.id), kind: .report, taskID: nil, taskTitle: "", projectTitle: report.projectTitle,
+                          agentLabel: report.sourceLabel, waitingSince: report.receivedAt, report: report)
+        }
+        let nowProject = tasks.first { $0.status == .now }?.projectID
+        return (fromAgents + checks + fromReports).sorted { lhs, rhs in
+            let left = key(lhs, open, nowProject), right = key(rhs, open, nowProject)
             if left.priority != right.priority { return left.priority < right.priority }
             if left.deadline != right.deadline { return left.deadline < right.deadline }
             return lhs.waitingSince < rhs.waitingSince
         }
     }
 
-    private static func key(_ item: AttentionItem, _ open: [Int64: TodayItem]) -> (priority: Int, deadline: Date) {
-        let task = open[item.taskID]
+    private static func key(_ item: AttentionItem, _ open: [Int64: TodayItem],
+                            _ nowProject: Int64?) -> (priority: Int, deadline: Date) {
+        if let report = item.report {
+            return (report.projectID != nil && report.projectID == nowProject ? 0 : 1, .distantFuture)
+        }
+        let task = item.taskID.flatMap { open[$0] }
         let priority = switch task?.status {
         case .now: 0
         case .next: 1

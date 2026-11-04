@@ -28,7 +28,7 @@ extension FocusCoordinator {
             }
         case .check(let taskID):
             try await repository.stopWaiting(taskID)
-        case nil:
+        case .report, nil:
             break
         }
         var opened: OpenAgentResult?

@@ -42,6 +42,11 @@ public actor FocusCoordinator {
     var ruleWait: StrictWait<ConfirmedRuleEdit>?
     /// The owner confirmed an exception request during a strict session.
     var exceptionWait: StrictWait<ExceptionRequest>?
+    /// Reports whose Accept is running, so a second click cannot send again.
+    var acceptingReports: Set<Int64> = []
+    /// The socket's per-pane report limit, applied to queued reports by
+    /// the time they were sent, since anyone can write the inbox file.
+    var queuedReportLimit = AddRateLimit()
     /// The reason given when `exceptionWait` was confirmed; asking again
     /// from another profile or the app need not type it again.
     var exceptionWaitReason: String?
@@ -187,11 +192,12 @@ public actor FocusCoordinator {
         await followNowAfterTaskChange()
     }
 
-    /// Imports the adds queued while FocusPilot was closed. Returns how many
-    /// were handed to the repository; already stored ones are not repeated.
+    /// Imports the adds and reports queued while FocusPilot was closed.
+    /// Returns how many were handed on; already stored ones are not repeated.
     public func importInbox(_ inbox: TaskInbox) async throws -> Int {
         let repository = repository
-        let imported = try await inbox.drain(isPermanent: TaskRepository.isPermanentAddFailure) {
+        let imported = try await inbox.drain(isPermanent: { TaskRepository.isPermanentAddFailure($0) || $0 is ReportRefused },
+                                             reports: { _ = try await self.receiveQueuedReport($0) }) {
             _ = try await repository.addFromHerdr($0)
         }.imported
         await followNowAfterTaskChange()

@@ -86,6 +86,14 @@ struct AttentionRow: View {
     var compact = false
 
     var body: some View {
+        if let report = item.report {
+            ReportRow(model: model, item: item, report: report, compact: compact)
+        } else {
+            taskRow
+        }
+    }
+
+    private var taskRow: some View {
         HStack(alignment: .center, spacing: 10) {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: symbol)
@@ -117,9 +125,11 @@ struct AttentionRow: View {
                     .buttonStyle(.borderless)
                     .accessibilityHint(item.kind == .check ? "Removes this check" : "Removes this item from Needs you")
             }
-            Button("Switch") { model.requestSwitch(SwitchRequest(item)) }
-                .help("Asks where you left off, then makes this task Now\(item.linkID == nil ? "" : " and opens the agent")")
-                .accessibilityHint("Switch to \(item.taskTitle)")
+            if let request = SwitchRequest(item) {
+                Button("Switch") { model.requestSwitch(request) }
+                    .help("Asks where you left off, then makes this task Now\(item.linkID == nil ? "" : " and opens the agent")")
+                    .accessibilityHint("Switch to \(item.taskTitle)")
+            }
         }
         .padding(.horizontal, compact ? 0 : 14)
         .padding(.vertical, compact ? 4 : 10)
@@ -130,6 +140,7 @@ struct AttentionRow: View {
         case .approval: "hand.raised.fill"
         case .finished: "checkmark.circle.fill"
         case .check: "clock.fill"
+        case .report: "text.bubble.fill"
         }
     }
 
@@ -138,6 +149,7 @@ struct AttentionRow: View {
         case .approval: .orange
         case .finished: .green
         case .check: .blue
+        case .report: .purple
         }
     }
 
@@ -149,6 +161,7 @@ struct AttentionRow: View {
         switch item.id {
         case .review(let id): await model.markReviewed(id)
         case .check(let taskID): await model.dismissCheck(taskID)
+        case .report(let id): await model.dismissReport(id)
         }
     }
 }

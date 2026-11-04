@@ -20,8 +20,10 @@ public struct SwitchRequest: Hashable, Sendable, Identifiable {
         self.item = item
     }
 
-    public init(_ item: AttentionItem) {
-        self.init(taskID: item.taskID, taskTitle: item.taskTitle, linkID: item.linkID, agentLabel: item.agentLabel, item: item.id)
+    /// Nil for a report: it has no task to switch to; Accept or Dismiss it.
+    public init?(_ item: AttentionItem) {
+        guard let taskID = item.taskID else { return nil }
+        self.init(taskID: taskID, taskTitle: item.taskTitle, linkID: item.linkID, agentLabel: item.agentLabel, item: item.id)
     }
 
     public init(_ thread: InFlightThread) {

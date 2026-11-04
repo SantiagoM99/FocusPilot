@@ -112,6 +112,5 @@ struct NowCard: View {
         Button { Task { await model.openContext(forTask: item.id, fromNowCard: true) } } label: {
             Label("Open context", systemImage: "arrow.up.forward.app")
         }
-        .help("Opens the task’s ticked resources, checking each one first. Nothing is created.")
     }
 }

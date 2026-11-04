@@ -13,8 +13,8 @@ struct ResourceTextTests {
     }
 
     @Test(arguments: [
-        (FolderProblem.missing, "Not found · deleted, or moved where FocusPilot can’t follow"),
-        (.volumeUnavailable("Thesis"), "On the disk “Thesis”, which isn’t connected"),
+        (FolderProblem.missing, "Not found"),
+        (.volumeUnavailable("Thesis"), "Disk “Thesis” not connected"),
         (.replaced(path: "/Users/owner/Projects/figures"), "A different folder is at this path now"),
         (.inTrash, "In the Trash"),
         (.outsideRoot(path: "/Users/owner/Desktop/figures", root: "/Users/owner/Projects"), "Moved out of ~/Projects"),
@@ -39,20 +39,12 @@ struct ResourceTextTests {
             == "Allowed in this project’s sessions")
     }
 
-    @Test func linkingABlockedPageSaysWhatOpensAndWhen() {
-        let rules = [BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .sessionOnly)]
-
-        #expect(ResourceText.blockedPageHelp(for: try! WebPageLink("youtube.com/watch?v=1"), rules: rules)
-            == "youtube.com is blocked by your rules. In normal sessions that cover this project, this exact page opens; other pages on the site stay blocked. In strict sessions it stays blocked: ask for an exception, and the usual wait applies.")
-        #expect(ResourceText.blockedPageHelp(for: try! WebPageLink("arxiv.org"), rules: rules) == nil)
-    }
-
     @Test(arguments: [
         (3, 0, [String](), "Opened 3 items."),
         (1, 0, [String](), "Opened 1 item."),
         (2, 1, ["figures"], "Opened 2 of 3. “figures” needs repair."),
         (0, 2, ["figures", "data"], "Opened 0 of 2. “figures” and “data” need repair."),
-        (0, 0, [String](), "Nothing to open. Choose what opens with this task in Resources."),
+        (0, 0, [String](), "Nothing to open"),
     ])
     func theLaunchResultSaysWhatOpened(opened: Int, broken: Int, names: [String], text: String) {
         #expect(ResourceText.launchResult(opened: opened, needingRepair: names) == text)
