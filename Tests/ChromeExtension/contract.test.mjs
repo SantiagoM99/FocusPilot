@@ -32,6 +32,6 @@ test("the app's delivery carries what the blocked page and the worker need", () 
   const m = FocusBlockedView.model({ delivery, url: "https://youtube.com/", now: at("2026-10-14T15:30:00Z"), appRunning: true, timeZone: "America/Bogota" });
 
   assert.equal(m.title, "Explain baseline results");
-  assert.equal(m.subtitle, "Write §4.2");
+  assert.equal(m.subtitle, "NLP report · Next: Write §4.2");
   assert.equal(P.isNewer({ ...delivery, source: "another data folder", policy: { ...delivery.policy, revision: 1 } }, delivery), true);
 });

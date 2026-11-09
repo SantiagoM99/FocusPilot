@@ -1,14 +1,15 @@
 import Foundation
 
-/// The words Settings shows for rules: activation names, schedule
-/// summaries and whether a rule blocks now. Times are 24-hour "HH:mm" in
-/// the schedule's own time zone, as the policy stores them.
+/// The words Settings shows for rules: activation labels, schedule
+/// summaries and running exceptions. Summaries are 24-hour "HH:mm" in the
+/// schedule's own time zone, as the policy stores them.
 public enum RuleText {
-    public static func activationName(_ activation: RuleActivation) -> String {
+    /// "Always", "During focus", "Weekdays 8:00 to 18:00".
+    public static func activationLabel(_ activation: RuleActivation) -> String {
         switch activation {
         case .always: "Always"
-        case .schedule: "Schedule"
-        case .sessionOnly: "Session only"
+        case .sessionOnly: "During focus"
+        case .schedule(let schedule): "\(dayLabel(schedule.days)) \(clock(schedule.start)) to \(clock(schedule.end))"
         }
     }
 
@@ -17,25 +18,15 @@ public enum RuleText {
         "\(days(schedule.days)) \(schedule.start)–\(schedule.end)"
     }
 
-    /// A rule set's status. Rules with only apps say they hide them while
-    /// the rule applies, or show an app exception's time left; site rules
-    /// show a site or page exception's (design 07: "Exception · 1 page · 8 min").
-    public static func status(_ rule: BlockRuleSet, at now: Date, sessionRulesApply: Bool,
-                              exceptions: [PolicyException] = []) -> String {
+    /// A running exception on the rule's targets, as Settings shows it in
+    /// place of the activation; nil when none is running.
+    public static func exceptionStatus(_ rule: BlockRuleSet, at now: Date, exceptions: [PolicyException]) -> String? {
         if let excepted = siteExceptionStatus(rule, at: now, exceptions: exceptions) { return excepted }
         let apps = rule.targets.compactMap { if case .app(let bundleID, _) = $0 { bundleID.lowercased() } else { nil } }
-        guard !apps.isEmpty, apps.count == rule.targets.count else {
-            return status(rule.activation, at: now, sessionRulesApply: sessionRulesApply)
+        guard let expiry = exceptions.filter({ exception in apps.contains { exception.exempts(app: $0, at: now) } }).map(\.expiresAt).max() else {
+            return nil
         }
-        if let expiry = exceptions.filter({ exception in apps.contains { exception.exempts(app: $0, at: now) } }).map(\.expiresAt).max() {
-            return "Exception · \(BlockedAppText.duration(expiry.timeIntervalSince(now))) left"
-        }
-        let applies = switch rule.activation {
-        case .always: true
-        case .sessionOnly: sessionRulesApply
-        case .schedule(let schedule): schedule.contains(now)
-        }
-        return applies ? "Hidden when opened" : status(rule.activation, at: now, sessionRulesApply: sessionRulesApply)
+        return "Exception · \(BlockedAppText.duration(expiry.timeIntervalSince(now))) left"
     }
 
     /// "Exception · whole site · 8 min left", "Exception · 2 pages · 12 min
@@ -53,29 +44,16 @@ public enum RuleText {
         return "Exception · \(what) · \(BlockedAppText.duration(expiry.timeIntervalSince(now))) left"
     }
 
-    /// "Blocked now", "During focus sessions", "Ends 18:00", "Starts Mon 08:00".
-    public static func status(_ activation: RuleActivation, at now: Date, sessionRulesApply: Bool) -> String {
-        switch activation {
-        case .always:
-            return "Blocked now"
-        case .sessionOnly:
-            return sessionRulesApply ? "Blocked now" : "During focus sessions"
-        case .schedule(let schedule):
-            let verb = schedule.contains(now) ? "Ends" : "Starts"
-            guard let change = schedule.nextChange(after: now) else { return verb }
-            return "\(verb) \(when(change, from: now, in: schedule.timeZone))"
-        }
+    /// "Weekdays", "Weekends", or the days by name.
+    private static func dayLabel(_ days: Set<Weekday>) -> String {
+        if days == [.mon, .tue, .wed, .thu, .fri] { return "Weekdays" }
+        if days == [.sat, .sun] { return "Weekends" }
+        return Self.days(days)
     }
 
-    /// "18:00" today, "Mon 08:00" on another day.
-    private static func when(_ instant: Date, from now: Date, in timeZone: TimeZone) -> String {
-        let calendar = Calendar.gregorian(in: timeZone)
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = calendar
-        formatter.timeZone = timeZone
-        formatter.dateFormat = calendar.isDate(instant, inSameDayAs: now) ? "HH:mm" : "EEE HH:mm"
-        return formatter.string(from: instant)
+    /// "8:00", "18:30".
+    private static func clock(_ time: ClockTime) -> String {
+        String(format: "%d:%02d", time.hour, time.minute)
     }
 
     private static func days(_ days: Set<Weekday>) -> String {

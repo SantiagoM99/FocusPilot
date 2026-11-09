@@ -26,18 +26,18 @@ struct TimedExceptionTests {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
 
-        #expect(try await fixture.coordinator.requestException(instagram, duration: 5 * 60)
-            == .granted(expiresAt: fixture.clock.now.addingTimeInterval(5 * 60)))
+        #expect(try await fixture.coordinator.requestException(instagram, duration: 10 * 60)
+            == .granted(expiresAt: fixture.clock.now.addingTimeInterval(10 * 60)))
     }
 
     @Test func theExpiryIsTheNextDeadlineAndReconcilingThenDropsIt() async throws {
         let fixture = try await SessionFixture()
         try await fixture.coordinator.saveRuleSet(blockInstagram)
-        _ = try await fixture.coordinator.requestException(instagram, duration: 5 * 60)
-        let expiry = fixture.clock.now.addingTimeInterval(5 * 60)
+        _ = try await fixture.coordinator.requestException(instagram, duration: 10 * 60)
+        let expiry = fixture.clock.now.addingTimeInterval(10 * 60)
         #expect(await fixture.coordinator.snapshot().nextDeadline == expiry)
 
-        fixture.advance(minutes: 5)
+        fixture.advance(minutes: 10)
         try await fixture.coordinator.reconcile()
 
         let policy = try #require(await fixture.publisher.published.last)
@@ -65,7 +65,7 @@ struct TimedExceptionTests {
         try await fixture.coordinator.saveRuleSet(BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always))
 
         _ = try await fixture.coordinator.requestException(.page(url: "https://www.youtube.com/watch?v=3kqW9M"), duration: 20 * 60)
-        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 5 * 60)
+        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 10 * 60)
 
         #expect(await fixture.publisher.published.last?.exceptions.count == 2)
     }
@@ -73,13 +73,13 @@ struct TimedExceptionTests {
     @Test func onlyTheOfferedDurationsAreGranted() async throws {
         let fixture = try await SessionFixture()
 
-        for minutes in [0.0, -5, 7, 15, 60] {
+        for minutes in [0.0, -5, 5, 7, 15, 60] {
             await #expect(throws: ExceptionError.unsupportedDuration) {
                 try await fixture.coordinator.requestException(instagram, duration: minutes * 60)
             }
         }
         #expect(await fixture.publisher.published.isEmpty)
-        for minutes in [5.0, 10, 20] {
+        for minutes in [10.0, 20, 45] {
             guard case .granted = try await fixture.coordinator.requestException(instagram, duration: minutes * 60) else {
                 Issue.record("\(minutes) min was not granted")
                 continue
@@ -92,7 +92,7 @@ struct TimedExceptionTests {
         try await fixture.coordinator.startSession(duration: 50 * 60, mode: .strict)
 
         await #expect(throws: ExceptionError.unsupportedDuration) {
-            try await fixture.coordinator.requestException(instagram, duration: 45 * 60, reason: "Lab chat", confirmed: true)
+            try await fixture.coordinator.requestException(instagram, duration: 7 * 60, reason: "Lab chat", confirmed: true)
         }
         #expect(await fixture.coordinator.snapshot().pendingException == nil)
     }
@@ -132,11 +132,11 @@ struct StrictExceptionTests {
 
     @Test func movingTheMacsClockDoesNotSkipTheWait() async throws {
         let fixture = try await strictFixture()
-        _ = try await fixture.coordinator.requestException(instagram, duration: 5 * 60, reason: "Lab chat", confirmed: true)
+        _ = try await fixture.coordinator.requestException(instagram, duration: 10 * 60, reason: "Lab chat", confirmed: true)
 
         fixture.clock.set(fixture.clock.now.addingTimeInterval(3600))
 
-        guard case .waitUntil = try await fixture.coordinator.requestException(instagram, duration: 5 * 60, reason: "Lab chat") else {
+        guard case .waitUntil = try await fixture.coordinator.requestException(instagram, duration: 10 * 60, reason: "Lab chat") else {
             Issue.record("granted before the wait was over")
             return
         }
@@ -146,29 +146,29 @@ struct StrictExceptionTests {
         let fixture = try await strictFixture()
 
         await #expect(throws: ExceptionError.reasonRequired) {
-            try await fixture.coordinator.requestException(instagram, duration: 5 * 60, reason: "  ", confirmed: true)
+            try await fixture.coordinator.requestException(instagram, duration: 10 * 60, reason: "  ", confirmed: true)
         }
         #expect(await fixture.coordinator.snapshot().pendingException == nil)
     }
 
     @Test func aDifferentRequestStartsItsOwnWait() async throws {
         let fixture = try await strictFixture()
-        _ = try await fixture.coordinator.requestException(instagram, duration: 5 * 60, reason: "Lab chat", confirmed: true)
+        _ = try await fixture.coordinator.requestException(instagram, duration: 10 * 60, reason: "Lab chat", confirmed: true)
         fixture.advance(seconds: 60)
 
-        let other = try await fixture.coordinator.requestException(.app(bundleID: "com.tiktok"), duration: 5 * 60, reason: "Lab chat")
+        let other = try await fixture.coordinator.requestException(.app(bundleID: "com.tiktok"), duration: 10 * 60, reason: "Lab chat")
 
         #expect(other == .needsConfirmation)
     }
 
     @Test func cancellingOrEndingTheSessionDropsTheWait() async throws {
         let fixture = try await strictFixture()
-        _ = try await fixture.coordinator.requestException(instagram, duration: 5 * 60, reason: "Lab chat", confirmed: true)
+        _ = try await fixture.coordinator.requestException(instagram, duration: 10 * 60, reason: "Lab chat", confirmed: true)
 
         await fixture.coordinator.cancelException()
         #expect(await fixture.coordinator.snapshot().pendingException == nil)
 
-        _ = try await fixture.coordinator.requestException(instagram, duration: 5 * 60, reason: "Lab chat", confirmed: true)
+        _ = try await fixture.coordinator.requestException(instagram, duration: 10 * 60, reason: "Lab chat", confirmed: true)
         fixture.advance(minutes: 50)
         try await fixture.coordinator.reconcile()
         #expect(await fixture.coordinator.snapshot().pendingException == nil)

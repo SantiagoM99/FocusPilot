@@ -2,29 +2,43 @@ import AppKit
 import FocusPilotCore
 import SwiftUI
 
-/// Settings › Blocking › Chrome: each profile's acknowledgement and
-/// incognito access (#16), and where to load the extension once. The full
-/// protection status arrives with #17.
-struct ChromeSection: View {
+/// Settings › Chrome: the extension in each Chrome profile, other browsers
+/// and the policy diagnostics.
+struct ChromeSettings: View {
+    let model: AppModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                ChromeSection(model: model)
+                OtherBrowsersSection()
+                PolicyDebugView(policy: model.snapshot.policy, profiles: model.chromeProfiles)
+            }
+            .padding(24)
+        }
+    }
+}
+
+/// Each profile's acknowledgement and incognito access, and the buttons for
+/// setting the extension up. The steps are in BUILDING.md.
+private struct ChromeSection: View {
     let model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("Chrome")
-            VStack(alignment: .leading, spacing: 0) {
+            SectionHeader("PROFILES")
+            SettingsCard {
                 ForEach(Array(model.chromeProfiles.enumerated()), id: \.element.id) { index, profile in
-                    if index > 0 { Divider() }
+                    if index > 0 { SettingsDivider() }
                     ChromeProfileRow(profile: profile) { model.forgetChromeProfile(profile.profileID) }
                 }
                 if model.chromeProfiles.isEmpty {
-                    LoadExtensionSteps(setup: model.chromeSetup)
+                    NotConnectedRow(problem: model.chromeSetup?.problem)
                 }
             }
-            .background(.background, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
-            if !model.chromeProfiles.isEmpty, let setup = model.chromeSetup {
-                Button("Show Extension Folder") { NSWorkspace.shared.activateFileViewerSelecting([setup.extensionFolder]) }
-                    .controlSize(.small)
+            if let setup = model.chromeSetup {
+                ChromeSetupButtons(setup: setup)
+                    .padding(.top, 4)
             }
         }
     }
@@ -59,7 +73,6 @@ private struct ChromeProfileRow: View {
             if isDisconnected {
                 Button("Forget", action: forget)
                     .controlSize(.small)
-                    .help("Remove this profile from the list. It comes back if it connects again.")
             }
         }
         .padding(10)
@@ -74,47 +87,56 @@ private struct ChromeProfileRow: View {
     }
 }
 
-/// First-time setup: Chrome loads the unpacked extension from a folder.
-/// The steps are in BUILDING.md, not on screen (decision 0003, 2026-11-03).
-private struct LoadExtensionSteps: View {
-    let setup: ChromeSetup?
+private struct NotConnectedRow: View {
+    let problem: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Not connected yet").font(.headline)
-            if let problem = setup?.problem {
-                Text(problem).foregroundStyle(.orange)
-            }
-            if let setup {
-                HStack {
-                    Button("Show Extension Folder") { NSWorkspace.shared.activateFileViewerSelecting([setup.extensionFolder]) }
-                    Button("Copy Folder Path") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(setup.extensionFolder.path, forType: .string)
-                    }
-                }
-                .controlSize(.small)
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Not connected yet").font(.system(size: 13)).foregroundStyle(.palette(.text))
+            if let problem {
+                Text(problem).font(.system(size: 12)).foregroundStyle(.palette(.amber))
             }
         }
-        .padding(10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Settings › Blocking › Other browsers (design 07, #17): Safari relies on
+/// Chrome loads the unpacked extension from a folder, once per profile.
+private struct ChromeSetupButtons: View {
+    let setup: ChromeSetup
+
+    var body: some View {
+        HStack {
+            Button("Show Extension Folder") { NSWorkspace.shared.activateFileViewerSelecting([setup.extensionFolder]) }
+            Button("Copy Folder Path") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(setup.extensionFolder.path, forType: .string)
+            }
+            if let chrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome"),
+               let extensions = URL(string: "chrome://extensions") {
+                Button("Open Chrome Extensions") {
+                    NSWorkspace.shared.open([extensions], withApplicationAt: chrome, configuration: NSWorkspace.OpenConfiguration())
+                }
+            }
+        }
+        .controlSize(.small)
+    }
+}
+
+/// Settings › Chrome › Other browsers (#17): Safari relies on
 /// the owner's own blocker (decision 0003, 2026-10-20); the rest have no
 /// FocusPilot extension.
 struct OtherBrowsersSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("Other browsers")
-            VStack(alignment: .leading, spacing: 0) {
+            SectionHeader("OTHER BROWSERS")
+            SettingsCard {
                 row("Safari", "Not verified")
-                Divider()
+                SettingsDivider()
                 row("Firefox, Arc and others", "Not supported")
             }
-            .background(.background, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
         }
     }
 

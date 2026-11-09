@@ -119,8 +119,8 @@ public struct TimedException: Hashable, Sendable {
     }
 
     /// The only durations granted, as offered on the blocked page and the
-    /// blocked-app panel (design 05 and 10): 5, 10 and 20 minutes.
-    public static let durations: [TimeInterval] = [5 * 60, 10 * 60, 20 * 60]
+    /// blocked-app panel (redesign Blocked.dc.html). The first is the default.
+    public static let durations: [TimeInterval] = [10 * 60, 20 * 60, 45 * 60]
 
     var policyException: PolicyException {
         PolicyException(scope: scope, expiresAt: expiresAt)

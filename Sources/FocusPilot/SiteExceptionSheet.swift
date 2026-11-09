@@ -15,7 +15,7 @@ struct SiteExceptionSheet: View {
     let model: AppModel
     @State private var typed: String
     @State private var wholeSite = true
-    @State private var duration = TimedException.durations[1]
+    @State private var duration = TimedException.durations[0]
     @State private var reason = ""
     @State private var isConfirming = false
     @State private var error: String?

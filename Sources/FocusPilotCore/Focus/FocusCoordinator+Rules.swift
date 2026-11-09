@@ -143,15 +143,27 @@ extension FocusCoordinator {
                                                source: repository.policySource, observe: observing ? true : nil))
     }
 
-    /// The session's task in Now for the blocked page, with its next step
-    /// and project; with nothing in Now, what the session covers, as the
-    /// app's panel shows it.
+    /// The session's task in Now for the blocked page, with its next step,
+    /// project and web page; with nothing in Now, what the session covers,
+    /// as the app's panel shows it.
     private func focusContext() async -> FocusContext? {
         guard let session else { return nil }
         guard let action = session.action else {
             return FocusContext(title: "Nothing in Now", covers: SessionText.covers(session.scope))
         }
         let task = (try? await repository.nowTask()).flatMap { $0?.id == session.taskID ? $0 : nil }
-        return FocusContext(title: action, nextAction: task?.nextAction, projectTitle: task?.projectTitle)
+        var page: WebPageLink?
+        if let taskID = session.taskID { page = await firstWebPage(forTask: taskID) }
+        return FocusContext(title: action, nextAction: task?.nextAction, projectTitle: task?.projectTitle,
+                            resourceName: page?.siteName, resourceURL: page?.url)
+    }
+
+    private func firstWebPage(forTask taskID: Int64) async -> WebPageLink? {
+        guard let launchSet = try? await repository.launchSet(forTask: taskID),
+              let resources = try? await repository.resources(forTask: taskID) else { return nil }
+        return launchSet.lazy.compactMap { item -> WebPageLink? in
+            guard case .resource(let id) = item else { return nil }
+            return resources.first { $0.id == id }?.webPage
+        }.first
     }
 }

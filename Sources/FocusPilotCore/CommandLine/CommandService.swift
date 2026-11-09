@@ -179,7 +179,7 @@ public actor CommandService {
 public enum ExceptionErrorText {
     public static func message(_ error: ExceptionError) -> String {
         switch error {
-        case .unsupportedDuration: "Choose 5, 10 or 20 minutes."
+        case .unsupportedDuration: "Choose 10, 20 or 45 minutes."
         case .reasonRequired: "Say why you need it for the task."
         case .invalidSite: "That isn't a site address."
         case .invalidPage: "That isn't a web page address."

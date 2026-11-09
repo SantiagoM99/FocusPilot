@@ -9,12 +9,19 @@ public struct FocusContext: Hashable, Codable, Sendable {
     /// Only with nothing in Now: what the session covers, "Covers all
     /// projects", shown under the title "Nothing in Now" (#56).
     public var covers: String?
+    /// The first web page in the task's open-with-context list, where
+    /// "Back to Overleaf" goes. Chrome can't open the list's folders or agents.
+    public var resourceName: String?
+    public var resourceURL: String?
 
-    public init(title: String, nextAction: String? = nil, projectTitle: String? = nil, covers: String? = nil) {
+    public init(title: String, nextAction: String? = nil, projectTitle: String? = nil, covers: String? = nil,
+                resourceName: String? = nil, resourceURL: String? = nil) {
         self.title = title
         self.nextAction = nextAction
         self.projectTitle = projectTitle
         self.covers = covers
+        self.resourceName = resourceName
+        self.resourceURL = resourceURL
     }
 }
 

@@ -34,8 +34,8 @@ Prefer the bundle over `swift run FocusPilot`: the bare executable has no Info.p
 
 The app shows only the state and the buttons (decision 0003, 2026-11-03), so the steps are here. Once per Chrome profile:
 
-1. In Settings › Blocking › Chrome, click Show Extension Folder (or Copy Folder Path).
-2. In Chrome, open `chrome://extensions`, turn on Developer mode, click Load unpacked and choose that folder.
+1. In Settings › Chrome, click Show Extension Folder (or Copy Folder Path).
+2. Click Open Chrome Extensions, turn on Developer mode, click Load unpacked and choose that folder.
 3. In the extension's details, keep Site access on all sites and turn on Allow in Incognito. Settings shows "Site access limited" or "Incognito not allowed" until you do.
 
 A profile that no longer connects shows as disconnected; Forget removes it from the list, and it comes back if it connects again.

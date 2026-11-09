@@ -1,7 +1,7 @@
 import FocusPilotCore
 import SwiftUI
 
-/// Settings › General: menu bar, focus panel and login.
+/// Settings › General: menu bar and login.
 struct GeneralSettings: View {
     let model: AppModel
 
@@ -10,10 +10,6 @@ struct GeneralSettings: View {
         Form {
             Section("Menu bar") {
                 Toggle("Show time left in the menu bar", isOn: $preferences.showsTime)
-            }
-            Section("Sessions") {
-                Toggle("Show the focus panel during sessions", isOn: $preferences.showsFocusPanel)
-                    .onChange(of: preferences.showsFocusPanel) { model.focusPanel.update() }
             }
             Section("General") {
                 Toggle("Open at Login", isOn: Binding(
