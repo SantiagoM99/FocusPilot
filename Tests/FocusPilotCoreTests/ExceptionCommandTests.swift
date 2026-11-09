@@ -69,7 +69,7 @@ struct ExceptionCommandTests {
     }
 
     @Test func requestsAndAnswersSurviveTheWire() throws {
-        let request = CommandRequest.exception(ExceptionCommand(scope: .site(domain: "youtube.com"), duration: 300, reason: "Lecture", confirmed: true))
+        let request = CommandRequest.exception(ExceptionCommand(scope: .site(domain: "youtube.com"), duration: 600, reason: "Lecture", confirmed: true))
         #expect(try JSONDecoder().decode(CommandRequest.self, from: JSONEncoder().encode(request)) == request)
         for outcome in [ExceptionOutcome.granted(expiresAt: wednesdayMorningInBogota), .needsConfirmation, .waitUntil(wednesdayMorningInBogota)] {
             let response = CommandResponse.exception(outcome)

@@ -54,6 +54,17 @@ public enum SessionCompletion: Equatable, Sendable {
 public enum RuleEdit: Equatable, Sendable {
     case save(BlockRuleSet)
     case delete(Int64)
+
+    /// Takes one site or app out of a saved rule; the rule goes with its last
+    /// target. Nil for a rule not saved yet.
+    public static func removing(_ target: ActivityTarget, from rule: BlockRuleSet) -> RuleEdit? {
+        guard let id = rule.id else { return nil }
+        let left = rule.targets.filter { $0 != target }
+        guard !left.isEmpty else { return .delete(id) }
+        var changed = rule
+        changed.targets = left
+        return .save(changed)
+    }
 }
 
 /// A confirmed rule change and the revision of the rule it was confirmed

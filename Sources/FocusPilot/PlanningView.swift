@@ -17,6 +17,8 @@ struct PlanningView: View {
     @State private var isCapturing = false
     @State private var todaySelection: Int64?
 
+    @State private var settingsTab = SettingsPage.Tab.blocking
+
     init(model: AppModel, page: Page = .today) {
         self.model = model
         _page = State(initialValue: page)
@@ -33,7 +35,7 @@ struct PlanningView: View {
                 // The date is read each minute, so it turns over at midnight.
                 TimelineView(.everyMinute) { context in
                     PlanningHeader(title: title, date: page == .today || page == nil ? PageHeader.todayDate(context.date) : nil,
-                                   newTask: { isCapturing = true })
+                                   newTask: { isCapturing = true }, settingsTab: page == .settings ? $settingsTab : nil)
                 }
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -117,7 +119,7 @@ struct PlanningView: View {
         } else if page == .review {
             ReviewQueueView(model: model)
         } else if page == .settings {
-            SettingsPage(model: model)
+            SettingsPage(model: model, tab: settingsTab)
         } else if model.today.isEmpty {
             ContentUnavailableView("No tasks yet", systemImage: "sun.max")
         } else {

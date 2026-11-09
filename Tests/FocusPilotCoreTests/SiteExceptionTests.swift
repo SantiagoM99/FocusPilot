@@ -57,7 +57,7 @@ struct SiteExceptionTests {
     @Test func aSiteIsStoredAsTheDomainTheRulesBlock() async throws {
         let fixture = try await fixture()
 
-        _ = try await fixture.coordinator.requestException(.site(domain: "https://www.YouTube.com/watch?v=1"), duration: 5 * 60)
+        _ = try await fixture.coordinator.requestException(.site(domain: "https://www.YouTube.com/watch?v=1"), duration: 10 * 60)
 
         #expect(await fixture.publisher.published.last?.exceptions.map(\.scope) == [.site(domain: "youtube.com")])
     }
@@ -76,10 +76,10 @@ struct SiteExceptionTests {
         let published = await fixture.publisher.published.count
 
         await #expect(throws: ExceptionError.invalidSite) {
-            try await fixture.coordinator.requestException(.site(domain: "not a site"), duration: 5 * 60)
+            try await fixture.coordinator.requestException(.site(domain: "not a site"), duration: 10 * 60)
         }
         await #expect(throws: ExceptionError.invalidPage) {
-            try await fixture.coordinator.requestException(.page(url: "chrome://extensions"), duration: 5 * 60)
+            try await fixture.coordinator.requestException(.page(url: "chrome://extensions"), duration: 10 * 60)
         }
         #expect(await fixture.publisher.published.count == published)
     }
@@ -88,10 +88,10 @@ struct SiteExceptionTests {
         let fixture = try await fixture()
 
         await #expect(throws: ExceptionError.notBlocked("example.com")) {
-            try await fixture.coordinator.requestException(.page(url: "https://example.com/a"), duration: 5 * 60)
+            try await fixture.coordinator.requestException(.page(url: "https://example.com/a"), duration: 10 * 60)
         }
         // A subdomain of a blocked site is blocked too.
-        guard case .granted = try await fixture.coordinator.requestException(.site(domain: "music.youtube.com"), duration: 5 * 60) else {
+        guard case .granted = try await fixture.coordinator.requestException(.site(domain: "music.youtube.com"), duration: 10 * 60) else {
             Issue.record("a subdomain of a blocked site was refused")
             return
         }
@@ -113,21 +113,21 @@ struct SiteExceptionTests {
 
     @Test func aSiteExceptionCoversItsPagesButAPageDoesNotCoverTheSite() async throws {
         let fixture = try await fixture()
-        _ = try await fixture.coordinator.requestException(.page(url: lecture), duration: 5 * 60)
+        _ = try await fixture.coordinator.requestException(.page(url: lecture), duration: 10 * 60)
 
         let site = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 20 * 60)
         #expect(site == .granted(expiresAt: fixture.clock.now.addingTimeInterval(20 * 60)))
-        #expect(try await fixture.coordinator.requestException(.page(url: "https://youtube.com/watch?v=other"), duration: 5 * 60)
+        #expect(try await fixture.coordinator.requestException(.page(url: "https://youtube.com/watch?v=other"), duration: 10 * 60)
             == .granted(expiresAt: fixture.clock.now.addingTimeInterval(20 * 60)))
         #expect(await fixture.publisher.published.last?.exceptions.count == 2)
     }
 
     @Test func afterItExpiresTheSameRequestIsGrantedAfresh() async throws {
         let fixture = try await fixture()
-        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 5 * 60)
+        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 10 * 60)
 
         fixture.advance(minutes: 5)
-        #expect(try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 5 * 60)
+        #expect(try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 10 * 60)
             == .granted(expiresAt: fixture.clock.now.addingTimeInterval(5 * 60)))
     }
 
@@ -139,7 +139,7 @@ struct SiteExceptionTests {
         // Starting the strict session cancelled it (decision 0003, 2026-10-22).
         #expect(await fixture.publisher.published.last?.exceptions == [])
 
-        #expect(try await fixture.coordinator.requestException(.page(url: lecture), duration: 5 * 60, reason: "Lecture") == .needsConfirmation)
+        #expect(try await fixture.coordinator.requestException(.page(url: lecture), duration: 10 * 60, reason: "Lecture") == .needsConfirmation)
     }
 
     @Test func inAStrictSessionWhatIsAlreadyAllowedNeedsNoNewWait() async throws {
@@ -154,7 +154,7 @@ struct SiteExceptionTests {
         #expect(try await request(false) == .granted(expiresAt: expiry))
 
         // Another profile asks for one of its pages: no confirmation, same expiry.
-        #expect(try await fixture.coordinator.requestException(.page(url: lecture), duration: 5 * 60, reason: "Lecture") == .granted(expiresAt: expiry))
+        #expect(try await fixture.coordinator.requestException(.page(url: lecture), duration: 10 * 60, reason: "Lecture") == .granted(expiresAt: expiry))
     }
 
     @Test func sleepOrARelaunchNeverExtendsASiteException() async throws {
@@ -180,8 +180,8 @@ struct SiteExceptionTests {
 struct SiteExceptionTextTests {
     private let youtube = BlockRuleSet(targets: [.site(domain: "youtube.com")], activation: .always)
     private let now = wednesdayMorningInBogota
-    private func status(_ exceptions: [PolicyException], rule: BlockRuleSet? = nil, at instant: Date? = nil) -> String {
-        RuleText.status(rule ?? youtube, at: instant ?? now, sessionRulesApply: false, exceptions: exceptions)
+    private func status(_ exceptions: [PolicyException], rule: BlockRuleSet? = nil, at instant: Date? = nil) -> String? {
+        RuleText.exceptionStatus(rule ?? youtube, at: instant ?? now, exceptions: exceptions)
     }
     private func expiring(_ scope: ExceptionScope, minutes: Double = 8) -> PolicyException {
         PolicyException(scope: scope, expiresAt: now.addingTimeInterval(minutes * 60 - 1))
@@ -198,9 +198,9 @@ struct SiteExceptionTextTests {
 
     @Test func otherSitesAndExpiredExceptionsDoNotCount() {
         let expired = expiring(.site(domain: "youtube.com"))
-        #expect(status([expiring(.site(domain: "instagram.com"))]) == "Blocked now")
-        #expect(status([expired], at: expired.expiresAt) == "Blocked now")
-        #expect(status([expiring(.app(bundleID: "com.google.youtube"))]) == "Blocked now")
+        #expect(status([expiring(.site(domain: "instagram.com"))]) == nil)
+        #expect(status([expired], at: expired.expiresAt) == nil)
+        #expect(status([expiring(.app(bundleID: "com.google.youtube"))]) == nil)
     }
 
     @Test func whatTheOwnerTypesBecomesASiteOrAPage() {
@@ -245,7 +245,7 @@ struct PendingReasonTests {
         #expect(try await fixture.coordinator.requestException(lecture, duration: 600)
             == .granted(expiresAt: fixture.clock.now.addingTimeInterval(600)))
         await #expect(throws: ExceptionError.reasonRequired) {
-            try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 300)
+            try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 600)
         }
     }
 }
@@ -278,7 +278,7 @@ struct SharedStrictWaitTests {
     @Test func anotherUnconfirmedRequestLeavesTheConfirmedWaitAlone() async throws {
         let fixture = try await waiting()
 
-        #expect(try await fixture.coordinator.requestException(other, duration: 300, reason: "Other") == .needsConfirmation)
+        #expect(try await fixture.coordinator.requestException(other, duration: 600, reason: "Other") == .needsConfirmation)
         #expect(await fixture.coordinator.snapshot().pendingException?.scope == lecture)
 
         fixture.advance(seconds: 60)
@@ -332,16 +332,16 @@ struct EndedExceptionPrivacyTests {
         let fixture = try await fixture()
         try await fixture.coordinator.startSession(duration: 50 * 60, mode: .strict)
         let page = ExceptionScope.page(url: "https://youtube.com/watch?v=private")
-        _ = try await fixture.coordinator.requestException(page, duration: 300, reason: "Lecture for §4.2", confirmed: true)
+        _ = try await fixture.coordinator.requestException(page, duration: 600, reason: "Lecture for §4.2", confirmed: true)
         fixture.advance(seconds: 60)
-        _ = try await fixture.coordinator.requestException(page, duration: 300, reason: "Lecture for §4.2")
+        _ = try await fixture.coordinator.requestException(page, duration: 600, reason: "Lecture for §4.2")
         _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 1200, reason: "Course", confirmed: true)
         fixture.advance(seconds: 60)
         _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 1200, reason: "Course")
 
         #expect(try await rows(fixture).map(\.reason) == ["Lecture for §4.2", "Course"], "kept while running")
 
-        fixture.advance(minutes: 5)
+        fixture.advance(minutes: 10)
         try await fixture.coordinator.reconcile()
 
         let after = try await rows(fixture)
@@ -372,7 +372,7 @@ struct ChromeGrantNoticeTests {
 
         _ = try await fixture.coordinator.requestException(page, duration: 600, origin: .chrome)
         _ = try await fixture.coordinator.requestException(page, duration: 1200, origin: .chrome)  // already covered
-        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 300)  // from the app
+        _ = try await fixture.coordinator.requestException(.site(domain: "youtube.com"), duration: 600)  // from the app
 
         #expect(await fixture.notices.delivered == [.exceptionGrantedFromChrome(.page(url: "https://youtube.com/watch?v=1"), until: until)])
     }

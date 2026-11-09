@@ -50,7 +50,7 @@ See [workload visual study](AI_WORKLOAD_BOARD.svg). Values are illustrative, not
 
 ## Blocked page
 
-Current action, break time, Return to task, and deliberate timed exception request, scoped to this exact page (e.g. one lecture video) or the whole site. Outside a focus session, a site blocked by an always-on or scheduled rule shows which rule applies (and when a schedule ends) instead of a current action. No arbitrary commands from page content. Global policy reports the remaining exception in both browsers. If redirect behavior is unsupported for a case, use truthful browser feedback and app notification rather than pretending navigation succeeded.
+Current action, break time, the way back to the work, and deliberate timed exception request, scoped to this exact page (e.g. one lecture video) or the whole site. Outside a focus session, a site blocked by an always-on or scheduled rule shows which rule applies (and when a schedule ends) instead of a current action. No arbitrary commands from page content. Global policy reports the remaining exception in both browsers. If redirect behavior is unsupported for a case, use truthful browser feedback and app notification rather than pretending navigation succeeded.
 
 ## Coach behavior
 

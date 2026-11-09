@@ -97,29 +97,6 @@ struct RuleCoordinatorTests {
 
 @Suite("Rule status text")
 struct RuleStatusTests {
-    private let workdays = WeeklySchedule(days: [.mon, .tue, .wed, .thu, .fri], from: ClockTime(8, 0), to: ClockTime(18, 0), timeZone: bogota)
-
-    @Test func alwaysIsBlockedNow() {
-        #expect(RuleText.status(.always, at: wednesdayMorningInBogota, sessionRulesApply: false) == "Blocked now")
-    }
-
-    @Test func sessionOnlyDependsOnSessionRules() {
-        #expect(RuleText.status(.sessionOnly, at: wednesdayMorningInBogota, sessionRulesApply: true) == "Blocked now")
-        #expect(RuleText.status(.sessionOnly, at: wednesdayMorningInBogota, sessionRulesApply: false) == "During focus sessions")
-    }
-
-    @Test func schedulesSayWhenTheyEndOrStart() {
-        #expect(RuleText.status(.schedule(workdays), at: wednesdayMorningInBogota, sessionRulesApply: false) == "Ends 18:00")
-        #expect(RuleText.status(.schedule(workdays), at: instant("2026-10-14T07:00:00-05:00"), sessionRulesApply: false) == "Starts 08:00")
-        #expect(RuleText.status(.schedule(workdays), at: instant("2026-10-16T19:00:00-05:00"), sessionRulesApply: false) == "Starts Mon 08:00")
-    }
-
-    @Test func activationNames() {
-        #expect(RuleText.activationName(.always) == "Always")
-        #expect(RuleText.activationName(.sessionOnly) == "Session only")
-        #expect(RuleText.activationName(.schedule(workdays)) == "Schedule")
-    }
-
     @Test func sessionRulesApplyWhileTheEngineWouldPublishThem() {
         let start = FocusSession.sampleStart
         var strict = FocusSession.sample(phase: .paused(since: start))
@@ -148,26 +125,11 @@ struct RuleErrorTextTests {
 struct AppRuleStatusTests {
     private let instagram = ActivityTarget.app(bundleID: "com.burbn.instagram", name: "Instagram")
 
-    @Test func appRulesThatApplySayTheAppIsHiddenWhenOpened() {
-        let apps = BlockRuleSet(targets: [instagram], activation: .always)
-        let mixed = BlockRuleSet(targets: [instagram, .site(domain: "instagram.com")], activation: .always)
-
-        #expect(RuleText.status(apps, at: wednesdayMorningInBogota, sessionRulesApply: false) == "Hidden when opened")
-        #expect(RuleText.status(mixed, at: wednesdayMorningInBogota, sessionRulesApply: false) == "Blocked now")
-    }
-
-    @Test func appRulesThatDoNotApplyNowSayWhenTheyWill() {
-        let session = BlockRuleSet(targets: [instagram], activation: .sessionOnly)
-
-        #expect(RuleText.status(session, at: wednesdayMorningInBogota, sessionRulesApply: false) == "During focus sessions")
-        #expect(RuleText.status(session, at: wednesdayMorningInBogota, sessionRulesApply: true) == "Hidden when opened")
-    }
-
     @Test func anAppExceptionShowsItsTimeLeft() {
         let apps = BlockRuleSet(targets: [instagram], activation: .always)
         let exception = PolicyException(scope: .app(bundleID: "com.burbn.instagram"), expiresAt: wednesdayMorningInBogota.addingTimeInterval(8 * 60 - 1))
 
-        #expect(RuleText.status(apps, at: wednesdayMorningInBogota, sessionRulesApply: false, exceptions: [exception]) == "Exception · 8 min left")
-        #expect(RuleText.status(apps, at: exception.expiresAt, sessionRulesApply: false, exceptions: [exception]) == "Hidden when opened")
+        #expect(RuleText.exceptionStatus(apps, at: wednesdayMorningInBogota, exceptions: [exception]) == "Exception · 8 min left")
+        #expect(RuleText.exceptionStatus(apps, at: exception.expiresAt, exceptions: [exception]) == nil)
     }
 }

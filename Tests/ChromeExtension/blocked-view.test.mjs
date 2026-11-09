@@ -31,13 +31,44 @@ test("during a session the page shows the task and the way back", () => {
   const m = view(delivery({ session: session(), focus }), "https://www.youtube.com/watch?v=3kqW9M");
 
   assert.equal(m.kind, "session");
-  assert.equal(m.status.text, "Focus session · 24:08 left");
-  assert.equal(m.eyebrow, "You're working on");
+  assert.deepEqual(m.status, { tone: "green", text: "Focusing · 24:08 left" });
   assert.equal(m.title, "Explain baseline results");
-  assert.equal(m.subtitle, focus.nextAction);
-  assert.deepEqual(m.primary, { label: "Return to task", action: "open-app" });
+  assert.equal(m.subtitle, `NLP report · Next: ${focus.nextAction}`);
+  assert.deepEqual(m.primary, { label: "Back to FocusPilot", action: "open-app" });
   assert.equal(m.exceptionLink, true);
-  assert.deepEqual(m.footer, ["youtube.com is blocked during focus sessions", "FocusPilot · Chrome"]);
+  assert.equal(m.note, "youtube.com · Blocked during focus");
+  assert.equal(m.eyebrow, undefined);
+  assert.equal(m.footer, undefined);
+});
+
+test("the task line shows what the task has", () => {
+  const line = (f) => view(delivery({ session: session(), focus: { title: "T", ...f } }), "https://youtube.com/").subtitle;
+
+  assert.equal(line({ projectTitle: "NLP report" }), "NLP report");
+  assert.equal(line({ nextAction: "Write" }), "Next: Write");
+  assert.equal(line({}), null);
+});
+
+test("the way back goes to the task's first web page", () => {
+  const overleaf = { ...focus, resourceName: "Overleaf", resourceURL: "https://www.overleaf.com/project/1" };
+  const m = view(delivery({ session: session(), focus: overleaf }), "https://youtube.com/");
+
+  assert.deepEqual(m.primary, { label: "Back to Overleaf", action: "open-url", url: "https://www.overleaf.com/project/1" });
+});
+
+test("the web page still works without the app", () => {
+  const overleaf = { ...focus, resourceName: "Overleaf", resourceURL: "https://www.overleaf.com/project/1" };
+  const m = view(delivery({ session: session(), focus: overleaf }), "https://facebook.com/", { appRunning: false });
+
+  assert.equal(m.primary.label, "Back to Overleaf");
+});
+
+// A task's page can sit on a blocked site, and only http(s) may be navigated to.
+test("the way back never points at a blocked or non-web page", () => {
+  for (const resourceURL of ["https://youtube.com/watch?v=1", "javascript:alert(1)"]) {
+    const m = view(delivery({ session: session(), focus: { ...focus, resourceName: "X", resourceURL } }), "https://youtube.com/");
+    assert.deepEqual(m.primary, { label: "Back to FocusPilot", action: "open-app" });
+  }
 });
 
 // #56: with nothing in Now the page names what the session covers, as the app's panel does.
@@ -46,7 +77,6 @@ test("with nothing in Now the page says so and what the session covers", () => {
   const m = view(delivery({ session: session(), focus: empty }), "https://www.youtube.com/");
 
   assert.equal(m.kind, "session");
-  assert.equal(m.eyebrow, null);
   assert.equal(m.title, "Nothing in Now");
   assert.equal(m.subtitle, "Covers FocusPilot and NLP report");
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
@@ -56,7 +86,7 @@ test("a site blocked by a schedule during a session still shows the task", () =>
   const m = view(delivery({ session: session(), focus }), "https://instagram.com/");
 
   assert.equal(m.kind, "session");
-  assert.equal(m.footer[0], "instagram.com is blocked by a schedule");
+  assert.equal(m.note, "instagram.com · Blocked by a schedule");
 });
 
 test("outside a session a schedule says when it ends", () => {
@@ -65,8 +95,8 @@ test("outside a session a schedule says when it ends", () => {
   assert.equal(m.kind, "rule");
   assert.equal(m.status.text, "No session running");
   assert.equal(m.title, "instagram.com is blocked by a schedule");
-  assert.equal(m.subtitle, "Mon–Fri 08:00–18:00 · America/Bogota");
-  assert.equal(m.detail, "Schedule ends today at 18:00 · in 7 h 33 min");
+  assert.equal(m.subtitle, "Ends today at 18:00 · in 7 h 33 min");
+  assert.equal(m.detail, undefined);
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
 });
 
@@ -74,7 +104,7 @@ test("always-on rules have no end", () => {
   const m = view(delivery(), "https://facebook.com/");
 
   assert.equal(m.title, "facebook.com is blocked at all times");
-  assert.equal(m.detail, "Always-on rule · no end time");
+  assert.equal(m.subtitle, null);
 });
 
 test("a strict session past its end without the app offers to open it, with no explanation", () => {
@@ -87,7 +117,7 @@ test("a strict session past its end without the app offers to open it, with no e
   assert.equal(m.hint, undefined);
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
   assert.equal(m.exceptionLink, false);
-  assert.deepEqual(m.footer, ["", "FocusPilot"]);
+  assert.equal(m.footer, undefined);
 });
 
 // Design 05 D applies to the whole strict session, not only past its end.
@@ -108,7 +138,7 @@ test("a normal session without the app says when the rule lifts (05 D2)", () => 
   assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
   assert.equal(m.hint, undefined);
   assert.equal(m.exceptionLink, false);
-  assert.deepEqual(m.footer, ["", "FocusPilot"]);
+  assert.equal(m.footer, undefined);
 });
 
 // The offline session variants speak about the session, so a site blocked
@@ -119,7 +149,7 @@ test("without the app, a site blocked only by an always-on rule still says so", 
     const m = view(delivery({ session: session("strict"), focus }), "https://facebook.com/", extra);
 
     assert.equal(m.kind, "session");
-    assert.equal(m.footer[0], "facebook.com is blocked at all times");
+    assert.equal(m.note, "facebook.com · Always blocked");
     assert.deepEqual(m.primary, { label: "Open FocusPilot", action: "open-app" });
     assert.equal(m.exceptionLink, false);
     assert.equal(m.hint, "FocusPilot isn't running");
@@ -171,21 +201,31 @@ const form = (mode, state = {}, extra = {}) => FocusBlockedView.exceptionForm({
   state: { duration: 600, scope: "page", reason: "", phase: "editing", ...state }, ...extra,
 });
 
-test("the exception form offers 5, 10 or 20 minutes for this page or the whole site", () => {
+test("the exception form offers 10, 20 or 45 minutes for this video or the whole site", () => {
   const f = form("normal");
 
-  assert.equal(f.title, "Timed exception");
-  assert.deepEqual(f.durations, [{ seconds: 300, label: "5 min", selected: false }, { seconds: 600, label: "10 min", selected: true }, { seconds: 1200, label: "20 min", selected: false }]);
-  assert.deepEqual(f.scopes.map((s) => [s.id, s.label, s.selected]), [["page", "This page only", true], ["site", "All of youtube.com", false]]);
-  assert.equal(f.scopes[0].detail, "youtube.com/watch?v=3kqW9MabcdEFG&list=…");
-  assert.equal(f.scopes[1].detail, undefined);
+  assert.equal(f.title, "Allow youtube.com");
+  assert.deepEqual(f.durations, [{ seconds: 600, label: "10 min", selected: true }, { seconds: 1200, label: "20 min", selected: false }, { seconds: 2700, label: "45 min", selected: false }]);
+  assert.deepEqual(f.scopes.map((s) => [s.id, s.label, s.selected]), [["page", "This video only", true], ["site", "Whole site", false]]);
+  assert.equal(f.scopes[0].detail, undefined);
   assert.equal(f.reason, null, "only strict sessions ask why");
-  assert.deepEqual(f.allow, { label: "Allow for 10 min", disabled: false });
+  assert.deepEqual(f.allow, { label: "Allow 10 min", disabled: false });
+});
+
+test("on a page that isn't a video the choice says page", () => {
+  const label = (url) => FocusBlockedView.exceptionForm({
+    delivery: delivery({ session: session(), focus }), url, now, timeZone: "America/Bogota",
+    state: { duration: 600, scope: "page", reason: "", phase: "editing" },
+  }).scopes[0].label;
+
+  assert.equal(label("https://youtube.com/feed/subscriptions"), "This page only");
+  assert.equal(label("https://www.youtube.com/shorts/abc"), "This video only");
+  assert.equal(label("https://facebook.com/watch?v=1"), "This page only");
 });
 
 test("the request names the page as it was blocked, or the rule's site", () => {
   assert.deepEqual(form("normal").request, { scope: { kind: "page", url: videoURL }, durationSeconds: 600, reason: null, confirmed: false });
-  assert.deepEqual(form("normal", { scope: "site", duration: 300 }).request.scope, { kind: "site", domain: "youtube.com" });
+  assert.deepEqual(form("normal", { scope: "site", duration: 1200 }).request.scope, { kind: "site", domain: "youtube.com" });
 });
 
 test("a strict session asks why, then confirms, then counts down a wait", () => {
@@ -224,20 +264,20 @@ test("an excepted page says until when it is allowed and offers the way back", (
   assert.equal(m.kind, "excepted");
   assert.deepEqual(m.status, { tone: "green", text: "Timed exception · 10:00 left" });
   assert.equal(m.title, "youtube.com is allowed for now");
-  assert.equal(m.subtitle, "This page is allowed until 10:36, then it is blocked again.");
+  assert.equal(m.subtitle, "This page · until 10:36");
   assert.deepEqual(m.primary, { label: "Go back to youtube.com", action: "go-back" });
   assert.equal(m.backURL, videoURL);
   assert.equal(m.exceptionLink, false);
 
   d.policy.exceptions = [{ scope: { kind: "site", domain: "youtube.com" }, expiresAt: "2026-10-14T15:36:52Z" }];
-  assert.equal(view(d, videoURL).subtitle, "All of youtube.com is allowed until 10:36, then it is blocked again.");
+  assert.equal(view(d, videoURL).subtitle, "Whole site · until 10:36");
 });
 
 // #23: with Reduce Motion the timers change once a minute, rounded up, as
 // the focus panel does (design 04); the strict wait keeps its seconds.
 test("with Reduce Motion the countdowns read in whole minutes", () => {
   const d = delivery({ session: session(), focus });
-  assert.equal(view(d, "https://youtube.com/", { reduceMotion: true }).status.text, "Focus session · 25 min left");
+  assert.equal(view(d, "https://youtube.com/", { reduceMotion: true }).status.text, "Focusing · 25 min left");
   d.policy.exceptions = [{ scope: { kind: "site", domain: "youtube.com" }, expiresAt: "2026-10-14T15:36:22Z" }];
   assert.equal(view(d, "https://youtube.com/", { reduceMotion: true }).status.text, "Timed exception · 10 min left");
   assert.equal(view(d, "https://youtube.com/").status.text, "Timed exception · 9:30 left", "seconds without it");

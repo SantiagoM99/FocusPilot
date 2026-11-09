@@ -16,6 +16,11 @@ public struct WebPageLink: Codable, Equatable, Sendable {
     /// The site, as block rules and the allowed list name it.
     public var domain: String { SiteDomain.normalized(url) ?? url }
 
+    /// "Overleaf" for overleaf.com: links have no title of their own.
+    public var siteName: String {
+        (domain.split(separator: ".").first.map(String.init) ?? domain).capitalized
+    }
+
     /// "overleaf.com/project/nlp-report", "youtube.com/watch?v=1": host,
     /// path and query, without the scheme, "www." or a fragment.
     public var displayName: String {

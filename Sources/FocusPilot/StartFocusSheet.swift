@@ -12,12 +12,18 @@ struct StartFocusSheet: View {
         case minutes(Int), custom
     }
 
-    @State private var duration = Duration.minutes(50)
+    @State private var duration: Duration
     @State private var customMinutes = 30
-    @State private var mode = SessionMode.normal
+    @State private var mode: SessionMode
     @State private var coversAll = true
     @State private var chosen: Set<Int64> = []
     @State private var isStarting = false
+
+    init(model: AppModel) {
+        self.model = model
+        _duration = State(initialValue: .minutes(model.sessionPreferences.defaultMinutes))
+        _mode = State(initialValue: model.sessionPreferences.strictByDefault ? .strict : .normal)
+    }
 
     private var minutes: Int {
         if case .minutes(let value) = duration { value } else { customMinutes }

@@ -18,7 +18,7 @@ let state = { delivery: null, appRunning: null };
 let current = null;
 let reported = false;
 let unreachable = false;
-// The timed exception form (design 05B); null while it is closed.
+// The exception sheet; null while it is closed.
 let form = null;
 
 // Reduce Motion: the countdowns change once a minute instead of every second.
@@ -30,20 +30,17 @@ function render() {
   current = m;
   $("dot").className = "dot " + m.status.tone;
   $("status").textContent = m.status.text;
-  $("eyebrow").textContent = m.eyebrow ?? "";
-  $("eyebrow").hidden = !m.eyebrow;
   $("title").textContent = m.title;
   $("subtitle").textContent = m.subtitle ?? "";
   $("subtitle").hidden = !m.subtitle;
-  $("detail").textContent = m.detail ?? "";
-  $("detail").hidden = !m.detail;
-  $("primary").textContent = m.primary.label;
+  $("primary-label").textContent = m.primary.label;
+  $("primary-arrow").toggleAttribute("hidden", !m.primary.label.startsWith("Back to "));
   const hint = unreachable ? "FocusPilot couldn't be reached" : m.hint;
   $("hint").textContent = hint ?? "";
   $("hint").hidden = !hint;
   $("exception").hidden = !m.exceptionLink;
-  $("footer-left").textContent = m.footer[0];
-  $("footer-right").textContent = m.footer[1];
+  $("note").textContent = m.note ?? "";
+  $("note").hidden = !m.note;
   document.title = ["unblocked", "excepted", "linked"].includes(m.kind) ? "FocusPilot" : `Blocked · ${m.domain}`;
   // Granted here or in another profile: back to the page once the policy carries it.
   if (form?.phase === "granted" && m.kind === "excepted" && m.backURL) {
@@ -59,6 +56,10 @@ function render() {
 }
 
 $("primary").addEventListener("click", async () => {
+  if (current.primary.action === "open-url") {
+    location.replace(current.primary.url);
+    return;
+  }
   if (current.primary.action === "go-back") {
     if (current.backURL) location.replace(current.backURL);
     else chrome.tabs.update({ url: "chrome://newtab/" }).catch(() => {});
@@ -69,7 +70,7 @@ $("primary").addEventListener("click", async () => {
   render();
 });
 
-// ---- Timed exception form ----
+// ---- Exception sheet ----
 
 // Arrow keys, Home and End pick within a radio group, as native radios do.
 for (const group of [$("x-durations"), $("x-scopes")]) {
@@ -97,10 +98,9 @@ function openForm() {
   form = { duration: 600, scope: path === "/" ? "site" : "page", reason: "", phase: "editing", availableAt: null, error: null };
   $("x-reason").value = "";
   $("exception-panel").hidden = false;
-  $("page").hidden = true;
+  $("page").inert = true;
   renderForm();
-  // Keyboard focus follows the form; the link that opened it is now hidden.
-  $("x-durations").querySelector("[aria-checked=true]")?.focus();
+  $("x-scopes").querySelector("[aria-checked=true]")?.focus();
   chrome.runtime.sendMessage({ type: "exception-opened", domain: current.domain }).catch(() => {});
 }
 
@@ -112,11 +112,11 @@ function closeForm() {
   const hadFocus = $("exception-panel").contains(document.activeElement);
   form = null;
   $("exception-panel").hidden = true;
-  $("page").hidden = false;
+  $("page").inert = false;
   if (hadFocus) ($("exception").hidden ? $("primary") : $("exception")).focus();
 }
 
-function choice(group, { label, detail, selected, disabled }, onPick) {
+function choice(group, { label, selected, disabled }, onPick) {
   const button = document.createElement("button");
   button.type = "button";
   button.setAttribute("role", "radio");
@@ -124,14 +124,7 @@ function choice(group, { label, detail, selected, disabled }, onPick) {
   // One stop per group for Tab; arrow keys move within it.
   button.tabIndex = selected ? 0 : -1;
   button.disabled = disabled;
-  const title = document.createElement("span");
-  title.textContent = label;
-  button.append(title);
-  if (detail) {
-    const small = document.createElement("small");
-    small.textContent = detail;
-    button.append(small);
-  }
+  button.textContent = label;
   button.addEventListener("click", onPick);
   group.append(button);
 }
@@ -151,7 +144,7 @@ function renderForm() {
     }
     $("x-scopes").replaceChildren();
     for (const s of f.scopes) {
-      choice($("x-scopes"), { label: s.label, detail: s.detail, selected: s.selected, disabled: f.locked }, () => { form.scope = s.id; renderForm(); });
+      choice($("x-scopes"), { label: s.label, selected: s.selected, disabled: f.locked }, () => { form.scope = s.id; renderForm(); });
     }
     if (focused) [...document.querySelectorAll("[role=radio]")].find((b) => b.textContent === focused)?.focus();
   }

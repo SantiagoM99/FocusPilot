@@ -91,6 +91,7 @@ final class AppModel {
     @ObservationIgnored lazy var appBlocker = AppBlocker(model: self)
     let loginItem = LoginItemSettings(service: MainAppLoginItem())
     let menuBarPreferences = MenuBarPreferences()
+    let sessionPreferences = SessionPreferences()
     private let firstLaunch = FirstLaunchWelcome()
 
     let coordinator: FocusCoordinator?

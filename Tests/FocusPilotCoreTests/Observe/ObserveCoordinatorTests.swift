@@ -102,11 +102,11 @@ struct ObserveCoordinatorTests {
         try await fixture.coordinator.startSession(duration: 25 * 60, mode: .normal)
         let session = try #require(await fixture.coordinator.snapshot().activeSession)
 
-        _ = try await fixture.coordinator.requestException(.site(domain: "instagram.com"), duration: 5 * 60)
+        _ = try await fixture.coordinator.requestException(.site(domain: "instagram.com"), duration: 10 * 60)
 
         let events = try await fixture.coordinator.pilotEvents(since: fixture.clock.now.addingTimeInterval(-60))
             .filter { $0.kind == .exceptionGranted }
-        #expect(events == [PilotEvent(kind: .exceptionGranted, at: fixture.clock.now, duration: 300,
+        #expect(events == [PilotEvent(kind: .exceptionGranted, at: fixture.clock.now, duration: 600,
                                       sessionID: session.id, taskID: session.taskID)])
     }
 }

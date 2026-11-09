@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    // Opening the app again (Finder, Spotlight, or "Return to task" on
+    // Opening the app again (Finder, Spotlight, or "Back to FocusPilot" on
     // Chrome's blocked page) brings up the planning window with the task.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         NotificationCenter.default.post(name: .showPlanningWindow, object: nil)

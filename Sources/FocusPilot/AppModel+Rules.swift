@@ -26,6 +26,11 @@ extension AppModel {
         await perform(.delete(id), confirmed: false)
     }
 
+    /// Takes one site or app out of its rule. A strict session asks first, as for any weakening.
+    func remove(_ target: ActivityTarget, from rule: BlockRuleSet) async {
+        if let edit = RuleEdit.removing(target, from: rule) { await perform(edit, confirmed: false) }
+    }
+
     /// Sends a rule change, confirmed or not, and records whether it now
     /// needs confirmation. The countdown comes from the snapshot.
     @discardableResult

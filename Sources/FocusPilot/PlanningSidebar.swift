@@ -109,6 +109,8 @@ struct PlanningHeader: View {
     let title: String
     let date: String?
     let newTask: () -> Void
+    /// Settings shows its tabs here in place of New Task, as its board draws it.
+    var settingsTab: Binding<SettingsPage.Tab>?
 
     var body: some View {
         HStack(alignment: .center) {
@@ -124,18 +126,22 @@ struct PlanningHeader: View {
                 }
             }
             Spacer()
-            Button(action: newTask) {
-                Label("New Task", systemImage: "plus")
-                    .labelStyle(.titleAndIcon)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.palette(.text))
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(Color.palette(.buttonBackground), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.palette(.buttonBorder)))
+            if let settingsTab {
+                SettingsTabs(selection: settingsTab)
+            } else {
+                Button(action: newTask) {
+                    Label("New Task", systemImage: "plus")
+                        .labelStyle(.titleAndIcon)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.palette(.text))
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(Color.palette(.buttonBackground), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.palette(.buttonBorder)))
+                }
+                .buttonStyle(.plain)
+                .help("New Task (⌘N)")
             }
-            .buttonStyle(.plain)
-            .help("New Task (⌘N)")
         }
         .padding(EdgeInsets(top: 14, leading: 24, bottom: 10, trailing: 24))
         .overlay(alignment: .bottom) { Rectangle().fill(Color.palette(.separator)).frame(height: 1) }

@@ -1,7 +1,7 @@
 import FocusPilotCore
 import SwiftUI
 
-/// Settings › Blocking: one collapsed "Show technical details" with the
+/// Settings › Chrome: one collapsed "Show technical details" with the
 /// policy revision, checksum, what each Chrome profile applied and the exact
 /// JSON the extensions receive. These are diagnostics; the rest of the UI
 /// speaks plainly (decision 0003, 2026-10-26).

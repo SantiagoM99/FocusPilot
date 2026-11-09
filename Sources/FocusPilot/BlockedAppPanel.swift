@@ -96,7 +96,7 @@ private final class KeyablePanel: NSPanel {
 final class BlockedAppPanelState {
     var blocked: BlockedApp?
     var isRequestingException = false
-    var duration = TimedException.durations[1]
+    var duration = TimedException.durations[0]
     var reason = ""
     /// A strict session asked the owner to confirm the wait.
     var isConfirming = false
@@ -104,7 +104,7 @@ final class BlockedAppPanelState {
 
     func reset() {
         isRequestingException = false
-        duration = TimedException.durations[1]
+        duration = TimedException.durations[0]
         reason = ""
         isConfirming = false
         error = nil

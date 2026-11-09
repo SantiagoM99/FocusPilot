@@ -1,11 +1,8 @@
-// What the blocked page says (design 05: A in a session, C outside one,
-// D and D2 for a strict or normal session without the app). Pure, so node can test it;
+// What the blocked page says (redesign Blocked.dc.html): controls, labels and
+// real status only (decision 0003, 2026-11-03). Pure, so node can test it;
 // blocked.js renders it.
 
 var FocusBlockedView = (() => {
-  const DAY_NAMES = { mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun" };
-  const ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-
   // "24:08", "1:00:05", as MenuBarStatus.format in the app.
   function countdown(seconds) {
     const total = Math.max(0, Math.floor(seconds));
@@ -29,20 +26,6 @@ var FocusBlockedView = (() => {
     return `in ${m} min`;
   }
 
-  // "Mon–Fri", "Sat, Sun", "Every day", as RuleText.summary in the app.
-  function days(list) {
-    if (list.length >= 7) return "Every day";
-    const runs = [];
-    ORDER.forEach((day, i) => {
-      if (!list.includes(day)) return;
-      const run = runs[runs.length - 1];
-      if (run && run[run.length - 1] === i - 1) run.push(i); else runs.push([i]);
-    });
-    return runs.flatMap((run) => run.length >= 3
-      ? [`${DAY_NAMES[ORDER[run[0]]]}–${DAY_NAMES[ORDER[run[run.length - 1]]]}`]
-      : run.map((i) => DAY_NAMES[ORDER[i]])).join(", ");
-  }
-
   // "today at 18:00", "tomorrow at 08:00", "Mon at 08:00", in the Mac's zone.
   function clock(instant, timeZone) {
     return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(instant));
@@ -63,6 +46,21 @@ var FocusBlockedView = (() => {
     always: (d) => `${d} is blocked at all times`,
   };
 
+  const reasonNote = { session: "Blocked during focus", schedule: "Blocked by a schedule", always: "Always blocked" };
+
+  // "NLP report · Next: write the comparison table".
+  function taskLine({ projectTitle, nextAction }) {
+    const parts = [projectTitle, nextAction && `Next: ${nextAction}`].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  // The task's web page, unless a rule would only bounce the owner back here.
+  function workPage(focus, policy, now) {
+    const { resourceName: name, resourceURL: url } = focus;
+    if (!name || !/^https?:/i.test(url ?? "") || FocusPolicy.decide(policy, url, now).blocked) return null;
+    return { label: `Back to ${name}`, action: "open-url", url };
+  }
+
   function hostOf(url) {
     try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
   }
@@ -72,19 +70,19 @@ var FocusBlockedView = (() => {
     const policy = delivery?.policy ?? null;
     const decision = FocusPolicy.decide(policy, url, now);
     const offline = appRunning === false;
-    const openApp = { label: offline ? "Open FocusPilot" : "Return to task", action: "open-app" };
+    const openApp = { label: offline ? "Open FocusPilot" : "Back to FocusPilot", action: "open-app" };
 
     if (decision.excepted) {
       const host = hostOf(url);
       const { scope, expiresAt } = decision.excepted;
-      const what = scope.kind === "site" ? `All of ${scope.domain}` : "This page";
+      const what = scope.kind === "site" ? "Whole site" : "This page";
       return {
         kind: "excepted", domain: decision.domain,
         status: { tone: "green", text: `Timed exception · ${left((expiresAt - now) / 1000)} left` },
         title: `${host} is allowed for now`,
-        subtitle: `${what} is allowed until ${clock(expiresAt, timeZone)}, then it is blocked again.`,
+        subtitle: `${what} · until ${clock(expiresAt, timeZone)}`,
         primary: { label: `Go back to ${host}`, action: "go-back" }, backURL: FocusPolicy.returnURL(policy, url),
-        exceptionLink: false, footer: ["", "FocusPilot"],
+        exceptionLink: false,
       };
     }
 
@@ -96,7 +94,7 @@ var FocusBlockedView = (() => {
         title: "This page is allowed in this session",
         subtitle: `Until ${clock(Date.parse(policy.session.end), timeZone)}`,
         primary: { label: `Go back to ${host}`, action: "go-back" }, backURL: FocusPolicy.returnURL(policy, url),
-        exceptionLink: false, footer: ["", "FocusPilot"],
+        exceptionLink: false,
       };
     }
 
@@ -106,7 +104,7 @@ var FocusBlockedView = (() => {
       return {
         kind: "unblocked", status: { tone: "gray", text: "Not blocked" }, title: `${host} isn't blocked now`,
         primary: { label: backURL ? `Go back to ${host}` : "Open a new tab", action: "go-back" }, backURL,
-        exceptionLink: false, footer: ["", "FocusPilot"],
+        exceptionLink: false,
       };
     }
 
@@ -119,7 +117,6 @@ var FocusBlockedView = (() => {
         title: "Still blocked · strict session",
         primary: { label: "Open FocusPilot", action: "open-app" },
         exceptionLink: false,
-        footer: ["", "FocusPilot"],
       };
     }
     if (offlineSession) {
@@ -129,56 +126,48 @@ var FocusBlockedView = (() => {
         title: `Still blocked until ${end}`,
         primary: { label: "Open FocusPilot", action: "open-app" },
         exceptionLink: false,
-        footer: ["", "FocusPilot"],
       };
     }
     const offlineHint = offline ? "FocusPilot isn't running" : null;
 
     if (FocusPolicy.sessionApplies(session, now) && delivery.focus) {
       const remaining = Date.parse(session.end) - now;
-      const status = remaining > 0 ? `Focus session · ${left(remaining / 1000)} left` : "Strict session · past its planned end";
+      const status = remaining > 0 ? `Focusing · ${left(remaining / 1000)} left` : "Strict session · past its planned end";
       // With nothing in Now the app sends what the session covers instead (#56).
       const focus = delivery.focus, nothingInNow = focus.covers != null;
       return {
-        kind: "session", domain, status: { tone: "accent", text: status },
-        eyebrow: nothingInNow ? null : "You're working on",
-        title: focus.title, subtitle: focus.nextAction ?? focus.projectTitle ?? focus.covers ?? null,
-        primary: nothingInNow ? { label: "Open FocusPilot", action: "open-app" } : openApp,
+        kind: "session", domain, status: { tone: "green", text: status },
+        title: focus.title, subtitle: nothingInNow ? focus.covers : taskLine(focus),
+        primary: nothingInNow ? { label: "Open FocusPilot", action: "open-app" } : workPage(focus, policy, now) ?? openApp,
         hint: offlineHint, exceptionLink: !offline,
-        footer: [reasonText[decision.reason](domain), "FocusPilot · Chrome"],
+        note: `${domain} · ${reasonNote[decision.reason]}`,
       };
     }
 
-    let subtitle = null, detail = "Always-on rule · no end time";
+    let subtitle = null;
     if (decision.reason === "schedule") {
-      const s = decision.schedule;
-      subtitle = `${days(s.days)} ${s.start}–${s.end} · ${s.timeZone}`;
-      const end = FocusPolicy.scheduleNextChange(s, now);
-      detail = end ? `Schedule ends ${when(end, now, timeZone)} · ${relative((end - now) / 1000)}` : null;
-    } else if (decision.reason === "session") {
-      detail = "Blocked during focus sessions";
+      const end = FocusPolicy.scheduleNextChange(decision.schedule, now);
+      subtitle = end ? `Ends ${when(end, now, timeZone)} · ${relative((end - now) / 1000)}` : null;
     }
     return {
       kind: "rule", domain, status: { tone: "gray", text: "No session running" },
-      title: reasonText[decision.reason](domain), subtitle, detail,
+      title: reasonText[decision.reason](domain), subtitle,
       primary: { label: "Open FocusPilot", action: "open-app" }, hint: offlineHint, exceptionLink: !offline,
-      footer: ["", "FocusPilot"],
     };
   }
 
-  const DURATIONS = [300, 600, 1200];
+  const DURATIONS = [600, 1200, 2700];
 
-  // "youtube.com/watch?v=3kqW9M…": the page as the scope choice shows it.
-  function shortPage(url) {
-    let text;
+  // An exact-page exception on a video is what the owner came for, so it says so.
+  function pageChoice(url) {
     try {
-      const u = new URL(url);
-      text = u.hostname.replace(/^www\./, "") + u.pathname + u.search;
-    } catch { text = url; }
-    return text.length > 40 ? text.slice(0, 39) + "…" : text;
+      const u = new URL(url), host = u.hostname.replace(/^(www|m)\./, "");
+      const video = (host === "youtube.com" && /^\/(watch|shorts\/)/.test(u.pathname)) || host === "youtu.be";
+      return video ? "This video only" : "This page only";
+    } catch { return "This page only"; }
   }
 
-  // The timed exception form (design 05B). `state` is the page's: the
+  // The exception sheet. `state` is the page's: the
   // chosen duration and scope, the reason, and the phase of the request:
   // editing, confirming (strict: asked to confirm), waiting (strict: the
   // wait until `availableAt`), or sending.
@@ -195,15 +184,15 @@ var FocusBlockedView = (() => {
     if (state.phase === "sending") allow = { label: "Allowing…", disabled: true };
     else if (state.phase === "confirming") allow = { label: "Start the wait", disabled: false };
     else if (waiting) allow = remaining > 0 ? { label: `Allow in ${countdown(remaining / 1000)}`, disabled: true } : { label: "Allow now", disabled: false };
-    else allow = { label: `Allow for ${minutes(state.duration)}`, disabled: strict && !state.reason.trim() };
+    else allow = { label: `Allow ${minutes(state.duration)}`, disabled: strict && !state.reason.trim() };
 
     const reason = state.reason.trim();
     return {
-      title: "Timed exception", strict,
+      title: `Allow ${domain}`, strict,
       durations: DURATIONS.map((seconds) => ({ seconds, label: minutes(seconds), selected: seconds === state.duration })),
       scopes: [
-        { id: "page", label: "This page only", detail: shortPage(url), selected: state.scope === "page" },
-        { id: "site", label: `All of ${domain}`, selected: state.scope === "site" },
+        { id: "page", label: pageChoice(url), selected: state.scope === "page" },
+        { id: "site", label: "Whole site", selected: state.scope === "site" },
       ],
       reason: strict ? {} : null,
       locked: waiting || state.phase === "sending",
@@ -228,7 +217,7 @@ var FocusBlockedView = (() => {
     }
   }
 
-  return { model, exceptionForm, countdown, relative, days, when, nextChoice };
+  return { model, exceptionForm, countdown, relative, when, nextChoice };
 })();
 
 if (typeof module === "object") module.exports = FocusBlockedView;
