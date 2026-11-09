@@ -1,80 +1,19 @@
 import FocusPilotCore
 import SwiftUI
 
-/// Decision 0004: what needs the owner now, at the top, then every thread
-/// that moves without them, grouped by project and collapsed. Nothing here
-/// switches on its own; Switch asks first, and agent text is shown verbatim.
+/// In flight (redesign, InFlight board): three flat sections, and the
+/// selected row in the inspector. Switch asks first; nothing here switches
+/// on its own, and agent text is shown verbatim.
 struct InFlightView: View {
     let model: AppModel
-    @State private var expanded: Set<Int64?> = []
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                section("Needs you") {
-                    if model.attention.isEmpty {
-                        note("Nothing needs you")
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(Array(model.attention.enumerated()), id: \.element.id) { index, item in
-                                if index > 0 { Divider() }
-                                AttentionRow(model: model, item: item)
-                            }
-                        }
-                        .card()
-                    }
-                }
-                section("In flight") {
-                    if model.inFlight.isEmpty {
-                        note("Nothing in flight")
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(Array(model.inFlight.enumerated()), id: \.element.id) { index, project in
-                                if index > 0 { Divider() }
-                                DisclosureGroup(isExpanded: isExpanded(project.id)) {
-                                    VStack(spacing: 0) {
-                                        ForEach(project.threads) { ThreadRow(model: model, thread: $0) }
-                                    }
-                                } label: {
-                                    Text(project.summary)
-                                        .fontWeight(.medium)
-                                        .accessibilityLabel(project.summary.replacing(" · ", with: ", "))
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                            }
-                        }
-                        .card()
-                    }
-                }
-                if let notice = model.agentNotice {
-                    Label(notice, systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                }
-            }
-            .padding(20)
-            .frame(maxWidth: 760, alignment: .leading)
-        }
-    }
-
-    private func isExpanded(_ id: Int64?) -> Binding<Bool> {
-        Binding(get: { expanded.contains(id) },
-                set: { if $0 { expanded.insert(id) } else { expanded.remove(id) } })
-    }
-
-    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            content()
-        }
-    }
-
-    private func note(_ text: String) -> some View {
-        Text(text)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        let board = model.inFlightBoard
+        InFlightList(model: model, sections: [
+            .init(title: "WAITING ON YOU", titleColor: .amberText, dot: .amber, rows: board.waitingOnYou),
+            .init(title: "RUNNING", titleColor: .secondaryText, dot: .accent, rows: board.running),
+            .init(title: "WAITING", titleColor: .secondaryText, dot: .idleDot, rows: board.waiting),
+        ])
     }
 }
 
@@ -183,75 +122,5 @@ struct WaitedText: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
-    }
-}
-
-/// One thread inside a project: its state, the agent or what it waits on,
-/// the task, and Switch.
-private struct ThreadRow: View {
-    let model: AppModel
-    let thread: InFlightThread
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
-                StatusDot(title: stateTitle, color: stateColor, filled: thread.state != .waiting)
-                    .frame(width: 96, alignment: .leading)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: thread.label)
-                        .lineLimit(1)
-                    Text(verbatim: detail)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel([stateTitle, thread.label, detail.replacing(" · ", with: ", ")].joined(separator: ", "))
-            Spacer(minLength: 8)
-            if case .waiting(let taskID) = thread.id {
-                Button("Stop waiting") { Task { await model.stopWaiting(taskID) } }
-                    .buttonStyle(.borderless)
-                    .accessibilityHint("Takes \(thread.taskTitle) out of In flight")
-            }
-            Button("Switch") { model.requestSwitch(SwitchRequest(thread)) }
-                .accessibilityHint("Switch to \(thread.taskTitle)")
-        }
-        .padding(.vertical, 6)
-        .padding(.leading, 18)
-    }
-
-    private var stateTitle: String {
-        switch thread.state {
-        case .working: "Working"
-        case .needsYou: "Needs you"
-        case .finished: "Finished"
-        case .waiting: "Waiting"
-        }
-    }
-
-    private var stateColor: Color {
-        switch thread.state {
-        case .working: .blue
-        case .needsYou: .orange
-        case .finished: .green
-        case .waiting: .secondary
-        }
-    }
-
-    /// "Run ablation · since 10:15", or "Send the draft · check at 15:00".
-    private var detail: String {
-        let time = { (date: Date) in date.formatted(date: .omitted, time: .shortened) }
-        if thread.state == .waiting, let checkAt = thread.checkAt {
-            return "\(thread.taskTitle) · check at \(time(checkAt))"
-        }
-        return "\(thread.taskTitle) · since \(time(thread.since))"
-    }
-}
-
-private extension View {
-    func card() -> some View {
-        background(.background, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.separator))
     }
 }
