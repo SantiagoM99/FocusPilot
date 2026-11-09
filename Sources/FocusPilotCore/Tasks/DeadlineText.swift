@@ -69,6 +69,27 @@ public struct DeadlineText: Sendable {
         }
     }
 
+    /// The deadline on a task row: "Today", "Tomorrow", "Fri", "12 Nov" or
+    /// "Overdue". The row's tooltip carries the exact date.
+    public func short(at now: Date) -> String {
+        guard !deadline.isOverdue(at: now) else { return "Overdue" }
+        let today = LocalDate(containing: now, in: deadline.timeZone)
+        let days = Calendar.gregorian(in: deadline.timeZone)
+            .dateComponents([.day], from: today.start(in: deadline.timeZone), to: dayStart).day!
+        switch days {
+        case 0: return "Today"
+        case 1: return "Tomorrow"
+        case 2...6: return format(dayStart, "EEE")
+        default: return format(dayStart, deadline.localDate.year == today.year ? "d MMM" : "d MMM yyyy")
+        }
+    }
+
+    /// "Fri 16 Oct, 17:00" or "Tue 20 Oct", with the year only when it is
+    /// not the current one: the inspector and the capture preview.
+    public func dayAndTime(at now: Date) -> String {
+        dayAndMonth(today: LocalDate(containing: now, in: deadline.timeZone)) + time(", ")
+    }
+
     // MARK: VoiceOver
 
     /// The deadline as VoiceOver reads it, with full names and no middle

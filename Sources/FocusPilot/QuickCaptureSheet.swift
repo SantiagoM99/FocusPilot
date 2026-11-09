@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The "New task" sheet. The owner types the task and its deadline in one
 /// field ("Write NLP report by Friday 11pm"); the sheet previews the split
-/// title and the deadline's reading, both correctable, before saving.
+/// title and the deadline's reading, both correctable, before saving
+/// (redesign Sheets, #71).
 struct QuickCaptureSheet: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -19,54 +20,45 @@ struct QuickCaptureSheet: View {
     @State private var isSaving = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("New task")
-                .font(.title3.weight(.semibold))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.palette(.text))
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Task")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.palette(.secondaryText))
                 TextField("Task", text: $text, prompt: Text("Write NLP report by Friday 5pm"))
-                    .font(.title3)
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 14))
                 if let hint = draft.unrecognizedDateHint {
                     Label(hint, systemImage: "questionmark.circle")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.palette(.secondaryText))
                 }
             }
 
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 12) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
                     fieldLabel("Title")
                     TextField("Title", text: $draft.title, prompt: Text(""))
+                        .labelsHidden()
+                        .textFieldStyle(.plain)
+                        .fontWeight(.medium)
                 }
                 GridRow {
                     fieldLabel("Deadline")
-                    VStack(alignment: .leading, spacing: 8) {
-                        // The row itself opens the editor, so a deadline can
-                        // be set or changed by hand, not only typed.
-                        Button {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
+                        Button("Change") {
                             proposal = draft.proposedDeadline(now: .now, timeZone: .current)
                             isEditingDeadline.toggle()
-                        } label: {
-                            DeadlinePreview(deadlineText: draft.deadlineText, deadline: draft.deadline)
-                                .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        .help("Choose the deadline by hand")
+                        .buttonStyle(PaletteButtonStyle(height: 22, cornerRadius: 5, fontSize: 12, horizontalPadding: 8))
                         .accessibilityHint("Opens a date picker")
-                        if draft.deadline != nil || draft.deadlineText != nil {
-                            Button("Remove deadline") {
-                                draft.removeDeadline()
-                                isEditingDeadline = false
-                            }
-                            .buttonStyle(.link)
-                        }
-                        if isEditingDeadline, let shown = draft.deadline ?? proposal {
-                            DeadlineEditor(deadline: Binding(get: { shown }, set: { draft.correctDeadline($0) }))
-                            Button("Done") {
-                                draft.confirmPicker(shown)
-                                isEditingDeadline = false
-                            }
-                        }
+                        .popover(isPresented: $isEditingDeadline, arrowEdge: .bottom) { deadlineEditor }
                     }
                 }
                 GridRow {
@@ -77,51 +69,73 @@ struct QuickCaptureSheet: View {
                     fieldLabel("Next action")
                     TextField("Next action", text: Binding(get: { draft.nextAction ?? "" }, set: { draft.nextAction = $0 }),
                               prompt: Text("Optional"))
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
                 }
             }
+            .font(.system(size: 13))
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.palette(.nowTint), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.palette(.nowBorder)))
 
             if let taskError = model.taskError {
                 Label(taskError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.palette(.amber))
             }
 
             HStack(spacing: 8) {
-                if let deadline = draft.deadline {
-                    Button(deadline.wallClockTime == nil ? "Add a time…" : "Change date or time zone…") {
-                        isEditingDeadline.toggle()
-                    }
-                }
                 Spacer()
-                Button(role: .cancel) { dismiss() } label: {
-                    HStack(spacing: 6) {
-                        Text("Cancel")
-                        KeyHint("esc")
-                    }
-                }
-                .keyboardShortcut(.cancelAction)
-                Button(action: save) {
-                    HStack(spacing: 6) {
-                        Text("Save")
-                        KeyHint("⏎")
-                    }
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(draft.newTask == nil || isSaving)
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .buttonStyle(.palette)
+                    .keyboardShortcut(.cancelAction)
+                Button("Save", action: save)
+                    .buttonStyle(PaletteButtonStyle(kind: .primary, horizontalPadding: 16))
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(draft.newTask == nil || isSaving)
             }
         }
-        .padding(16)
-        .frame(width: 520)
+        .padding(EdgeInsets(top: 22, leading: 22, bottom: 18, trailing: 22))
+        .frame(width: 460)
+        .background { Color.palette(.window) }
         .onChange(of: text) {
             draft.setText(text, now: .now, timeZone: .current, isKnownWord: SpellingDictionary.isKnown)
             isEditingDeadline = false
         }
     }
 
+    /// Changes commit as the picker moves; Done also commits today's
+    /// proposal, which the owner may accept untouched.
+    @ViewBuilder private var deadlineEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let shown = draft.deadline ?? proposal {
+                DeadlineEditor(deadline: Binding(get: { shown }, set: { draft.correctDeadline($0) }))
+                HStack {
+                    if draft.deadline != nil || draft.deadlineText != nil {
+                        Button("Remove Deadline") {
+                            draft.removeDeadline()
+                            isEditingDeadline = false
+                        }
+                        .buttonStyle(.link)
+                    }
+                    Spacer()
+                    Button("Done") {
+                        draft.confirmPicker(shown)
+                        isEditingDeadline = false
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: 340)
+    }
+
     private func fieldLabel(_ text: String) -> some View {
         Text(text)
-            .foregroundStyle(.secondary)
-            .gridColumnAlignment(.trailing)
+            .foregroundStyle(.palette(.secondaryText))
+            .frame(width: 84, alignment: .leading)
     }
 
     private func save() {
@@ -133,23 +147,5 @@ struct QuickCaptureSheet: View {
             }
             isSaving = false
         }
-    }
-}
-
-/// A keyboard shortcut chip shown inside a button, e.g. "esc" or "⏎".
-private struct KeyHint: View {
-    let key: String
-
-    init(_ key: String) {
-        self.key = key
-    }
-
-    var body: some View {
-        Text(key)
-            .font(.subheadline)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 4)
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(.separator))
-            .accessibilityHidden(true)
     }
 }

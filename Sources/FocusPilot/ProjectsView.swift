@@ -87,7 +87,7 @@ struct ProjectsView: View {
                          undoHerdrAdd: { id in Task { await model.undoHerdrAdd(id) } },
                      activeSessionTaskID: model.snapshot.activeSession?.taskID,
                          selection: $taskSelection)
-                    .taskInspector(model: model, items: model.projectItems, selection: $taskSelection,
+                    .taskInspector(model: model, task: model.projectItems.first { $0.id == taskSelection },
                                    showReviewQueue: showReviewQueue)
             }
         } else if model.projects.isEmpty {
