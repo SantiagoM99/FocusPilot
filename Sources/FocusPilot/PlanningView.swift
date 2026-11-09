@@ -2,17 +2,15 @@ import AppKit
 import FocusPilotCore
 import SwiftUI
 
-/// The planning window (design 01, 07, 15 and 16): a sidebar with Today,
-/// In flight (#57), Projects, Review queue and Settings, and the quick capture sheet. A
-/// selected task shows its Agent section in the inspector; the rest of the
-/// task detail pane arrives with its ticket. The sidebar footer shows
-/// protection status (#17).
+/// The planning window (redesign 2026-11, Main; #70): a sidebar with Today,
+/// In flight, Projects, Review queue and Settings and a one-line protection
+/// footer, a header with the page title, the date on Today and New Task,
+/// and the quick capture sheet. A selected task shows its Agent section in
+/// the inspector. Colors come from `Palette`.
 struct PlanningView: View {
     static let windowID = "planning"
 
-    enum Page: Hashable {
-        case today, inFlight, projects, review, settings
-    }
+    typealias Page = PlanningPage
 
     let model: AppModel
     @State private var page: Page?
@@ -25,27 +23,25 @@ struct PlanningView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $page) {
-                Label("Today", systemImage: "sun.max").tag(Page.today)
-                Label("In flight", systemImage: "arrow.triangle.branch").tag(Page.inFlight)
-                    .badge(model.attention.count)
-                Label("Projects", systemImage: "folder").tag(Page.projects)
-                Label("Review queue", systemImage: "tray.full").tag(Page.review)
-                    .badge(model.reviewItems.count)
-                Label("Settings", systemImage: "gearshape").tag(Page.settings)
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .safeAreaInset(edge: .bottom) { SidebarProtectionFooter(model: model) }
-        } detail: {
-            content
-                .navigationTitle(title)
-                .navigationSubtitle(subtitle)
-                .toolbar {
-                    Button("New Task", systemImage: "plus") { isCapturing = true }
-                        .help("New task (⌘N)")
+        // A fixed sidebar beside the page, as the board draws it: the window's
+        // buttons sit over the sidebar and the header is level with them.
+        HStack(spacing: 0) {
+            PlanningSidebar(model: model, page: $page)
+                .frame(width: 210)
+                .overlay(alignment: .trailing) { Rectangle().fill(Color.palette(.sidebarBorder)).frame(width: 1) }
+            VStack(spacing: 0) {
+                // The date is read each minute, so it turns over at midnight.
+                TimelineView(.everyMinute) { context in
+                    PlanningHeader(title: title, date: page == .today || page == nil ? PageHeader.todayDate(context.date) : nil,
+                                   newTask: { isCapturing = true })
                 }
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(Color.palette(.window))
         }
+        .ignoresSafeArea(.container, edges: .top)
+        .navigationTitle(title)
         .frame(minWidth: 760, minHeight: 420)
         .focusedSceneValue(\.quickCapture, { isCapturing = true })
         .sheet(item: sheet) { sheet in
@@ -108,24 +104,6 @@ struct PlanningView: View {
         case .review: "Review queue"
         case .settings: "Settings"
         case .today, nil: "Today"
-        }
-    }
-
-    private var subtitle: String {
-        switch page {
-        case .projects, .settings: return ""
-        case .inFlight:
-            let threads = model.inFlight.map(\.threads.count).reduce(0, +)
-            let needs = model.attention.count
-            return [needs == 0 ? nil : (needs == 1 ? "1 needs you" : "\(needs) need you"),
-                    threads == 1 ? "1 thread" : "\(threads) threads"].compactMap(\.self).joined(separator: " · ")
-        case .review:
-            let count = model.reviewItems.count
-            let approvals = model.reviewItems.filter { $0.kind == .approval }.count
-            let results = count == 1 ? "1 result" : "\(count) results"
-            return count == 0 ? "Nothing queued"
-                : approvals == 0 ? results : "\(results) · \(approvals) need\(approvals == 1 ? "s" : "") your approval"
-        case .today, nil: return Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
         }
     }
 

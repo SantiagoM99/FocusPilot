@@ -18,6 +18,8 @@ struct FocusPilotApp: App {
         Window("Planning", id: PlanningView.windowID) {
             PlanningView(model: model)
         }
+        // The redesign (#70) has no title bar: the window's buttons sit over the sidebar.
+        .windowStyle(.hiddenTitleBar)
         // Login launches should not open a window; the menu bar item is the
         // entry point. The first launch is the exception (see MenuBarIcon).
         .defaultLaunchBehavior(.suppressed)
