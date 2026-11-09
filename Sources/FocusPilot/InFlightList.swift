@@ -35,8 +35,7 @@ struct InFlightList: View {
     private var list: some View {
         ScrollViewReader { reader in
             ScrollView {
-                // Lazy: there is no limit on threads.
-                LazyVStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 26) {
                     ForEach(sections.filter { !$0.rows.isEmpty }) { section in
                         VStack(alignment: .leading, spacing: 6) {
                             if let title = section.title {
@@ -67,6 +66,7 @@ struct InFlightList: View {
                 selection = next
                 reader.scrollTo(next)
             }
+            .onChange(of: selected?.id) { model.agentNotice = nil }
         }
     }
 
@@ -95,6 +95,7 @@ private struct InFlightRowView: View {
                 Circle()
                     .fill(Color.palette(dot))
                     .frame(width: 8, height: 8)
+                    .contrastOutline()
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: row.title)
@@ -130,7 +131,7 @@ private struct InFlightRowView: View {
         if case .attention(let item) = row.source {
             switch item.id {
             case .review(let id):
-                Button("Mark Reviewed") { Task { await model.markReviewed(id) } }
+                Button("Mark reviewed") { Task { await model.markReviewed(id) } }
             case .check(let taskID):
                 Button("Dismiss") { Task { await model.dismissCheck(taskID) } }
             case .report(let id):
@@ -203,6 +204,7 @@ private struct InFlightInspector: View {
             Circle()
                 .fill(Color.palette(row.inspectorDot))
                 .frame(width: 7, height: 7)
+                .contrastOutline()
                 .accessibilityHidden(true)
             Text(verbatim: row.statusLine)
                 .font(.system(size: 12))
@@ -251,17 +253,18 @@ private struct InFlightInspector: View {
 }
 
 /// The boards' small bordered button, and its filled accent form.
-private struct PaletteButtonStyle: ButtonStyle {
+struct PaletteButtonStyle: ButtonStyle {
     let height: CGFloat
     let fontSize: CGFloat
     var fillsWidth = false
     var isProminent = false
+    var horizontalPadding: CGFloat = 10
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: fontSize, weight: isProminent ? .semibold : .regular))
             .foregroundStyle(isProminent ? Color.white : .palette(.text))
-            .padding(.horizontal, 10)
+            .padding(.horizontal, horizontalPadding)
             .frame(maxWidth: fillsWidth ? .infinity : nil)
             .frame(height: height)
             .background(Color.palette(isProminent ? .accent : .buttonBackground), in: RoundedRectangle(cornerRadius: 6))

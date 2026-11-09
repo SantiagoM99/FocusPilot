@@ -43,10 +43,10 @@ struct SwitchSheet: View {
                 Spacer()
                 Button("Cancel") { model.switchRequest = nil }
                     .keyboardShortcut(.cancelAction)
+                    .buttonStyle(PaletteButtonStyle(height: 28, fontSize: 13, horizontalPadding: 14))
                 Button("Switch", action: confirm)
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.palette(.accent))
+                    .buttonStyle(PaletteButtonStyle(height: 28, fontSize: 13, isProminent: true, horizontalPadding: 16))
                     .disabled(isSwitching)
             }
         }
