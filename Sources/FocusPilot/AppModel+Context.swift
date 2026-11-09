@@ -90,6 +90,16 @@ extension AppModel {
         await refresh()
     }
 
+    /// The owner clicked one resource in the inspector.
+    func openResource(_ status: ResourceStatus) {
+        let opened = switch status.resource.target {
+        case .folder(let bookmark): Self.open(bookmark)
+        case .webPage(let page): URL(string: page.url).map { NSWorkspace.shared.open($0) } ?? false
+        }
+        contextNoticeOnNowCard = false
+        contextNotice = opened ? nil : "“\(status.resource.name)” didn’t open."
+    }
+
     static func chooseFolder(prompt: String, startingNear path: String? = nil) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true

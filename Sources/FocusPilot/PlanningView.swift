@@ -5,8 +5,8 @@ import SwiftUI
 /// The planning window (redesign 2026-11, Main; #70): a sidebar with Today,
 /// In flight, Projects, Review queue and Settings and a one-line protection
 /// footer, a header with the page title, the date on Today and New Task,
-/// and the quick capture sheet. A selected task shows its Agent section in
-/// the inspector. Colors come from `Palette`.
+/// and the quick capture sheet. Today keeps the task inspector open beside
+/// its list. Colors come from `Palette`.
 struct PlanningView: View {
     static let windowID = "planning"
 
@@ -42,7 +42,7 @@ struct PlanningView: View {
         }
         .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(title)
-        .frame(minWidth: 760, minHeight: 420)
+        .frame(minWidth: 980, minHeight: 520)
         .focusedSceneValue(\.quickCapture, { isCapturing = true })
         .sheet(item: sheet) { sheet in
             switch sheet {
@@ -126,22 +126,19 @@ struct PlanningView: View {
                      undoHerdrAdd: { id in Task { await model.undoHerdrAdd(id) } },
                      activeSessionTaskID: model.snapshot.activeSession?.taskID,
                      selection: $todaySelection)
-                .taskInspector(model: model, items: model.today, selection: $todaySelection,
+                .taskInspector(model: model, task: TaskInspection.shownTask(selection: todaySelection, in: model.today),
                                showReviewQueue: { page = .review })
         }
     }
 }
 
 extension View {
-    /// The selected task's Agent section in an inspector, open while a task
-    /// is selected.
-    func taskInspector(model: AppModel, items: [TodayItem], selection: Binding<Int64?>,
-                       showReviewQueue: @escaping () -> Void) -> some View {
-        inspector(isPresented: Binding(get: { selection.wrappedValue != nil },
-                                       set: { if !$0 { selection.wrappedValue = nil } })) {
-            if let task = items.first(where: { $0.id == selection.wrappedValue }) {
-                TaskAgentInspector(model: model, task: task, showReviewQueue: showReviewQueue)
-                    .inspectorColumnWidth(min: 260, ideal: 300, max: 400)
+    /// `task`'s details in a fixed column on the right, as the board draws it.
+    func taskInspector(model: AppModel, task: TodayItem?, showReviewQueue: @escaping () -> Void) -> some View {
+        HStack(spacing: 0) {
+            frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let task {
+                TaskInspector(model: model, task: task, showReviewQueue: showReviewQueue)
             }
         }
     }

@@ -1,3 +1,4 @@
+import AppKit
 import FocusPilotCore
 import SwiftUI
 
@@ -19,22 +20,30 @@ struct TaskList: View {
     /// For Mark as waiting (#57); absent in previews.
     @Environment(AppModel.self) private var model: AppModel?
 
+    /// A plain list indents row content 8 pt; with this it lands on the
+    /// board's 24 pt margin.
+    private static let rowInsets = EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+
     var body: some View {
         let sections = TaskSections(items)
         // Relative labels ("Due today 17:00", "Overdue …") change with time.
         TimelineView(.everyMinute) { context in
             List(selection: $selection) {
                 if sections.now != nil || showsEmptyNow {
-                    Section {
-                        NowCard(item: sections.now, showsProject: showsProject, now: context.date)
-                            .tag(sections.now?.id)
-                            .listRowSeparator(.hidden)
-                    }
+                    NowCard(item: sections.now, showsProject: showsProject, now: context.date)
+                        .padding(.top, 22)
+                        .tag(sections.now?.id)
+                        .listRowInsets(Self.rowInsets)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                 }
                 section(.next, "Next", sections, context.date)
                 section(.later, "Later", sections, context.date)
             }
-            .listStyle(.inset)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background { Color.palette(.window) }
+            .environment(\.defaultMinListRowHeight, 1)
             .contextMenu(forSelectionType: Int64.self) { ids in
                 if let id = ids.first {
                     Button("Make Current (Now)") { perform(.now, on: id) }
@@ -66,23 +75,29 @@ struct TaskList: View {
                          _ now: Date) -> some View {
         let members = sections.items(in: status)
         if !members.isEmpty {
-            Section {
-                ForEach(members) { item in
-                    TaskRow(item: item, showsProject: showsProject, now: now,
-                            undo: item.offersHerdrUndo(activeSessionTaskID: activeSessionTaskID)
-                                ? undoHerdrAdd.map { undo in { undo(item.id) } } : nil)
+            SectionTitle(title)
+                .padding(EdgeInsets(top: 28, leading: 6, bottom: 6, trailing: 0))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .listRowInsets(Self.rowInsets)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            ForEach(members) { item in
+                TaskRow(item: item, showsProject: showsProject, now: now, isSelected: selection == item.id,
+                        undo: item.offersHerdrUndo(activeSessionTaskID: activeSessionTaskID)
+                            ? undoHerdrAdd.map { undo in { undo(item.id) } } : nil)
+                    .background(NoSystemRowHighlight())
+                    .listRowInsets(Self.rowInsets)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(RoundedRectangle(cornerRadius: 6)
+                        .fill(selection == item.id ? Color.palette(.selectedRow) : .clear)
+                        .padding(.horizontal, 24))
+            }
+            .onMove { offsets, destination in
+                guard let source = offsets.first else { return }
+                let ids = members.map(\.id)
+                if let placement = TaskPlacement.drop(ids[source], at: destination, in: ids) {
+                    move(ids[source], status, placement)
                 }
-                .onMove { offsets, destination in
-                    guard let source = offsets.first else { return }
-                    let ids = members.map(\.id)
-                    if let placement = TaskPlacement.drop(ids[source], at: destination, in: ids) {
-                        move(ids[source], status, placement)
-                    }
-                }
-            } header: {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .textCase(.uppercase)
             }
         }
     }
@@ -112,4 +127,29 @@ struct TaskList: View {
         case .down: return TaskPlacement.down(id, in: visible).map { (id, item.status, $0) }
         }
     }
+}
+
+/// The board tints the selected row in place of the system's accent bar.
+/// SwiftUI has no API for that, so this turns the highlight off on the
+/// table the row sits in; if AppKit's hierarchy changes, the system bar
+/// simply comes back.
+private struct NoSystemRowHighlight: NSViewRepresentable {
+    final class Probe: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            var view = superview
+            while let current = view {
+                if let table = current as? NSTableView {
+                    table.selectionHighlightStyle = .none
+                    return
+                }
+                view = current.superview
+            }
+        }
+    }
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+    func updateNSView(_ view: Probe, context: Context) {}
 }

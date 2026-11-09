@@ -27,6 +27,7 @@ struct PaletteTests {
         (.buttonBorder, "#d1d1d6", "#4a4a50"),
         (.green, "#1f9d55", "#1f9d55"),
         (.amber, "#c77d00", "#c77d00"),
+        (.greenText, "#1f6b3a", "#7fd79c"),
     ])
     func eachTokenIsTheBoardsColor(token: Palette.Token, light: String, dark: String) {
         #expect(Palette.color(token, dark: false).hex == light)

@@ -273,6 +273,19 @@ final class AppModel {
         await refresh()
     }
 
+    /// The owner's Done in the inspector. A failure shows there.
+    func completeTask(_ id: Int64) async {
+        guard let coordinator else { return }
+        do {
+            try await coordinator.completeTask(id)
+            agentNotice = nil
+        } catch {
+            agentNotice = "Could not mark the task done: \(error.localizedDescription)"
+            return
+        }
+        await refresh()
+    }
+
     func importHerdrWorkspaces(_ workspaces: [HerdrWorkspace], on server: HerdrServer) async {
         await perform("Could not import the workspaces") {
             try await $0.importHerdrWorkspaces(workspaces, on: server)

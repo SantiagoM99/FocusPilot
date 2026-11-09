@@ -18,6 +18,8 @@ public enum Palette {
         case buttonBackground, buttonBorder
         /// Status dots.
         case green, amber
+        /// "Results ready" beside its green dot.
+        case greenText
     }
 
     public struct RGB: Equatable, Sendable {
@@ -78,6 +80,7 @@ public enum Palette {
         .buttonBorder: (0xd1d1d6, 0x4a4a50),
         .green: (0x1f9d55, 0x1f9d55),
         .amber: (0xc77d00, 0xc77d00),
+        .greenText: (0x1f6b3a, 0x7fd79c),
     ]
 
     /// Increased Contrast: darker (or lighter) text, borders and selection;

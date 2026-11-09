@@ -15,7 +15,7 @@ public actor FocusCoordinator {
         case noCurrentTask
         /// A project chosen for a session is no longer there.
         case unknownProject
-        /// A wrap-up was asked for a session that is still running or paused.
+        /// A wrap-up or Done was asked for a session or task still in focus.
         case sessionStillActive
     }
 
@@ -135,6 +135,17 @@ public actor FocusCoordinator {
     /// Only called for the owner's own actions.
     public func moveTask(_ id: Int64, to status: TaskStatus, _ placement: TaskPlacement) async throws {
         try await repository.moveTask(id, to: status, placement)
+        await followNowAfterTaskChange()
+        await broadcast()
+    }
+
+    /// The owner's Done. A task a session is running on ends through that
+    /// session's Complete, so its wrap-up is not lost.
+    public func completeTask(_ id: Int64) async throws {
+        if let current = session, !current.hasEnded, current.taskID == id {
+            throw SessionError.sessionStillActive
+        }
+        try await repository.completeTask(id)
         await followNowAfterTaskChange()
         await broadcast()
     }

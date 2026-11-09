@@ -135,6 +135,20 @@ public actor TaskRepository {
         }
     }
 
+    /// Marks a task done, by the rule in `TaskOrder.complete`, all in one write.
+    public func completeTask(_ id: Int64) async throws {
+        let updatedAt = now()
+        try await ownerDatabase.write { db in
+            let positions = try Row.fetchAll(db, sql: "SELECT id, status, rank FROM task")
+                .map { TaskPosition(id: $0["id"], status: TaskStatus(rawValue: $0["status"])!, rank: $0["rank"]) }
+            for change in TaskOrder.complete(id, in: positions) {
+                try db.execute(sql: """
+                    UPDATE task SET status = ?, rank = ?, revision = revision + 1, updatedAt = ? WHERE id = ?
+                    """, arguments: [change.status.rawValue, change.rank, updatedAt, change.id])
+            }
+        }
+    }
+
     /// The pinned Now task, if the owner chose one.
     public func nowTask() async throws -> TodayItem? {
         try await ownerDatabase.read { db in
