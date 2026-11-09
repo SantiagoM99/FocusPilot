@@ -16,7 +16,7 @@ struct PlanningSidebar: View {
                 row(.today, "Today", "sun.max")
                 row(.inFlight, "In flight", "arrow.turn.up.right", count: model.attention.count)
                 row(.projects, "Projects", "folder")
-                row(.review, "Review queue", "tray", count: model.reviewItems.count)
+                row(.review, "Review queue", "tray", count: model.inFlightBoard.results.count)
                 row(.settings, "Settings", "gearshape")
             }
             .padding(.horizontal, 10)

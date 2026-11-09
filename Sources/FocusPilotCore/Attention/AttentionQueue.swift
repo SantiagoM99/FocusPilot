@@ -102,7 +102,11 @@ public enum AttentionQueue {
         if let report = item.report {
             return (report.projectID != nil && report.projectID == nowProject ? 0 : 1, .distantFuture)
         }
-        let task = item.taskID.flatMap { open[$0] }
+        return rank(item.taskID.flatMap { open[$0] })
+    }
+
+    /// The task's place (Now, then Next, then Later), then its deadline.
+    static func rank(_ task: TodayItem?) -> (priority: Int, deadline: Date) {
         let priority = switch task?.status {
         case .now: 0
         case .next: 1

@@ -1,7 +1,7 @@
 import FocusPilotCore
 import SwiftUI
 
-/// A helper agent's report in Needs you (#67): who sent it, its summary,
+/// A helper agent's report (#67), in the In flight inspector: its summary
 /// and any proposed message, shown exactly as it would be sent. Accept
 /// sends that text to that agent, after FocusPilot checks the agent again;
 /// Dismiss discards the report. Report text is plain text, never markup.
@@ -42,49 +42,30 @@ struct ReportRow: View {
 
     private var full: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: "text.bubble.fill")
-                    .foregroundStyle(.purple)
-                    .frame(width: 18)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: item.headline)
-                        .fontWeight(.medium)
-                    Text(verbatim: item.place)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    if let claimed = report.claimedName {
-                        // Free text from the sender, never its identity.
-                        Text(verbatim: "Calls itself “\(claimed)”")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    WaitedText(item: item, now: model.attentionTime)
-                }
-                Spacer(minLength: 8)
+            if let claimed = report.claimedName {
+                // Free text from the sender, never its identity.
+                Text(verbatim: "Calls itself “\(claimed)”")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
             Text(verbatim: report.summary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.leading, 28)
             if let proposal = report.proposal {
                 proposalView(proposal)
-                    .padding(.leading, 28)
-            }
+                }
             if report.outcomeUnknown {
                 Label(AcceptRefusal.outcomeUnknownText(report.proposal?.target?.label ?? report.proposal?.targetAsGiven ?? "the agent"),
                       systemImage: "questionmark.diamond.fill")
                     .font(.callout)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 28)
-            } else if let notice = model.reportNotices[report.id] {
+                } else if let notice = model.reportNotices[report.id] {
                 Label(notice, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 28)
-            }
+                }
             HStack {
                 Spacer()
                 Button("Dismiss") { Task { await model.dismissReport(report.id) } }
@@ -98,8 +79,6 @@ struct ReportRow: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
         .accessibilityElement(children: .contain)
     }
 

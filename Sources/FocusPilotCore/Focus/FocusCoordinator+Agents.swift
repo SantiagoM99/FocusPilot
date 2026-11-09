@@ -78,8 +78,23 @@ extension FocusCoordinator {
     /// The target is revalidated right before: same server instance, same
     /// pane, same agent. Its status is recorded first, because focusing marks
     /// a finished agent as seen and Herdr then reports it as idle.
-    public func openAgent(_ linkID: Int64) async -> OpenAgentResult {
-        await oneAgentReadingAtATime { await self.focusAgent(linkID) }
+    ///
+    /// `item` is the queued result or approval the owner opened it from. Only
+    /// a pane that really opened settles it: a result whose agent is gone
+    /// stays, so its output can still be read. An approval stays until Herdr
+    /// says the agent moved on.
+    public func openAgent(_ linkID: Int64, handling item: AttentionItem.ID? = nil) async -> OpenAgentResult {
+        let result = await oneAgentReadingAtATime { await self.focusAgent(linkID) }
+        if result == .opened, case .review(let id) = item { await settleOpened(id) }
+        return result
+    }
+
+    private func settleOpened(_ id: Int64) async {
+        try? await repository.noteOwnerReached(id)
+        if (try? await repository.reviewQueue().contains { $0.id == id && $0.kind == .finished }) == true {
+            try? await repository.markReviewed(id)
+        }
+        await broadcast()
     }
 
     private func focusAgent(_ linkID: Int64) async -> OpenAgentResult {

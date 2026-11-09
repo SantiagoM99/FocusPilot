@@ -31,7 +31,7 @@ final class AppModel {
     private(set) var reports: [AgentReport] = []
     /// Why the last Accept sent nothing, by report.
     var reportNotices: [Int64: String] = [:]
-    private(set) var inFlight: [InFlightProject] = []
+    private(set) var inFlightBoard = InFlightBoard()
     /// The time waiting times are shown for; moves once a minute.
     private(set) var attentionTime = Date.now
     /// A Switch the owner clicked, shown as a sheet until confirmed or cancelled.
@@ -253,7 +253,7 @@ final class AppModel {
     func recomputeAttention() {
         attentionTime = .now
         attention = AttentionQueue.items(tasks: today, reviews: reviewItems, waiting: waiting, reports: reports, now: attentionTime)
-        inFlight = InFlight.projects(tasks: today, links: agentLinks, reviews: reviewItems, waiting: waiting, now: attentionTime)
+        inFlightBoard = InFlight.board(tasks: today, links: agentLinks, reviews: reviewItems, waiting: waiting, reports: reports, now: attentionTime)
     }
 
     func showProject(_ id: ProjectSummary.ID) async {
@@ -329,9 +329,9 @@ final class AppModel {
     /// The owner clicked Open agent: focuses that agent's pane in Herdr.
     /// This is the only path to a Herdr focus, and it never restores the
     /// previous one afterwards.
-    func openAgent(_ linkID: Int64) async {
+    func openAgent(_ linkID: Int64, handling item: AttentionItem.ID? = nil) async {
         guard let coordinator else { return }
-        agentNotice = Self.notice(await coordinator.openAgent(linkID))
+        agentNotice = Self.notice(await coordinator.openAgent(linkID, handling: item))
         await refresh()
     }
 

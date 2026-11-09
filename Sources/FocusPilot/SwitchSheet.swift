@@ -1,8 +1,8 @@
 import FocusPilotCore
 import SwiftUI
 
-/// Switch (decision 0004): one optional line about where the owner left
-/// off, saved as the current task's return cue; then the target becomes Now
+/// Switch (decision 0004; redesign, Parallel board at 14:13): one optional
+/// line about where the owner left off, saved as the current task's return cue; then the target becomes Now
 /// and its agent opens. Return confirms, Esc cancels and changes nothing.
 struct SwitchSheet: View {
     let model: AppModel
@@ -17,34 +17,41 @@ struct SwitchSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Switch to “\(request.taskTitle)”")
-                    .font(.headline)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: "Switch to \(request.taskTitle)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let current {
+                    Text(verbatim: "Leaving \(current.title)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.palette(.secondaryText))
+                }
             }
-            if let current {
-                VStack(alignment: .leading, spacing: 4) {
+            if current != nil {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Where did you leave off?")
-                    TextField("Optional", text: $note, axis: .vertical)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.palette(.secondaryText))
+                    TextField("Where did you leave off?", text: $note, prompt: Text(verbatim: ""))
                         .labelsHidden()
-                        .accessibilityLabel("Where did you leave off?")
-                        .lineLimit(1...3)
                         .textFieldStyle(.roundedBorder)
                         .focused($isNoteFocused)
                         .onSubmit(confirm)
                 }
             }
-            HStack {
+            HStack(spacing: 8) {
                 Spacer()
                 Button("Cancel") { model.switchRequest = nil }
                     .keyboardShortcut(.cancelAction)
                 Button("Switch", action: confirm)
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
+                    .tint(.palette(.accent))
                     .disabled(isSwitching)
             }
         }
-        .padding(20)
-        .frame(width: 460)
+        .padding(EdgeInsets(top: 18, leading: 20, bottom: 18, trailing: 20))
+        .frame(width: 340)
         .onAppear { isNoteFocused = true }
     }
 

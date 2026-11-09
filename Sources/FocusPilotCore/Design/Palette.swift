@@ -17,7 +17,9 @@ public enum Palette {
         case badge, badgeText
         case buttonBackground, buttonBorder
         /// Status dots.
-        case green, amber
+        case green, amber, idleDot
+        /// "WAITING ON YOU" and "Results ready" on In flight.
+        case amberText, greenText
     }
 
     public struct RGB: Equatable, Sendable {
@@ -78,6 +80,9 @@ public enum Palette {
         .buttonBorder: (0xd1d1d6, 0x4a4a50),
         .green: (0x1f9d55, 0x1f9d55),
         .amber: (0xc77d00, 0xc77d00),
+        .idleDot: (0xaeaeb2, 0x8e8e93),
+        .amberText: (0x8a4b00, 0xe0a458),
+        .greenText: (0x1f6b3a, 0x7fd79c),
     ]
 
     /// Increased Contrast: darker (or lighter) text, borders and selection;
@@ -85,7 +90,7 @@ public enum Palette {
     private static let increasedLight: [Token: UInt32] = [
         .text: 0x000000, .secondaryText: 0x3a3a3c, .footerText: 0x1d1d1f,
         .sidebarSelection: 0xc7c7cc, .sidebarBorder: 0x8e8e93, .separator: 0x8e8e93, .buttonBorder: 0x6e6e73,
-        .badge: 0x3a3a3c, .nowLabel: 0x1f3a63,
+        .badge: 0x3a3a3c, .nowLabel: 0x1f3a63, .amberText: 0x6b3a00, .greenText: 0x14522b,
     ]
     private static let increasedDark: [Token: UInt32] = [
         .text: 0xffffff, .secondaryText: 0xd1d1d6, .footerText: 0xe5e5ea,

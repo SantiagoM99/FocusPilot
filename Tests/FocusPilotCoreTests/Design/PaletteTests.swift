@@ -27,6 +27,9 @@ struct PaletteTests {
         (.buttonBorder, "#d1d1d6", "#4a4a50"),
         (.green, "#1f9d55", "#1f9d55"),
         (.amber, "#c77d00", "#c77d00"),
+        (.amberText, "#8a4b00", "#e0a458"),
+        (.greenText, "#1f6b3a", "#7fd79c"),
+        (.idleDot, "#aeaeb2", "#8e8e93"),
     ])
     func eachTokenIsTheBoardsColor(token: Palette.Token, light: String, dark: String) {
         #expect(Palette.color(token, dark: false).hex == light)
@@ -40,6 +43,7 @@ struct PaletteTests {
         let pairs: [(Palette.Token, Palette.Token)] = [
             (.text, .window), (.text, .sidebar), (.text, .sidebarSelection), (.text, .selectedRow), (.text, .nowTint),
             (.secondaryText, .window), (.secondaryText, .sidebar), (.footerText, .sidebar), (.badgeText, .badge),
+            (.amberText, .window), (.greenText, .inspector),
         ]
         for (text, surface) in pairs {
             let normal = Palette.color(text, dark: dark).contrast(with: Palette.color(surface, dark: dark))

@@ -178,15 +178,54 @@ struct SwitchTests {
         _ = try await coordinator.linkAgent(agent(.working, pane: "w4:p2"), on: herdrServer, workspaceLabel: nil, toTask: target)
         herdr.set(.connected(herdrServer, [agent(.done, pane: "w4:p2")]))
         _ = await coordinator.refreshHerdrAgents()
-        let thread = try #require(InFlight.projects(tasks: try await coordinator.todayTasks(),
-                                                    links: try await coordinator.agentLinks(),
-                                                    reviews: try await coordinator.reviewQueue(), waiting: [],
-                                                    now: clock.now).first?.threads.first)
-        let request = SwitchRequest(thread)
+        let row = try #require(InFlight.board(tasks: try await coordinator.todayTasks(),
+                                              links: try await coordinator.agentLinks(),
+                                              reviews: try await coordinator.reviewQueue(), waiting: [],
+                                              now: clock.now).waitingOnYou.first)
+        let request = try #require(row.switchRequest)
 
         _ = try await coordinator.switchTo(request.taskID, note: nil, openingAgent: request.linkID, handling: request.item)
 
-        #expect(thread.state == .finished)
+        #expect(row.status == .resultsReady)
         #expect(try await coordinator.reviewQueue().isEmpty)
+    }
+
+    private func linkedAgent(reaching status: HerdrAgentStatus) async throws -> (link: Int64, item: Int64) {
+        let target = try await task("Run ablation")
+        let link = try await coordinator.linkAgent(agent(.working, pane: "w4:p2"), on: herdrServer, workspaceLabel: nil, toTask: target)
+        herdr.set(.connected(herdrServer, [agent(status, pane: "w4:p2")]))
+        _ = await coordinator.refreshHerdrAgents()
+        return (link.id, try #require(try await coordinator.reviewQueue().first?.id))
+    }
+
+    // Decision 0004: a result leaves the queue on Open agent.
+    @Test func openingAgentMarksItsResultReviewed() async throws {
+        let queued = try await linkedAgent(reaching: .done)
+
+        #expect(await coordinator.openAgent(queued.link, handling: .review(queued.item)) == .opened)
+
+        #expect(try await coordinator.reviewQueue().isEmpty)
+    }
+
+    // The owner must still be able to read a result whose agent has gone.
+    @Test func aResultStaysWhenItsAgentCouldNotBeOpened() async throws {
+        let queued = try await linkedAgent(reaching: .done)
+        herdr.set(.connected(herdrServer, []))
+
+        #expect(await coordinator.openAgent(queued.link, handling: .review(queued.item)) == .notFound)
+
+        #expect(try await coordinator.reviewQueue().map(\.id) == [queued.item])
+    }
+
+    // FocusPilot never answers approvals: only Herdr's status clears one.
+    @Test func openingAnApprovalLeavesItWaitingButEndsTheOwnersWait() async throws {
+        let queued = try await linkedAgent(reaching: .blocked)
+        clock.set(clock.now.addingTimeInterval(5 * 60))
+
+        #expect(await coordinator.openAgent(queued.link, handling: .review(queued.item)) == .opened)
+
+        #expect(try await coordinator.reviewQueue().map(\.id) == [queued.item])
+        let waits = try await coordinator.pilotEvents(since: .distantPast).filter { $0.kind == .agentWait }
+        #expect(waits.map(\.duration) == [5 * 60])
     }
 }

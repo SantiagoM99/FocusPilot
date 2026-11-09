@@ -27,11 +27,7 @@ public struct SwitchRequest: Hashable, Sendable, Identifiable {
     }
 
     public init(_ thread: InFlightThread) {
-        let item: AttentionItem.ID? = switch thread.id {
-        case .agent: thread.reviewID.map(AttentionItem.ID.review)
-        case .waiting(let taskID): thread.state == .needsYou ? .check(taskID) : nil
-        }
         self.init(taskID: thread.taskID, taskTitle: thread.taskTitle, linkID: thread.linkID,
-                  agentLabel: thread.linkID == nil ? nil : thread.label, item: item)
+                  agentLabel: thread.linkID == nil ? nil : thread.label, item: nil)
     }
 }

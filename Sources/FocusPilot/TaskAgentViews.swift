@@ -36,7 +36,7 @@ struct TaskAgentInspector: View {
                 } else {
                     ForEach(links) { link in
                         AgentLinkView(model: model, link: link,
-                                      reviewCount: model.reviewItems.filter { $0.linkID == link.id }.count,
+                                      reviewCount: model.reviewItems.filter { $0.linkID == link.id && $0.kind == .finished }.count,
                                       showReviewQueue: showReviewQueue)
                     }
                 }
